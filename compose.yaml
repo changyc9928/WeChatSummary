@@ -1,0 +1,40 @@
+services:
+  rabbitmq:
+    image: rabbitmq:latest
+    environment:
+      - RABBITMQ_DEFAULT_USER=myuser
+      - RABBITMQ_DEFAULT_PASS=secret
+    ports:
+      - "45672:5672"
+
+  redis:
+    image: redis:latest
+    ports:
+      - "46379:6379"
+
+  postgres:
+    image: postgres:16
+    environment:
+      POSTGRES_USER: myuser
+      POSTGRES_PASSWORD: secret
+      POSTGRES_DB: wechat
+    ports:
+      - "45432:5432"
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+
+  local-api:
+    image: localai/localai:latest-aio-cpu
+    container_name: local-ai
+    ports:
+      - "58080:8080"
+    environment:
+      - MODELS_PATH=/models
+      - CONTEXT_SIZE=512
+    volumes:
+      - models:/models
+    restart: always
+
+volumes:
+  pgdata:
+  models:

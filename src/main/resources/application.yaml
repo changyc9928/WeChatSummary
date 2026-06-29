@@ -1,0 +1,51 @@
+spring:
+  application:
+    name: WeChatSummary
+
+  servlet:
+    multipart:
+      max-file-size: 500MB
+      max-request-size: 500MB
+
+  data:
+    redis:
+      host: localhost
+      port: 46379
+
+  rabbitmq:
+    host: localhost
+    port: 45672
+    username: myuser
+    password: secret
+
+  datasource:
+    url: jdbc:postgresql://localhost:45432/wechat
+    username: myuser
+    password: secret
+    driver-class-name: org.postgresql.Driver
+
+  flyway:
+    enabled: true
+    locations: classpath:db/migration
+
+  ai:
+    openai:
+      api-key: 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
+      base-url: https://integrate.api.nvidia.com/v1/
+      chat:
+        options:
+          model: meta/llama-4-maverick-17b-128e-instruct
+      audio:
+        transcription:
+          base-url: http://localhost:58080/v1/ # 指向本地 Docker
+          api-key: text-not-empty             # LocalAI 不需要 key，但 Spring AI 校验不能为空，随便填
+          options:
+            model: whisper-1
+
+  jpa:
+    hibernate:
+      naming:
+        physical-strategy: org.hibernate.boot.model.naming.CamelCaseToUnderscoresNamingStrategy
+
+storage:
+  upload-dir: ${HOME}/uploads
