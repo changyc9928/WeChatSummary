@@ -23,18 +23,17 @@ services:
     volumes:
       - pgdata:/var/lib/postgresql/data
 
-  local-api:
-    image: localai/localai:latest-aio-cpu
-    container_name: local-ai
+  whisper-api:
+    image: fedirz/faster-whisper-server:latest-cpu
+    container_name: whisper-api
+    restart: unless-stopped
     ports:
-      - "58080:8080"
+      - "48000:8000"
     environment:
-      - MODELS_PATH=/models
-      - CONTEXT_SIZE=512
+      - WHISPER_MODEL=large-v3  # 可选: tiny, base, small, medium, large-v3
     volumes:
-      - models:/models
-    restart: always
+      - whisper_models:/root/.cache/huggingface # 挂载模型目录，避免每次重启重复下载
 
 volumes:
   pgdata:
-  models:
+  whisper_models:

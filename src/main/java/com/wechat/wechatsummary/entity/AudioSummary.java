@@ -1,8 +1,10 @@
 package com.wechat.wechatsummary.entity;
 
-import jakarta.persistence.*;
-import lombok.Data;
+import jakarta.persistence.Entity;
+import jakarta.persistence.Id;
+import jakarta.persistence.Table;
 import java.time.LocalDateTime;
+import lombok.Data;
 
 @Data
 @Entity

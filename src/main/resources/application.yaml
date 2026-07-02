@@ -30,17 +30,24 @@ spring:
 
   ai:
     openai:
-      api-key: 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
-      base-url: https://integrate.api.nvidia.com/v1/
+      api-key: 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
+      base-url: https://integrate.api.nvidia.com
       chat:
         options:
-          model: meta/llama-4-maverick-17b-128e-instruct
+          model: deepseek-ai/deepseek-v4-pro
+          timeout: 60m
       audio:
         transcription:
-          base-url: http://localhost:58080/v1/ # 指向本地 Docker
-          api-key: text-not-empty             # LocalAI 不需要 key，但 Spring AI 校验不能为空，随便填
+          timeout: 60m
+          base-url: http://localhost:48000/v1/
           options:
-            model: whisper-1
+            model: large-v3
+
+custom-ai:
+  multimodal:
+    base-url: https://integrate.api.nvidia.com/v1
+    api-key: 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
+    model: moonshotai/kimi-k2.6
 
   jpa:
     hibernate:

@@ -32,15 +32,16 @@ public class UploadController {
         }
 
         try {
+            // 1. 接收 Service 层返回的 UUID
+            String uuid = zipExtractionService.upload(file);
 
-            zipExtractionService.upload(file);
-
-            return ResponseEntity.ok(
-                "Extracted files"
-            );
+            // 2. 将 UUID 返回给前端（如果前端需要 JSON 格式，也可以后续包成一个 DTO）
+            return ResponseEntity.ok(uuid);
 
         } catch (Exception e) {
-            log.debug(e.getMessage());
+            // 顺手改个小细节：上传/解压失败一般是比较严重的错误，
+            // 建议用 log.error 记录异常堆栈，方便排查问题（比如权限不足、压缩包损坏等）
+            log.error("Failed to process uploaded zip file", e);
 
             return ResponseEntity.internalServerError()
                 .body("Upload failed: " + e.getMessage());

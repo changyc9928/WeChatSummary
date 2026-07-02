@@ -20,7 +20,9 @@ public class ImageListener {
     public void receive(String message) {
         log.info("Received image message: {}", message);
         String[] parts = message.split(":", 2);
-        if (parts.length < 2) return;
+        if (parts.length < 2) {
+            return;
+        }
 
         String uuid = parts[0];
         String filePath = parts[1];
@@ -28,7 +30,8 @@ public class ImageListener {
         try {
             imageProcessorService.processImage(filePath);
         } catch (Exception e) {
-            log.error("Failed to process image file, path: {}. Skipping and releasing lock.", filePath, e);
+            log.error("Failed to process image file, path: {}. Skipping and releasing lock.",
+                filePath, e);
         } finally {
             // 确保归零触发
             coordinatorService.completeTask(uuid);

@@ -9,5 +9,6 @@ import org.springframework.stereotype.Component;
 @Component
 @Data
 public class StorageConfig {
+
     private Path uploadDir;
 }

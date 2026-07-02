@@ -2,12 +2,12 @@ package com.wechat.wechatsummary.service;
 
 import com.wechat.wechatsummary.config.RabbitConfig;
 import com.wechat.wechatsummary.config.StorageConfig;
-import lombok.extern.slf4j.Slf4j;
 import java.io.IOException;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.util.Optional;
 import java.util.stream.Stream;
+import lombok.extern.slf4j.Slf4j;
 import org.springframework.amqp.rabbit.core.RabbitTemplate;
 import org.springframework.stereotype.Service;
 
@@ -35,7 +35,8 @@ public class MediaProducerService {
         try (Stream<Path> list = Files.list(baseDir)) {
             Optional<Path> jsonFile = list.filter(p -> p.toString().endsWith(".json")).findFirst();
             if (jsonFile.isEmpty()) {
-                throw new RuntimeException("在目录 " + baseDir + " 下未找到任何聊天记录 JSON 原始文件！");
+                throw new RuntimeException(
+                    "在目录 " + baseDir + " 下未找到任何聊天记录 JSON 原始文件！");
             }
             inputJsonPath = jsonFile.get().toAbsolutePath().toString();
         }
@@ -67,19 +68,24 @@ public class MediaProducerService {
     }
 
     private int countFiles(Path dir) throws IOException {
-        if (!Files.exists(dir)) return 0;
+        if (!Files.exists(dir)) {
+            return 0;
+        }
         try (Stream<Path> paths = Files.walk(dir)) {
             return (int) paths.filter(Files::isRegularFile).count();
         }
     }
 
     private void scanAndPublish(String uuid, Path dir, String routingKey) throws IOException {
-        if (!Files.exists(dir)) return;
+        if (!Files.exists(dir)) {
+            return;
+        }
         try (Stream<Path> paths = Files.walk(dir)) {
             paths.filter(Files::isRegularFile)
                 .forEach(file -> {
                     String messagePayload = uuid + ":" + file.toAbsolutePath().toString();
-                    rabbitTemplate.convertAndSend(RabbitConfig.EXCHANGE, routingKey, messagePayload);
+                    rabbitTemplate.convertAndSend(RabbitConfig.EXCHANGE, routingKey,
+                        messagePayload);
                 });
         }
     }

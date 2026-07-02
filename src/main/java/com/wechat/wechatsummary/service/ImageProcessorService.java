@@ -9,6 +9,7 @@ import java.nio.file.Paths;
 import java.security.MessageDigest;
 import java.time.Instant;
 import java.util.HexFormat;
+import java.util.Optional;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.ai.chat.client.ChatClient;
@@ -16,6 +17,7 @@ import org.springframework.ai.chat.messages.UserMessage;
 import org.springframework.ai.chat.model.ChatResponse;
 import org.springframework.ai.chat.prompt.Prompt;
 import org.springframework.ai.content.Media;
+import org.springframework.beans.factory.annotation.Qualifier;
 import org.springframework.retry.support.RetryTemplate;
 import org.springframework.stereotype.Service;
 import org.springframework.util.MimeType;
@@ -25,68 +27,51 @@ import org.springframework.util.MimeType;
 @Slf4j
 public class ImageProcessorService {
 
+    @Qualifier("multimodalChatClient")
     private final ChatClient chatClient;
     private final ImageSummaryCacheService cacheService;
     private final ImageSummaryRepository imageSummaryRepository;
 
-    // 🧠 声明一个专用的重试模板
     private final RetryTemplate aiRetryTemplate = RetryTemplate.builder()
-        .maxAttempts(4)          // 最多重试 4 次
-        .exponentialBackoff(2000, 2.0, 10000) // 初始 2s, 每次翻倍 (2s -> 4s -> 8s), 最大 10s
-        .retryOn(Exception.class) // 遇到任何异常（包括 429/503 抛出的异常）都重试
+        .maxAttempts(4)
+        .exponentialBackoff(2000, 2.0, 10000)
+        .retryOn(Exception.class)
         .build();
 
     public void processImage(String filePath) {
-
         try {
             Path path = Paths.get(filePath);
-
             if (!Files.exists(path)) {
                 log.warn("File does not exist: {}", filePath);
                 return;
             }
 
             byte[] imageBytes = Files.readAllBytes(path);
-
             if (imageBytes.length > 5_000_000) {
                 log.warn("Image too large: {}", filePath);
                 return;
             }
 
-            // 保留你原汁原味的设计：基于文件路径计算 Hash
             String hash = sha256(filePath);
 
-            // =========================
-            // 1. CACHE (Redis)
-            // =========================
-            var cached = cacheService.get(hash);
-            if (cached.isPresent()) {
-                log.info("Cache hit for image: {}", filePath);
-                return;
+            // =======================================================
+            // 💡 1 & 2. 自动化缓存拦截（Redis Hit 直接返回 / DB Hit 自动回填 Redis 并在下一行返回）
+            // =======================================================
+            Optional<String> existingSummary = cacheService.getSummary(hash);
+            if (existingSummary.isPresent()) {
+                log.info("【命中缓存/持久层】图片已被处理过，无需调用 AI. File: {}", filePath);
+                return; // 直接结束，完美拦截
             }
 
-            // =========================
-            // 2. DATABASE (Postgres - source of truth)
-            // =========================
-            ImageSummaryEntity dbResult = imageSummaryRepository.findByImageHash(hash);
-
-            if (dbResult != null) {
-                log.info("DB hit for image: {}", filePath);
-                cacheService.put(hash, dbResult.getSummary());
-                return;
-            }
-
-            // =========================
-            // 3. AI PROCESSING (带 429/503 弹性重试)
-            // =========================
+            // =======================================================
+            // 3. AI PROCESSING (缓存未命中，开始昂贵的 AI 算力调用)
+            // =======================================================
             String mimeType = Files.probeContentType(path);
             if (mimeType == null) {
                 mimeType = "image/jpeg";
             }
-
             String finalMimeType = mimeType;
 
-            // 使用重试模板包裹 AI 调用逻辑
             String summary = aiRetryTemplate.execute(context -> {
                 if (context.getRetryCount() > 0) {
                     log.warn("AI API failed, retrying... Attempt #{}", context.getRetryCount() + 1);
@@ -119,9 +104,9 @@ public class ImageProcessorService {
                 return;
             }
 
-            // =========================
-            // 4. SAVE TO POSTGRES
-            // =========================
+            // =======================================================
+            // 4. 保存到 Postgres (Source of Truth)
+            // =======================================================
             ImageSummaryEntity entity = new ImageSummaryEntity();
             entity.setId(hash);
             entity.setImageHash(hash);
@@ -131,10 +116,10 @@ public class ImageProcessorService {
 
             imageSummaryRepository.save(entity);
 
-            // =========================
-            // 5. CACHE RESULT
-            // =========================
-            cacheService.put(hash, summary);
+            // =======================================================
+            // 5. 同步写入 Redis 缓存
+            // =======================================================
+            cacheService.putSummary(hash, summary);
 
             log.info("Processed image successfully: {}", filePath);
 
@@ -143,7 +128,6 @@ public class ImageProcessorService {
         }
     }
 
-    // 保持你原有的路径 Hash 计算逻辑
     private String sha256(String input) {
         try {
             MessageDigest digest = MessageDigest.getInstance("SHA-256");

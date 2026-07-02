@@ -6,6 +6,7 @@ import lombok.Data;
 @Data
 @JsonIgnoreProperties(ignoreUnknown = true)
 public class WeChatMessageDto {
+
     private Long localId;
     private String platformMessageId;
     private Long createTime;
