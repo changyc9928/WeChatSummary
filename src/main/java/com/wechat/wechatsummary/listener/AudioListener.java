@@ -1,7 +1,7 @@
 package com.wechat.wechatsummary.listener;
 
 import com.wechat.wechatsummary.config.RabbitConfig;
-import com.wechat.wechatsummary.service.AudioSummaryService;
+import com.wechat.wechatsummary.service.AudioProcessorService;
 import com.wechat.wechatsummary.service.TaskTaskCoordinatorService;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
@@ -13,7 +13,7 @@ import org.springframework.stereotype.Component;
 @Slf4j
 public class AudioListener {
 
-    private final AudioSummaryService audioSummaryService;
+    private final AudioProcessorService audioSummaryService;
     private final TaskTaskCoordinatorService coordinatorService;
 
     @RabbitListener(queues = RabbitConfig.AUDIO_QUEUE)

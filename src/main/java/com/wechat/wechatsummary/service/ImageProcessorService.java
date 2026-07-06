@@ -12,101 +12,86 @@ import java.util.HexFormat;
 import java.util.Optional;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
-import org.springframework.ai.chat.client.ChatClient;
-import org.springframework.ai.chat.messages.UserMessage;
-import org.springframework.ai.chat.model.ChatResponse;
-import org.springframework.ai.chat.prompt.Prompt;
-import org.springframework.ai.content.Media;
-import org.springframework.beans.factory.annotation.Qualifier;
-import org.springframework.retry.support.RetryTemplate;
 import org.springframework.stereotype.Service;
-import org.springframework.util.MimeType;
 
+/**
+ * Service orchestration class responsible for managing the end-to-end image processing lifecycle.
+ * Coordinates validation, lookup checks between the cache and persistence layers, and coordinates
+ * multimodal AI vision requests for image description and text extraction.
+ */
 @Service
 @RequiredArgsConstructor
 @Slf4j
 public class ImageProcessorService {
 
-    @Qualifier("multimodalChatClient")
-    private final ChatClient chatClient;
-    private final ImageSummaryCacheService cacheService;
+    private final AiService imageAiSummaryService;
+    private final WeChatSummaryCacheService cacheService;
     private final ImageSummaryRepository imageSummaryRepository;
 
-    private final RetryTemplate aiRetryTemplate = RetryTemplate.builder()
-        .maxAttempts(4)
-        .exponentialBackoff(2000, 2.0, 10000)
-        .retryOn(Exception.class)
-        .build();
-
+    /**
+     * Processes an image file by checking caches, parsing data payloads, probing media types,
+     * routing payloads to multimodal AI frameworks, and securely persisting results.
+     *
+     * <p>Gracefully catches and logs unexpected pipeline exceptions to prevent runtime cascading
+     * failures.</p>
+     *
+     * @param filePath system path pointing to the targeted image file resource
+     */
     public void processImage(String filePath) {
+        log.info("Initiating image processing pipeline execution for target file: [{}]", filePath);
         try {
             Path path = Paths.get(filePath);
+
             if (!Files.exists(path)) {
-                log.warn("File does not exist: {}", filePath);
+                log.warn("Image file validation failed. Target resource does not exist on disk: {}",
+                    filePath);
                 return;
             }
 
             byte[] imageBytes = Files.readAllBytes(path);
+
+            // Constraint Check: 5MB maximum file payload ceiling
             if (imageBytes.length > 5_000_000) {
-                log.warn("Image too large: {}", filePath);
+                log.warn(
+                    "Image analysis aborted. Payload size ({} bytes) exceeds the allowed 5MB structural limit for file: {}",
+                    imageBytes.length, filePath);
                 return;
             }
 
             String hash = sha256(filePath);
 
-            // =======================================================
-            // 💡 1 & 2. 自动化缓存拦截（Redis Hit 直接返回 / DB Hit 自动回填 Redis 并在下一行返回）
-            // =======================================================
-            Optional<String> existingSummary = cacheService.getSummary(hash);
+            // Layered Cache & DB Verification Check
+            Optional<String> existingSummary = cacheService.getImageSummary(hash);
             if (existingSummary.isPresent()) {
-                log.info("【命中缓存/持久层】图片已被处理过，无需调用 AI. File: {}", filePath);
-                return; // 直接结束，完美拦截
-            }
-
-            // =======================================================
-            // 3. AI PROCESSING (缓存未命中，开始昂贵的 AI 算力调用)
-            // =======================================================
-            String mimeType = Files.probeContentType(path);
-            if (mimeType == null) {
-                mimeType = "image/jpeg";
-            }
-            String finalMimeType = mimeType;
-
-            String summary = aiRetryTemplate.execute(context -> {
-                if (context.getRetryCount() > 0) {
-                    log.warn("AI API failed, retrying... Attempt #{}", context.getRetryCount() + 1);
-                }
-
-                var userMessage = new UserMessage(
-                    "Describe this image in a short sentence. If there is text, extract all text accurately."
-                );
-
-                userMessage.getMedia().add(
-                    Media.builder()
-                        .mimeType(MimeType.valueOf(finalMimeType))
-                        .data(imageBytes)
-                        .build()
-                );
-
-                Prompt prompt = new Prompt(userMessage);
-                ChatResponse response = chatClient.prompt(prompt).call().chatResponse();
-
-                if (response == null || response.getResult() == null
-                    || response.getResult().getOutput() == null) {
-                    throw new RuntimeException("AI returned an empty response structure");
-                }
-
-                return response.getResult().getOutput().getText();
-            });
-
-            if (summary == null || summary.isBlank()) {
-                log.warn("AI returned blank text for file: {}", filePath);
+                log.info(
+                    "Cache/Database trace match hit for image hash: [{}]. Skipping duplicate AI processing for file: {}",
+                    hash, filePath);
                 return;
             }
 
-            // =======================================================
-            // 4. 保存到 Postgres (Source of Truth)
-            // =======================================================
+            String mimeType = Files.probeContentType(path);
+            if (mimeType == null) {
+                mimeType = "image/jpeg";
+                if (log.isDebugEnabled()) {
+                    log.debug(
+                        "Probed MimeType resolved to null for file {}. Defaulting fallback header to image/jpeg.",
+                        filePath);
+                }
+            }
+
+            log.info(
+                "Cache miss for image [{}]. Requesting multimodal vision summary from AI service...",
+                hash);
+            String summary = imageAiSummaryService.generateSummary(imageBytes, mimeType, filePath);
+
+            if (summary == null || summary.isBlank()) {
+                log.warn(
+                    "AI multimodal vision analysis returned a blank or empty summary layout text contract for file: {}",
+                    filePath);
+                return;
+            }
+
+            // Persistence and Memory Mapping Storage Phase
             ImageSummaryEntity entity = new ImageSummaryEntity();
             entity.setId(hash);
             entity.setImageHash(hash);
@@ -115,25 +100,33 @@ public class ImageProcessorService {
             entity.setCreatedAt(Instant.now());
 
             imageSummaryRepository.save(entity);
+            cacheService.putImageSummary(hash, summary);
 
-            // =======================================================
-            // 5. 同步写入 Redis 缓存
-            // =======================================================
-            cacheService.putSummary(hash, summary);
-
-            log.info("Processed image successfully: {}", filePath);
+            log.info(
+                "Image processing pipeline executed successfully. Record saved and cached for hash: [{}]",
+                hash);
 
         } catch (Exception e) {
-            log.error("Failed to process image permanently: {}", filePath, e);
+            log.error(
+                "Fatal exception or structural IO crash encountered while processing image resource context: {}",
+                filePath, e);
         }
     }
 
+    /**
+     * Computes the SHA-256 cryptographic digest hash string of the provided input text.
+     *
+     * @param input source text payload to hash
+     * @return hexadecimal SHA-256 string representation
+     * @throws RuntimeException if the SHA-256 messaging digest mechanism is unavailable
+     */
     private String sha256(String input) {
         try {
             MessageDigest digest = MessageDigest.getInstance("SHA-256");
             byte[] hash = digest.digest(input.getBytes(StandardCharsets.UTF_8));
             return HexFormat.of().formatHex(hash);
         } catch (Exception e) {
+            log.error("Cryptographic configuration error initialization for SHA-256 failed.", e);
             throw new RuntimeException(e);
         }
     }
