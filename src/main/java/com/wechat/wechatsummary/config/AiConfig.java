@@ -1,45 +1,22 @@
 package com.wechat.wechatsummary.config;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
-import java.io.IOException;
-import java.util.concurrent.TimeUnit;
-import okhttp3.Interceptor;
-import okhttp3.Response;
+import java.time.Duration;
 import org.springframework.ai.chat.client.ChatClient;
 import org.springframework.ai.chat.model.ChatModel;
 import org.springframework.ai.openai.OpenAiChatModel;
 import org.springframework.ai.openai.OpenAiChatOptions;
-import org.springframework.ai.openai.http.okhttp.OpenAiHttpClientBuilderCustomizer;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
-import org.springframework.core.annotation.Order;
 
 @Configuration
 public class AiConfig {
 
     @Bean
-    @Order(Integer.MIN_VALUE) // 赋予最高优先级
-    public OpenAiHttpClientBuilderCustomizer openAiHttpClientTimeoutCustomizer() {
-        return builder -> {
-            // 强行插入一个最高权限的拦截器，物理改写 OkHttp 的运行时超时
-            builder.interceptor(new Interceptor() {
-                @Override
-                public Response intercept(Chain chain) throws IOException {
-                    return chain
-                        // 强制改写当前这一棒的链条超时时间
-                        .withConnectTimeout(15, TimeUnit.SECONDS)
-                        .withReadTimeout(3600, TimeUnit.MINUTES) // 1小时
-                        .withWriteTimeout(15, TimeUnit.SECONDS)
-                        .proceed(chain.request());
-                }
-            });
-        };
-    }
-
-    @Bean
     ChatClient chatClient(ChatModel chatModel) {
-        return ChatClient.builder(chatModel).build();
+        return ChatClient.builder(chatModel).defaultOptions(OpenAiChatOptions.builder().timeout(
+            Duration.ofHours(1))).build();
     }
 
     @Bean

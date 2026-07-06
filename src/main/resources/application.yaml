@@ -35,7 +35,6 @@ spring:
       chat:
         options:
           model: deepseek-ai/deepseek-v4-pro
-          timeout: 60m
       audio:
         transcription:
           timeout: 60m
