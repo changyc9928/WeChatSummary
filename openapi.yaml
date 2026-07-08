@@ -1,0 +1,186 @@
+openapi: 3.0.1
+info:
+  title: OpenAPI definition
+  version: v0
+servers:
+- url: http://localhost:8080
+  description: Generated server url
+paths:
+  /api/preprocess/{uuid}:
+    post:
+      tags:
+      - preprocess-controller
+      operationId: preprocess
+      parameters:
+      - name: uuid
+        in: path
+        required: true
+        schema:
+          type: string
+      responses:
+        "200":
+          description: OK
+          content:
+            '*/*':
+              schema:
+                type: string
+  /api/files/upload:
+    post:
+      tags:
+      - upload-controller
+      operationId: upload
+      requestBody:
+        content:
+          application/json:
+            schema:
+              required:
+              - file
+              type: object
+              properties:
+                file:
+                  type: string
+                  format: binary
+      responses:
+        "200":
+          description: OK
+          content:
+            '*/*':
+              schema:
+                type: string
+  /api/analysis/{uuid}:
+    post:
+      tags:
+      - chat-analysis-controller
+      operationId: startAnalysis
+      parameters:
+      - name: uuid
+        in: path
+        required: true
+        schema:
+          type: string
+          format: uuid
+      responses:
+        "200":
+          description: OK
+          content:
+            '*/*':
+              schema:
+                type: object
+  /api/analysis/restart/{uuid}:
+    post:
+      tags:
+      - chat-analysis-controller
+      operationId: restartAnalysis
+      parameters:
+      - name: uuid
+        in: path
+        required: true
+        schema:
+          type: string
+          format: uuid
+      responses:
+        "200":
+          description: OK
+          content:
+            '*/*':
+              schema:
+                type: object
+                additionalProperties:
+                  type: string
+  /api/analysis/pause/{uuid}:
+    post:
+      tags:
+      - chat-analysis-controller
+      operationId: pauseAnalysis
+      parameters:
+      - name: uuid
+        in: path
+        required: true
+        schema:
+          type: string
+          format: uuid
+      responses:
+        "200":
+          description: OK
+          content:
+            '*/*':
+              schema:
+                type: object
+                additionalProperties:
+                  type: string
+  /api/preprocess/{uuid}/progress:
+    get:
+      tags:
+      - preprocess-controller
+      operationId: getProgress
+      parameters:
+      - name: uuid
+        in: path
+        required: true
+        schema:
+          type: string
+      responses:
+        "200":
+          description: OK
+          content:
+            '*/*':
+              schema:
+                $ref: "#/components/schemas/TaskProgress"
+  /api/preprocess/{uuid}/finished:
+    get:
+      tags:
+      - preprocess-controller
+      operationId: isFinished
+      parameters:
+      - name: uuid
+        in: path
+        required: true
+        schema:
+          type: string
+      responses:
+        "200":
+          description: OK
+          content:
+            '*/*':
+              schema:
+                type: boolean
+  /api/analysis/status-pool/{uuid}:
+    get:
+      tags:
+      - chat-analysis-controller
+      operationId: getStatusAndProgress
+      parameters:
+      - name: uuid
+        in: path
+        required: true
+        schema:
+          type: string
+          format: uuid
+      responses:
+        "200":
+          description: OK
+          content:
+            '*/*':
+              schema:
+                type: object
+                additionalProperties:
+                  type: object
+components:
+  schemas:
+    TaskProgress:
+      type: object
+      properties:
+        status:
+          type: string
+        totalTasks:
+          type: integer
+          format: int32
+        remainingTasks:
+          type: integer
+          format: int32
+        completedTasks:
+          type: integer
+          format: int32
+        progressPercentage:
+          type: number
+          format: double

@@ -13,12 +13,14 @@ import org.springframework.ai.content.Media;
 import org.springframework.ai.openai.OpenAiAudioTranscriptionModel;
 import org.springframework.retry.annotation.Backoff;
 import org.springframework.retry.annotation.Retryable;
+import org.springframework.stereotype.Service;
 import org.springframework.util.MimeType;
 
 /**
  * Service responsible for interacting with various AI capabilities including audio transcription,
  * text summaries, rolling chat analysis, and image description.
  */
+@Service
 @Slf4j
 @RequiredArgsConstructor
 public class AiService {
@@ -147,7 +149,8 @@ public class AiService {
         maxAttempts = 10,
         backoff = @Backoff(delay = 30000, maxDelay = 3600000, multiplier = 2.0, random = true)
     )
-    public String callChatClientToSummarizeTextWithRetry(String historyContext, String currentChunk) {
+    public String callChatClientToSummarizeTextWithRetry(String historyContext,
+        String currentChunk) {
         log.info("Requesting rolling chat consolidation summary from ChatClient...");
         if (log.isDebugEnabled()) {
             log.debug("History context size: {} chars, Current chunk size: {} chars",

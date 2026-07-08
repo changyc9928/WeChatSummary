@@ -126,7 +126,8 @@ public class AudioProcessorService {
             }
 
             // Invoke through the Spring proxy so @Retryable is applied.
-            String summary = audioAiSummaryService.callChatClientToSummarizeAudioWithRetry(transcript);
+            String summary = audioAiSummaryService.callChatClientToSummarizeAudioWithRetry(
+                transcript);
 
             // Layer 4: Persistence and Caching Strategy
             AudioSummary audioSummary = new AudioSummary();
