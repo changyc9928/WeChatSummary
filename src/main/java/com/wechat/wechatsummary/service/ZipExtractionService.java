@@ -1,6 +1,9 @@
 package com.wechat.wechatsummary.service;
 
+import com.fasterxml.jackson.databind.JsonNode;
+import com.fasterxml.jackson.databind.ObjectMapper;
 import com.wechat.wechatsummary.config.StorageConfig;
+import com.wechat.wechatsummary.dto.SessionResponseDTO;
 import java.io.BufferedInputStream;
 import java.io.IOException;
 import java.io.InputStream;
@@ -8,7 +11,15 @@ import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.StandardCopyOption;
+import java.nio.file.attribute.BasicFileAttributes;
+import java.time.Instant;
+import java.time.ZoneId;
+import java.time.format.DateTimeFormatter;
+import java.util.List;
+import java.util.Optional;
 import java.util.UUID;
+import java.util.stream.Collectors;
+import java.util.stream.Stream;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.apache.commons.compress.archivers.zip.ZipArchiveEntry;
@@ -25,7 +36,14 @@ import org.springframework.web.multipart.MultipartFile;
 @RequiredArgsConstructor
 public class ZipExtractionService {
 
+    private static final DateTimeFormatter CHAT_DATE_FORMATTER = DateTimeFormatter.ofPattern(
+            "yyyy-MM-dd")
+        .withZone(ZoneId.systemDefault());
+    private static final DateTimeFormatter UPLOAD_TIME_FORMATTER = DateTimeFormatter.ofPattern(
+            "yyyy/MM/dd HH:mm")
+        .withZone(ZoneId.systemDefault());
     private final StorageConfig storageConfig;
+    private final ObjectMapper objectMapper;
 
     /**
      * Stashes a multipart form upload file onto a temporary location, initializes a tracking UUID,
@@ -162,6 +180,116 @@ public class ZipExtractionService {
             Files.writeString(file, content, StandardCharsets.UTF_8);
         } catch (Exception ignored) {
             // Catch structural parsing failures quietly to skip adjustments over binary media streams
+        }
+    }
+
+    /**
+     * Scans the base upload directory for active session subdirectories. Returns sorted
+     * SessionResponseDTO objects with separated upload timestamps.
+     */
+    public List<SessionResponseDTO> listAvailableSessions() throws IOException {
+        Path uploadDir = storageConfig.getUploadDir();
+        if (!Files.exists(uploadDir)) {
+            return List.of();
+        }
+
+        try (Stream<Path> stream = Files.list(uploadDir)) {
+            return stream
+                .filter(Files::isDirectory)
+                .filter(dir -> {
+                    String dirName = dir.getFileName().toString();
+                    return !dirName.equalsIgnoreCase("outputs") && !dirName.startsWith(".");
+                })
+                .sorted((dir1, dir2) -> {
+                    try {
+                        Instant time1 = Files.readAttributes(dir1, BasicFileAttributes.class)
+                            .creationTime().toInstant();
+                        Instant time2 = Files.readAttributes(dir2, BasicFileAttributes.class)
+                            .creationTime().toInstant();
+                        return time2.compareTo(time1);
+                    } catch (IOException e) {
+                        log.warn("Sorting evaluation failed between paths [{}] and [{}]", dir1,
+                            dir2);
+                        return 0;
+                    }
+                })
+                .map(dir -> {
+                    String uuid = dir.getFileName().toString();
+                    String chatDisplayTitle = buildChatDisplayTitle(dir);
+                    String uploadTimeStr = getFolderCreationTime(dir);
+
+                    return new SessionResponseDTO(uuid, chatDisplayTitle, uploadTimeStr);
+                })
+                .collect(Collectors.toList());
+        }
+    }
+
+    /**
+     * Extracts folder creation attribute as a standalone string.
+     */
+    private String getFolderCreationTime(Path directory) {
+        try {
+            BasicFileAttributes attr = Files.readAttributes(directory, BasicFileAttributes.class);
+            return UPLOAD_TIME_FORMATTER.format(attr.creationTime().toInstant());
+        } catch (IOException e) {
+            log.warn("Could not discover system creation timeline data for folder context: [{}]",
+                directory);
+            return "Unknown Time";
+        }
+    }
+
+    /**
+     * Looks inside a session directory, finds the primary chat data JSON file, and compiles the
+     * Chat Group Name alongside its history coverage timeline window.
+     */
+    private String buildChatDisplayTitle(Path directory) {
+        try (Stream<Path> files = Files.list(directory)) {
+            Optional<Path> jsonFileOpt = files
+                .filter(Files::isRegularFile)
+                .filter(p -> p.getFileName().toString().toLowerCase().endsWith(".json"))
+                .findFirst();
+
+            if (jsonFileOpt.isEmpty()) {
+                return directory.getFileName().toString() + " (Empty Context)";
+            }
+
+            Path jsonFile = jsonFileOpt.get();
+            String rawFileName = jsonFile.getFileName().toString();
+            String fallbackTitle = rawFileName.substring(0,
+                rawFileName.toLowerCase().lastIndexOf(".json"));
+
+            try {
+                JsonNode rootNode = objectMapper.readTree(jsonFile.toFile());
+                JsonNode sessionNode = rootNode.get("session");
+
+                if (sessionNode != null) {
+                    String chatName =
+                        sessionNode.has("nickname") && !sessionNode.get("nickname").asText()
+                            .isEmpty()
+                            ? sessionNode.get("nickname").asText()
+                            : fallbackTitle;
+
+                    long firstTime = sessionNode.path("firstTimestamp").asLong(0);
+                    long lastTime = sessionNode.path("lastTimestamp").asLong(0);
+
+                    if (firstTime > 0 && lastTime > 0) {
+                        String startDate = CHAT_DATE_FORMATTER.format(
+                            Instant.ofEpochSecond(firstTime));
+                        String endDate = CHAT_DATE_FORMATTER.format(
+                            Instant.ofEpochSecond(lastTime));
+                        return String.format("%s (%s ~ %s)", chatName, startDate, endDate);
+                    }
+                    return chatName;
+                }
+                return fallbackTitle;
+            } catch (Exception jsonErr) {
+                log.warn("Metadata structure error inside [{}], dropping back to clean filename.",
+                    rawFileName);
+                return fallbackTitle;
+            }
+        } catch (IOException e) {
+            log.error("Failed to read system folder layers inside: [{}]", directory, e);
+            return directory.getFileName().toString() + " (Read Failure)";
         }
     }
 }

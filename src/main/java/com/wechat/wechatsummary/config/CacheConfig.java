@@ -1,5 +1,8 @@
 package com.wechat.wechatsummary.config;
 
+import com.fasterxml.jackson.annotation.JsonTypeInfo;
+import com.fasterxml.jackson.databind.ObjectMapper;
+import com.fasterxml.jackson.datatype.jsr310.JavaTimeModule;
 import java.time.Duration;
 import java.util.HashMap;
 import java.util.Map;
@@ -31,6 +34,21 @@ public class CacheConfig {
      */
     @Bean
     public CacheManager cacheManager(RedisConnectionFactory connectionFactory) {
+
+        // --- ADDED: Custom ObjectMapper to handle Java 8 Date/Time types ---
+        ObjectMapper objectMapper = new ObjectMapper();
+        objectMapper.registerModule(new JavaTimeModule());
+        // Crucial for GenericJackson2JsonRedisSerializer to accurately store class type metadata inside the JSON
+        objectMapper.activateDefaultTyping(
+            objectMapper.getPolymorphicTypeValidator(),
+            ObjectMapper.DefaultTyping.NON_FINAL,
+            JsonTypeInfo.As.PROPERTY
+        );
+
+        GenericJackson2JsonRedisSerializer jsonSerializer = new GenericJackson2JsonRedisSerializer(
+            objectMapper);
+        // -----------------------------------------------------------------
+
         // 1. Establish the clean base default configuration mapping (Swapping messy JDK binary for explicit JSON layouts)
         RedisCacheConfiguration baseConfiguration = RedisCacheConfiguration.defaultCacheConfig()
             .entryTtl(Duration.ofDays(1)) // Global fallback baseline threshold safety net of 1 day
@@ -40,7 +58,7 @@ public class CacheConfig {
             )
             .serializeValuesWith(
                 RedisSerializationContext.SerializationPair.fromSerializer(
-                    new GenericJackson2JsonRedisSerializer())
+                    jsonSerializer) // MODIFIED: Using the custom serializer here
             );
 
         // 2. Set up dynamic dedicated custom cache override rules per unique functional data domain region

@@ -4,8 +4,8 @@ spring:
 
   servlet:
     multipart:
-      max-file-size: 500MB
-      max-request-size: 500MB
+      max-file-size: 20GB
+      max-request-size: 20GB
 
   data:
     redis:
@@ -33,6 +33,7 @@ spring:
       api-key: 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
       base-url: https://integrate.api.nvidia.com
       chat:
+        timeout: 60m
         options:
           model: deepseek-ai/deepseek-v4-pro
       audio:
@@ -42,16 +43,16 @@ spring:
           options:
             model: large-v3
 
-custom-ai:
-  multimodal:
-    base-url: https://integrate.api.nvidia.com/v1
-    api-key: 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
-    model: moonshotai/kimi-k2.6
-
   jpa:
     hibernate:
       naming:
         physical-strategy: org.hibernate.boot.model.naming.CamelCaseToUnderscoresNamingStrategy
+
+custom-ai:
+  multimodal:
+    base-url: https://integrate.api.nvidia.com/v1
+    api-key: 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
+    model: nvidia/nemotron-nano-12b-v2-vl
 
 storage:
   upload-dir: ${HOME}/uploads

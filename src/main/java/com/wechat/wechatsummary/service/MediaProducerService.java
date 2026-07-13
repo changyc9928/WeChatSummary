@@ -151,4 +151,62 @@ public class MediaProducerService {
                 });
         }
     }
+
+    /**
+     * Resets the task tracking context and re-dispatches all files back to the message broker. This
+     * allows a paused or broken batch processing run to completely start over.
+     */
+    public void startOver(String uuid) throws IOException {
+        log.info("Request received to START OVER processing for batch UUID: [{}]", uuid);
+        Path baseDir = storageConfig.getUploadDir().resolve(uuid);
+
+        // 1. Locate the input JSON path again
+        String inputJsonPath;
+        try (Stream<Path> list = Files.list(baseDir)) {
+            Optional<Path> jsonFile = list.filter(p -> p.toString().endsWith(".json")).findFirst();
+            if (jsonFile.isEmpty()) {
+                log.error("Start over failed. Cannot locate source JSON in directory: {}", baseDir);
+                throw new RuntimeException("无法找到聊天记录 JSON 文件，重头开始失败！");
+            }
+            inputJsonPath = jsonFile.get().toAbsolutePath().toString();
+        }
+
+        String outputFilePath = storageConfig.getUploadDir()
+            .resolve("outputs")
+            .resolve(uuid + "_processed.md")
+            .toAbsolutePath()
+            .toString();
+
+        Path imagesDir = baseDir.resolve("images");
+        Path emojisDir = baseDir.resolve("emojis");
+        Path voicesDir = baseDir.resolve("voices");
+
+        int totalMediaFiles = countFiles(imagesDir) + countFiles(emojisDir) + countFiles(voicesDir);
+
+        // 2. Call coordinator service to wipe the slate clean and update state back to PROCESSING
+        boolean resetSuccessful = coordinatorService.startOverTask(uuid, inputJsonPath,
+            outputFilePath);
+
+        if (!resetSuccessful) {
+            log.error("Coordinator service rejected the start over request for UUID: [{}]", uuid);
+            throw new IllegalStateException(
+                "Redis operational reset failed. Task context may have expired.");
+        }
+
+        // 3. Re-queue all files back to RabbitMQ for workers to consume
+        if (totalMediaFiles > 0) {
+            log.info("Re-publishing all {} media items to RabbitMQ for batch UUID: [{}]",
+                totalMediaFiles, uuid);
+            scanAndPublish(uuid, imagesDir, RabbitConfig.IMAGE_ROUTING_KEY);
+            scanAndPublish(uuid, emojisDir, RabbitConfig.IMAGE_ROUTING_KEY);
+            scanAndPublish(uuid, voicesDir, RabbitConfig.AUDIO_ROUTING_KEY);
+            log.info("Start over process successfully fully re-queued for UUID: [{}]", uuid);
+        } else {
+            log.warn(
+                "Start over called on a batch with zero media attachments for UUID: [{}]. Completing immediately.",
+                uuid);
+            // If there are zero files, let completeTask handle the instant compilation check
+            coordinatorService.completeTask(uuid);
+        }
+    }
 }

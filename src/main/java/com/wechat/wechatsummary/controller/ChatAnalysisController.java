@@ -36,7 +36,7 @@ public class ChatAnalysisController {
         log.info("REST request received to initialize chat analysis pipeline for task UUID: [{}]",
             uuid);
 
-        chatAnalysisCacheService.saveAndEvictTask(ChatAnalysisTask.builder()
+        chatAnalysisCacheService.saveAndCacheTask(ChatAnalysisTask.builder()
             .id(uuid)
             .status("PROCESSING")
             .build());
@@ -86,7 +86,13 @@ public class ChatAnalysisController {
         log.info(
             "REST request received to restart execution pipeline from scratch for task UUID: [{}]",
             uuid);
+
+        // 1. Clear files and Redis state metrics synchronously
         chatAnalysisService.startOverAnalysis(uuid);
+
+        // 2. Fire up the execution worker thread asynchronously via the proxy reference
+        chatAnalysisService.analyzeChatLogAsync(uuid);
+
         return ResponseEntity.ok(Map.of(
             "message", "Task restarted successfully from chunk zero.",
             "taskId", uuid.toString()

@@ -87,42 +87,42 @@ public class AiService {
     )
     public String callChatClientToSummarizeAudioWithRetry(String transcript) {
         log.info("Requesting audio transcription summary from Spring AI ChatClient...");
-        if (log.isDebugEnabled()) {
-            log.debug("Target transcript length for summary: {} characters",
-                transcript != null ? transcript.length() : 0);
-        }
 
         String systemPrompt = """
-            你是一个精通马来西亚多元文化语言（Rojak 华语/Manglish）的智能助手。
-            下面是一段马来西亚本地人的语音转录文本，其中可能混杂了华语、英语、马来语（Malay）和方言。
+            # ROLE AND TASK
+            You are a deterministic data cleaning API that normalizes raw speech transcripts into grammatically smooth Chinese sentences.
             
-            请帮我理解这段话的核心意思，并用【规范、流畅的中文】写一段精简的摘要，列出核心要点（如有待办事项或重要结论请单独列出）。
+            # LINGUISTIC PROCESSING LOGIC
+            1. Keep the exact core facts, actions, and entities. Fix broken grammar and stutters.
+            2. Remove repetitive or meaningless particles (e.g., "呀呀呀", "咯").
+            3. Do NOT summarize or shorten the sentence into tags. Keep it as a full, natural sentence.
+            4. Dictionary:
+               - "Chino" -> "Chino"
+               - "邦加拉" -> "孟加拉人"
+               - "chicken pock" -> "爆米花/爆米鸡"
+               - "Mama" -> "妈妈"
+            5. Non-local Fallback: For Thai or completely unrecognizable text, set the result value to "[无法识别的非本地语言]".
+            6. If a sentence cuts off abruptly, do not invent an ending. Normalize only what is present.
             
-            ⚠️注意：输出文本长度严格不能超过原文长度。若原文仅有一句话，请用同样简短的一句话进行提炼，严禁展开无根据的联想和脑补背景。
+            # FORMAT INSTRUCTION
+            You must output the exact structure requested. Do NOT add any conversational explanation or text outside the structure.
             """;
 
         String userPrompt = """
-            转录文本：
-            \"\"\"
-            {transcript}
-            \"\"\"
-            """;
+            {
+              "input_transcript": "%s"
+            }
+            """.formatted(transcript);
 
         try {
-            String summary = chatClient.prompt()
+            // Correct Spring AI fluent chain:
+            return chatClient.prompt()
                 .system(systemPrompt)
-                .user(user -> user.text(userPrompt).param("transcript", transcript))
+                .user(userPrompt)
                 .call()
-                .content();
+                .entity(
+                    NormalizationResult.class).result; // <-- Pass the target class type right here
 
-            log.info("Audio transcription summary successfully generated.");
-            return summary;
-
-        } catch (RateLimitException | org.springframework.web.client.HttpServerErrorException e) {
-            log.warn(
-                "Transient error encountered while requesting summary: {}. Triggering automatic retry attempt.",
-                e.getMessage());
-            throw e;
         } catch (Exception e) {
             log.error("Failed to execute audio summary AI request via ChatClient", e);
             throw new RuntimeException("LLM request failed via ChatClient: " + e.getMessage(), e);
@@ -282,6 +282,10 @@ public class AiService {
         String outputText = response.getResult().getOutput().getText();
         log.info("Successfully extracted information and summarized target image: {}", filePath);
         return outputText;
+    }
+
+    public record NormalizationResult(String result) {
+
     }
 
 //    /**

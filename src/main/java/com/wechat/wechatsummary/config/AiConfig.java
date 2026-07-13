@@ -31,8 +31,6 @@ public class AiConfig {
     @Bean
     ChatClient chatClient(ChatModel chatModel) {
         return ChatClient.builder(chatModel)
-            .defaultOptions(OpenAiChatOptions.builder()
-                .timeout(Duration.ofHours(1)))
             .build();
     }
 
@@ -82,6 +80,7 @@ public class AiConfig {
             .model(model)
             .baseUrl(baseUrl)
             .apiKey(apiKey)
+            .timeout(Duration.ofMinutes(60))
             .build();
 
         return OpenAiChatModel.builder()

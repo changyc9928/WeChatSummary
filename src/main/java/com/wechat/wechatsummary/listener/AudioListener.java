@@ -1,6 +1,7 @@
 package com.wechat.wechatsummary.listener;
 
 import com.wechat.wechatsummary.config.RabbitConfig;
+import com.wechat.wechatsummary.dto.TaskProgress;
 import com.wechat.wechatsummary.service.AudioProcessorService;
 import com.wechat.wechatsummary.service.TaskTaskCoordinatorService;
 import lombok.RequiredArgsConstructor;
@@ -27,15 +28,26 @@ public class AudioListener {
         String uuid = parts[0];
         String filePath = parts[1];
 
+        // 1. Check current global orchestration state
+        TaskProgress progress = coordinatorService.getTaskProgress(uuid);
+        String status = progress.getStatus();
+
+        // IF PAUSED or NOT_FOUND: Drop the message immediately and do NOT decrement the counter
+        if ("PAUSED".equalsIgnoreCase(status) || "NOT_FOUND".equalsIgnoreCase(status)) {
+            log.warn(
+                "Task context [{}] is currently {}. DROPPING message safely to clear the queue.",
+                uuid, status);
+            return;
+        }
+
         try {
             audioSummaryService.processAudioSummary(filePath);
             log.info("Successfully processed audio summary for: {}", filePath);
         } catch (Exception e) {
-            // 捕获异常，打印日志。注意：这里不往外抛异常了，代表我们主动“跳过”并认领了这个失败任务
             log.error("Failed to process audio file, path: {}. Skipping and releasing lock.",
                 filePath, e);
         } finally {
-            // 无论成功还是失败，都必须扣减计数器，确保整个 UUID 链路不会因为单点失败而卡死
+            // This only executes if the message wasn't dropped above
             coordinatorService.completeTask(uuid);
         }
     }

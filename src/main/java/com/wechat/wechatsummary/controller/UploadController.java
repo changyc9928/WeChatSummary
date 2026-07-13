@@ -1,9 +1,12 @@
 package com.wechat.wechatsummary.controller;
 
+import com.wechat.wechatsummary.dto.SessionResponseDTO;
 import com.wechat.wechatsummary.service.ZipExtractionService;
+import java.util.List;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.http.ResponseEntity;
+import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RequestParam;
@@ -70,6 +73,25 @@ public class UploadController {
                 originalFilename, e);
             return ResponseEntity.internalServerError()
                 .body("Upload failed: " + e.getMessage());
+        }
+    }
+
+    /**
+     * Fetches all available processed storage session paths along with their target payload
+     * descriptor JSON file names and upload timestamps.
+     *
+     * @return HTTP 200 containing list of session meta configurations, or HTTP 500 on filesystem
+     * error.
+     */
+    @GetMapping("/sessions")
+    public ResponseEntity<List<SessionResponseDTO>> getAvailableSessions() {
+        log.info("Received request to look up historical or active background pipeline sessions.");
+        try {
+            List<SessionResponseDTO> sessions = zipExtractionService.listAvailableSessions();
+            return ResponseEntity.ok(sessions);
+        } catch (Exception e) {
+            log.error("Failed to compile directory history summary layout details.", e);
+            return ResponseEntity.internalServerError().build();
         }
     }
 }

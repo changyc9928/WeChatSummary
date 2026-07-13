@@ -3,20 +3,20 @@ info:
   title: OpenAPI definition
   version: v0
 servers:
-- url: http://localhost:8080
-  description: Generated server url
+  - url: http://localhost:8080
+    description: Generated server url
 paths:
   /api/preprocess/{uuid}:
     post:
       tags:
-      - preprocess-controller
+        - preprocess-controller
       operationId: preprocess
       parameters:
-      - name: uuid
-        in: path
-        required: true
-        schema:
-          type: string
+        - name: uuid
+          in: path
+          required: true
+          schema:
+            type: string
       responses:
         "200":
           description: OK
@@ -27,14 +27,14 @@ paths:
   /api/files/upload:
     post:
       tags:
-      - upload-controller
+        - upload-controller
       operationId: upload
       requestBody:
         content:
           application/json:
             schema:
               required:
-              - file
+                - file
               type: object
               properties:
                 file:
@@ -50,15 +50,15 @@ paths:
   /api/analysis/{uuid}:
     post:
       tags:
-      - chat-analysis-controller
+        - chat-analysis-controller
       operationId: startAnalysis
       parameters:
-      - name: uuid
-        in: path
-        required: true
-        schema:
-          type: string
-          format: uuid
+        - name: uuid
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
       responses:
         "200":
           description: OK
@@ -69,15 +69,15 @@ paths:
   /api/analysis/restart/{uuid}:
     post:
       tags:
-      - chat-analysis-controller
+        - chat-analysis-controller
       operationId: restartAnalysis
       parameters:
-      - name: uuid
-        in: path
-        required: true
-        schema:
-          type: string
-          format: uuid
+        - name: uuid
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
       responses:
         "200":
           description: OK
@@ -90,15 +90,15 @@ paths:
   /api/analysis/pause/{uuid}:
     post:
       tags:
-      - chat-analysis-controller
+        - chat-analysis-controller
       operationId: pauseAnalysis
       parameters:
-      - name: uuid
-        in: path
-        required: true
-        schema:
-          type: string
-          format: uuid
+        - name: uuid
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
       responses:
         "200":
           description: OK
@@ -111,14 +111,14 @@ paths:
   /api/preprocess/{uuid}/progress:
     get:
       tags:
-      - preprocess-controller
+        - preprocess-controller
       operationId: getProgress
       parameters:
-      - name: uuid
-        in: path
-        required: true
-        schema:
-          type: string
+        - name: uuid
+          in: path
+          required: true
+          schema:
+            type: string
       responses:
         "200":
           description: OK
@@ -129,14 +129,14 @@ paths:
   /api/preprocess/{uuid}/finished:
     get:
       tags:
-      - preprocess-controller
+        - preprocess-controller
       operationId: isFinished
       parameters:
-      - name: uuid
-        in: path
-        required: true
-        schema:
-          type: string
+        - name: uuid
+          in: path
+          required: true
+          schema:
+            type: string
       responses:
         "200":
           description: OK
@@ -147,15 +147,15 @@ paths:
   /api/analysis/status-pool/{uuid}:
     get:
       tags:
-      - chat-analysis-controller
+        - chat-analysis-controller
       operationId: getStatusAndProgress
       parameters:
-      - name: uuid
-        in: path
-        required: true
-        schema:
-          type: string
-          format: uuid
+        - name: uuid
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
       responses:
         "200":
           description: OK

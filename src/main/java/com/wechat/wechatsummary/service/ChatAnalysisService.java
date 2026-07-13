@@ -191,9 +191,6 @@ public class ChatAnalysisService {
 
         // 2. Wipe progress counters in Redis
         cacheService.clearProgress(uuid);
-
-        // 3. Fire up the Async processor again from index 0
-        analyzeChatLogAsync(uuid);
     }
 
     public Map<String, Object> getProgressAndStatus(UUID uuid) {
@@ -265,7 +262,7 @@ public class ChatAnalysisService {
     }
 
     private void updateTaskStatus(UUID uuid, String status, String meta) {
-        cacheService.saveAndEvictTask(ChatAnalysisTask.builder()
+        cacheService.saveAndCacheTask(ChatAnalysisTask.builder()
             .id(uuid)
             .status(status)
             .errorMessage(status.equals("FAILED") ? meta : null)

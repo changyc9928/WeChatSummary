@@ -12,6 +12,7 @@ import java.util.Optional;
 import java.util.UUID;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.cache.CacheManager;
 import org.springframework.cache.annotation.CacheEvict;
 import org.springframework.cache.annotation.CachePut;
 import org.springframework.cache.annotation.Cacheable;
@@ -31,6 +32,7 @@ public class WeChatSummaryCacheService {
     private final ChatAnalysisTaskRepository taskRepository;
     // Inject Redis template directly for fast progress tracking
     private final StringRedisTemplate redisTemplate;
+    private final CacheManager cacheManager;
 
     // =========================================================================
     // 1. IMAGE SUMMARY CACHE (Spring Cache Driven)
@@ -72,9 +74,7 @@ public class WeChatSummaryCacheService {
             "Cache miss for audio_summary signature target [{}]. Falling back to underlying persistence tables...",
             hash);
         return audioSummaryRepository.findByFileHash(hash)
-            .map(AudioSummary::getSummary)
-            .map(Optional::of)
-            .orElseGet(() -> Optional.of("语音无描述"));
+            .map(AudioSummary::getSummary);
     }
 
     @CachePut(cacheNames = "audio_summary", key = "#hash")
@@ -104,24 +104,43 @@ public class WeChatSummaryCacheService {
         return taskRepository.findById(uuid);
     }
 
-    public ChatAnalysisTask saveAndEvictTask(ChatAnalysisTask task) {
-        log.info(
-            "Initializing task execution pipeline state. Clearing stale cache context parameters for UUID: {}",
-            task.getId());
-        evictTaskCache(task.getId());
+//    public ChatAnalysisTask saveAndEvictTask(ChatAnalysisTask task) {
+//        log.info(
+//            "Initializing task execution pipeline state. Clearing stale cache context parameters for UUID: {}",
+//            task.getId());
+//        evictTaskCache(task.getId());
+//
+//        // Also ensure Redis state status reflects database lifecycle pushes
+//        if (task.getStatus() != null) {
+//            setTaskStatus(task.getId(), task.getStatus());
+//        }
+//
+//        return taskRepository.save(task);
+//    }
+//
+//    @CacheEvict(cacheNames = "chat_analysis", key = "#uuid.toString()")
+//    public void evictTaskCache(UUID uuid) {
+//        log.info("Evicting task cache context parameters from memory space for task UUID: [{}]",
+//            uuid);
+//    }
 
-        // Also ensure Redis state status reflects database lifecycle pushes
+    public ChatAnalysisTask saveAndCacheTask(ChatAnalysisTask task) {
+        // 1. Persist/Merge updates to DB
+        ChatAnalysisTask savedTask = taskRepository.save(task);
+
+        // 2. Synchronize status indicators
         if (task.getStatus() != null) {
             setTaskStatus(task.getId(), task.getStatus());
         }
 
-        return taskRepository.save(task);
-    }
+        // 3. Update Spring Cache programmatically with the RAW object
+        var cache = cacheManager.getCache("chat_analysis");
+        if (cache != null) {
+            // FIX: Remove Optional.of(...) wrapper here
+            cache.put(task.getId().toString(), savedTask);
+        }
 
-    @CacheEvict(cacheNames = "chat_analysis", key = "#uuid.toString()")
-    public void evictTaskCache(UUID uuid) {
-        log.info("Evicting task cache context parameters from memory space for task UUID: [{}]",
-            uuid);
+        return savedTask;
     }
 
     // =========================================================================
