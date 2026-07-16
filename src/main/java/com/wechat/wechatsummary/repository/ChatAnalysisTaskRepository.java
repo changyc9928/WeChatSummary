@@ -13,33 +13,8 @@ import org.springframework.transaction.annotation.Transactional;
 public interface ChatAnalysisTaskRepository extends JpaRepository<ChatAnalysisTask, UUID> {
 
     /**
-     * 💡 成功时：将本地 TXT 报告的绝对路径写入 result 字段，并将状态强刷为 SUCCESS
-     */
-    @Modifying
-    @Transactional
-    @Query(value = """
-        INSERT INTO chat_analysis_task (id, status, result, error_message, updated_at)
-        VALUES (:id, 'SUCCESS', :resultPath, NULL, NOW())
-        ON CONFLICT (id) 
-        DO UPDATE SET status = 'SUCCESS', result = :resultPath, error_message = NULL, updated_at = NOW()
-        """, nativeQuery = true)
-    void updateResult(@Param("id") UUID id, @Param("resultPath") String resultPath);
-
-    /**
-     * 💡 纯状态更新：单单把任务状态改为 SUCCESS（作为 Service 里的语义双保险兜底）
-     */
-    @Modifying
-    @Transactional
-    @Query(value = """
-        INSERT INTO chat_analysis_task (id, status, updated_at)
-        VALUES (:id, 'SUCCESS', NOW())
-        ON CONFLICT (id) 
-        DO UPDATE SET status = 'SUCCESS', updated_at = NOW()
-        """, nativeQuery = true)
-    void updateStatusToSuccess(@Param("id") UUID id);
-
-    /**
-     * 失败时：记录错误状态与异常堆栈信息
+     * Strictly responsible for logging internal service engine errors.
+     * No state tracking machine variables or structural assumptions belong here.
      */
     @Modifying
     @Transactional
@@ -49,5 +24,5 @@ public interface ChatAnalysisTaskRepository extends JpaRepository<ChatAnalysisTa
         ON CONFLICT (id) 
         DO UPDATE SET status = 'FAILED', error_message = :errorMessage, updated_at = NOW()
         """, nativeQuery = true)
-    void updateStatusToFailed(@Param("id") UUID id, @Param("errorMessage") String errorMessage);
+    void logFailureReason(@Param("id") UUID id, @Param("errorMessage") String errorMessage);
 }
