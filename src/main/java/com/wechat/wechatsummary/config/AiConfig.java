@@ -6,9 +6,11 @@ import org.springframework.ai.chat.client.ChatClient;
 import org.springframework.ai.chat.model.ChatModel;
 import org.springframework.ai.openai.OpenAiChatModel;
 import org.springframework.ai.openai.OpenAiChatOptions;
+import org.springframework.beans.factory.annotation.Qualifier;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
+import org.springframework.context.annotation.Primary;
 import org.springframework.web.servlet.config.annotation.CorsRegistry;
 import org.springframework.web.servlet.config.annotation.WebMvcConfigurer;
 
@@ -20,6 +22,27 @@ import org.springframework.web.servlet.config.annotation.WebMvcConfigurer;
 @Configuration
 public class AiConfig {
 
+    @Bean(name = "deepSeekChatModel")
+    @Primary
+    public OpenAiChatModel deepSeekChatModel(
+        @Value("${spring.ai.openai.base-url}") String baseUrl,
+        @Value("${spring.ai.openai.api-key}") String apiKey,
+        @Value("${spring.ai.openai.chat.options.model}") String model,
+        @Value("${spring.ai.openai.chat.temperature}") Double temperature) {
+
+        OpenAiChatOptions options = OpenAiChatOptions.builder()
+            .model(model)
+            .baseUrl(baseUrl)
+            .apiKey(apiKey)
+            .temperature(temperature)
+            .timeout(Duration.ofMinutes(60))
+            .build();
+
+        return OpenAiChatModel.builder()
+            .options(options)
+            .build();
+    }
+
     /**
      * Initializes the default system ChatClient interface wrapper. Sets a massive 1-hour connection
      * request timeout window to securely handle complex, long-running rolling transcript
@@ -29,7 +52,8 @@ public class AiConfig {
      * @return a thread-safe configured ChatClient instance
      */
     @Bean
-    ChatClient chatClient(ChatModel chatModel) {
+    @Primary
+    ChatClient chatClient(@Qualifier("deepSeekChatModel") ChatModel chatModel) {
         return ChatClient.builder(chatModel)
             .build();
     }
@@ -99,7 +123,8 @@ public class AiConfig {
      * @return a fluent ChatClient abstraction interface specifically allocated for visual assets
      */
     @Bean(name = "multimodalChatClient")
-    public ChatClient multimodalChatClient(OpenAiChatModel multimodalChatModel) {
+    public ChatClient multimodalChatClient(
+        @Qualifier("multimodalChatModel") OpenAiChatModel multimodalChatModel) {
         return ChatClient.builder(multimodalChatModel)
             // Optional baseline injection point configuration examples:
             // .defaultSystem("You are a multi-modal WeChat analysis engine expert...")

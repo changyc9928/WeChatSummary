@@ -1,5 +1,6 @@
 package com.wechat.wechatsummary.service;
 
+import com.openai.errors.InternalServerException;
 import com.openai.errors.RateLimitException;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
@@ -89,29 +90,52 @@ public class AiService {
         log.info("Requesting audio transcription summary from Spring AI ChatClient...");
 
         String systemPrompt = """
-            # ROLE AND TASK
-            You are a deterministic data cleaning API that normalizes raw speech transcripts into grammatically smooth Chinese sentences.
+            你是一个负责帮忙理解马来西亚华人说话的AI，我将给你一个由另一个AI转化出来的原始语音转写句子，但是这个句子的准确率不高，你需要尽量通过该句子语义来正确将一句马来西亚华语口语转写成中文普通话书面语。
+            例子：
+             A：
             
-            # LINGUISTIC PROCESSING LOGIC
-            1. Keep the exact core facts, actions, and entities. Fix broken grammar and stutters.
-            2. Remove repetitive or meaningless particles (e.g., "呀呀呀", "咯").
-            3. Do NOT summarize or shorten the sentence into tags. Keep it as a full, natural sentence.
-            4. Dictionary:
-               - "Chino" -> "Chino"
-               - "邦加拉" -> "孟加拉人"
-               - "chicken pock" -> "爆米花/爆米鸡"
-               - "Mama" -> "妈妈"
-            5. Non-local Fallback: For Thai or completely unrecognizable text, set the result value to "[无法识别的非本地语言]".
-            6. If a sentence cuts off abruptly, do not invent an ending. Normalize only what is present.
+             Eh cibeh long time no see leh！Lu 去哪里hilang料？WhatsApp你又blue tick diam diam。
             
-            # FORMAT INSTRUCTION
-            You must output the exact structure requested. Do NOT add any conversational explanation or text outside the structure.
+             普通话：
+            
+             哎，好久不见！你跑去哪里了？发 WhatsApp 给你，你已读也不回。
+            
+             B：
+            
+             Aiya paiseh lah，最近OT到siao。Boss一直kejar KPI，我做到beh tahan liao.
+            
+             普通话：
+            
+             不好意思，最近一直加班。老板一直催业绩，我快受不了了。
+            
+             A：
+            
+             Never mind lor。今晚jom去mamak makan，tapau一点satay，再叫teh ais kaw kaw。
+            
+             普通话：
+            
+             没关系。今晚去印度清真餐馆吃饭吧，顺便打包一点沙爹，再点一杯浓一点的冰奶茶。
+            
+             B：
+            
+             Onz lah！不过lu驾车来，我今天jam到pekcek，parking又susah gila。
+            
+             普通话：
+            
+             好啊！不过你开车来吧，我今天堵车堵得很烦，停车位也超级难找。
+            
+             A：
+            
+             Can can。等下reach了call lu。Don't fly aeroplane hor！
+            
+             普通话：
+            
+             可以。到了我打电话给你。可别放我鸽子啊！
             """;
 
         String userPrompt = """
-            {
-              "input_transcript": "%s"
-            }
+            这是ASR AI尝试把语音消息写成句子的原始形式，请你尝试理解并用普通话转写以下句子，把最终句子写给我就好，不要包含任何思考、解释或标签等等额外的内容：
+            %s
             """.formatted(transcript);
 
         try {
@@ -119,9 +143,7 @@ public class AiService {
             return chatClient.prompt()
                 .system(systemPrompt)
                 .user(userPrompt)
-                .call()
-                .entity(
-                    NormalizationResult.class).result; // <-- Pass the target class type right here
+                .call().content(); // <-- Pass the target class type right here
 
         } catch (Exception e) {
             log.error("Failed to execute audio summary AI request via ChatClient", e);
@@ -145,7 +167,7 @@ public class AiService {
      */
     @Retryable(
         retryFor = {RateLimitException.class,
-            org.springframework.web.client.HttpServerErrorException.class},
+            InternalServerException.class},
         maxAttempts = 10,
         backoff = @Backoff(delay = 30000, maxDelay = 3600000, multiplier = 2.0, random = true)
     )
@@ -159,55 +181,34 @@ public class AiService {
         }
 
         String refineSystemPrompt = """
-            # Role: 编年史滚动脱水官 (Rolling Executive Summary Historian)
+            # 微信聊天记录摘要任务 - 严格规范
             
-            ## 核心任务
-            你正在编纂一部微信群聊长篇纪实。输入包含【历史全量总结】和【新进聊天片段】。
-            你的任务是：**将历史故事高强度脱水压缩，同时将新发生的事件无缝续写在末尾。**
-            最终输出必须是一篇**从头讲起、脉络清晰、毫无拼接感、且篇幅极度受控**的现代大白话纪实。
+            你是一个冷静、客观、专门处理大马华人网络社群（包含二次元/网黑/面子书撕逼）群聊记录的审计员。你必须使用极其接地气、通俗且直接的“吃瓜/纪实语调”，严禁对聊天内容进行任何学术化、社会学或哲学高度的升华。
             
-            ## 铁律约束（如何防止字数爆炸）
+            ### 🚨 严格禁忌词与替代方案（违者扣除所有Token分）：
+            - 严禁使用以下虚空造词与神棍黑话：“模因”、“语境”、“身份认同”、“结构”、“博羞”、“模因义图”、“光复之战”、“权力纠纷”。
+            - 遇到群友用低俗语言人身攻击，直接写：“X用粗口/低俗语言（如叫爸爸、骂脏话）攻击Y”，严禁写成“探讨妇女权益/重演历史情节”。
+            - 遇到群友发语音胡言乱语，直接写：“群友语音胡口嗨/说废话转移视线”，严禁将其解读为“制造二次元侦探/组织教材/社会学隐喻”。
+            - 遇到大段英文表情包描述（如 "In the image...", "Without an image to analyze..."），这是系统的图片识别报错，请直接忽略，严禁将其翻译并脑补成群聊里的真实事件（例如不要把 book/notebook 脑补成“组织教材”）。
             
-            1. **历史全量：无损线索，高烈度脱水**：
-               - 必须保留之前发生过的**所有核心事件大纲和人物冲突**，绝对不能直接漏掉某段历史。
-               - **但是，必须对老故事进行全面合并和精简！** 删掉所有历史旧账里的“谁发了什么表情、谁撤回了消息、具体的斤两数字、具体的碎嘴子对白”。
-               - 示例：原本1000字的“杨和小鱼干围绕假发拉扯、整容自嘲、生日祝福、健身推多少公斤”的历史，在这一轮里必须被你高强度压缩成150字左右的骨架（如：“起初，群内围绕Cos圈乱象及杨与小鱼干的假发纠纷展开长相自嘲与整容讨论，期间夹杂短暂的生日祝福与健身动作交流。随后，话题转向……”）。
-            
-            2. **新进片段：详细记录，平铺直叙**：
-               - 对于【新进聊天片段】中的新事件，作为最新的章节，你需要相对详细地记录其发生的时间、人物、核心冲突和结果。
-               - 随着滚动推进，这一轮的“新内容”在下一轮就会变成“老历史”，并被再次脱水。
-            
-            3. **故事线从头到尾，严禁断层**：
-               - 最终文本必须是一个整体。用“起初……随后……接着……而最新进展是……”等时间/逻辑词连贯起来。
-               - 严禁出现“以下是前情提要：”等生硬的结构标签，它必须是一篇通顺的纪实故事。
-            
-            4. **文风：现代大白话**：
-               - 禁用文言文与任何无病呻吟的煽情，只留客观事实。
-            
-            ## 输出格式规范
-            你必须将最终融合生成的脱水全量纪实文本，完整包裹在 `<summary>` 和 `</summary>` 标签内并且将输出文本字数严格限制在1500字以内。
-            
-            格式示例：
-            <summary>
-            （这里是高强度脱水后的历史骨架 + 最新详细剧情融合而成的完整故事...）
-            </summary>
-            """;
+            ### 📝 术语对照表：
+            - 547：一个大马本地的网络群组/团队名。
+            - OKU：指残疾人证（大马专属），在群内被群友用来当成“智障/免死金牌”互相嘴臭。
+            - lanjiao / 林北 / 塞林木：大马闽南语粗口，直接归类为“爆粗口/人身攻击”。""";
 
         String userPrompt = """
-            请将以下两部分内容，完美熔炼成一篇毫无拼接感、从头讲起的全量群聊纪实：
+            请以文本内容为主，有标记的媒体内容为辅来总结以下微信聊天记录。你的聊天总结需要包含前情内容。请直接输出最终文本就行，无须包含思考、注解、标签等等。你需要让读者从来开始也能读懂群聊内容
             
-            <<<< 历史全量总结（旧内容） >>>>
-            {historyContext}
-            
-            <<<< 新进聊天片段（待融合的新内容） >>>>
+            聊天内容：
             {currentChunk}
             
-            请开始你的全量融合重写：
+            以下是前情提要，主要负责帮助你理解上面的聊天内容：
+            {historyContext}
             """;
 
         try {
             String summaryResult = chatClient.prompt()
-                .system(refineSystemPrompt)
+//                .system(refineSystemPrompt)
                 .user(user -> user.text(userPrompt)
                     .param("historyContext", historyContext)
                     .param("currentChunk", currentChunk))
@@ -282,10 +283,6 @@ public class AiService {
         String outputText = response.getResult().getOutput().getText();
         log.info("Successfully extracted information and summarized target image: {}", filePath);
         return outputText;
-    }
-
-    public record NormalizationResult(String result) {
-
     }
 
 //    /**

@@ -31,11 +31,12 @@ spring:
   ai:
     openai:
       api-key: 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
-      base-url: https://integrate.api.nvidia.com
+      base-url: https://integrate.api.nvidia.com/v1
       chat:
+        temperature: 0.1
         timeout: 60m
         options:
-          model: deepseek-ai/deepseek-v4-pro
+          model: deepseek-ai/deepseek-v4-flash
       audio:
         transcription:
           timeout: 60m
