@@ -1,7 +1,6 @@
 package com.wechat.wechatsummary.listener;
 
 import com.wechat.wechatsummary.config.RabbitConfig;
-import com.wechat.wechatsummary.dto.TaskProgress;
 import com.wechat.wechatsummary.service.AudioProcessorService;
 import com.wechat.wechatsummary.service.TaskTaskCoordinatorService;
 import lombok.RequiredArgsConstructor;
@@ -28,27 +27,25 @@ public class AudioListener {
         String uuid = parts[0];
         String filePath = parts[1];
 
-        // 1. Check current global orchestration state
-        TaskProgress progress = coordinatorService.getTaskProgress(uuid);
-        String status = progress.getStatus();
-
-        // IF PAUSED or NOT_FOUND: Drop the message immediately and do NOT decrement the counter
-        if ("PAUSED".equalsIgnoreCase(status) || "NOT_FOUND".equalsIgnoreCase(status)) {
+        // 1. Check directly if the abort flag key exists in Redis
+        if (coordinatorService.isAborted(uuid)) {
             log.warn(
-                "Task context [{}] is currently {}. DROPPING message safely to clear the queue.",
-                uuid, status);
+                "Task UUID [{}] has been explicitly ABORTED. DROPPING message safely.",
+                uuid);
             return;
         }
+
+        // 2. Register current thread with the coordinator
+        coordinatorService.registerThread(uuid, Thread.currentThread());
 
         try {
             audioSummaryService.processAudioSummary(filePath);
             log.info("Successfully processed audio summary for: {}", filePath);
         } catch (Exception e) {
-            log.error("Failed to process audio file, path: {}. Skipping and releasing lock.",
-                filePath, e);
+            log.error("Failed to process audio file, path: {}. Skipping.", filePath, e);
         } finally {
-            // This only executes if the message wasn't dropped above
-            coordinatorService.completeTask(uuid);
+            // 3. Clean up thread registration and decrement progress
+            coordinatorService.completeTask(uuid, Thread.currentThread(), null, null);
         }
     }
 }

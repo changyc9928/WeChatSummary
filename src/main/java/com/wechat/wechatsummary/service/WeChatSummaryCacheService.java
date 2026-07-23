@@ -43,11 +43,8 @@ public class WeChatSummaryCacheService {
         log.info(
             "Cache miss for image_summary signature target [{}]. Querying relational persistence layers...",
             hash);
-        ImageSummaryEntity dbResult = imageSummaryRepository.findByImageHash(hash);
-        if (dbResult != null) {
-            return Optional.ofNullable(dbResult.getSummary());
-        }
-        return Optional.empty();
+        Optional<ImageSummaryEntity> dbResult = imageSummaryRepository.findByImageHash(hash);
+        return dbResult.map(ImageSummaryEntity::getSummary);
     }
 
     @CachePut(cacheNames = "image_summary", key = "#hash")

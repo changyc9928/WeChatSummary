@@ -2,6 +2,7 @@ package com.wechat.wechatsummary.service;
 
 import com.wechat.wechatsummary.config.RabbitConfig;
 import com.wechat.wechatsummary.config.StorageConfig;
+import com.wechat.wechatsummary.dto.TaskProgress;
 import java.io.IOException;
 import java.nio.file.Files;
 import java.nio.file.Path;
@@ -37,6 +38,13 @@ public class MediaProducerService {
      *                          target workspace
      */
     public void preprocess(String uuid) throws IOException {
+        // 0. Prevent duplicate execution if the task is already running
+        TaskProgress progress = coordinatorService.getTaskProgress(uuid);
+        if ("RUNNING".equalsIgnoreCase(progress.getStatus())) {
+            log.warn("Preprocessing skipped for UUID: [{}]. Task is already RUNNING.", uuid);
+            return;
+        }
+
         log.info("Starting media file preprocessing lifecycle phase for transaction UUID: [{}]",
             uuid);
         Path baseDir = storageConfig.getUploadDir().resolve(uuid);
@@ -84,9 +92,12 @@ public class MediaProducerService {
             scanAndPublish(uuid, imagesDir, RabbitConfig.IMAGE_ROUTING_KEY);
             scanAndPublish(uuid, emojisDir, RabbitConfig.IMAGE_ROUTING_KEY);
             scanAndPublish(uuid, voicesDir, RabbitConfig.AUDIO_ROUTING_KEY);
-            log.info(
-                "Successfully dispatched all discovery tasks for batch UUID: [{}] to AMQP Broker.",
-                uuid);
+
+            if (!coordinatorService.isAborted(uuid)) {
+                log.info(
+                    "Successfully dispatched all discovery tasks for batch UUID: [{}] to AMQP Broker.",
+                    uuid);
+            }
         } else {
             log.warn(
                 "Zero media attachments detected for pipeline UUID: [{}]. Skipping messaging ingestion stage.",
@@ -118,6 +129,7 @@ public class MediaProducerService {
     /**
      * Walks a given directory path recursively, filtering out regular files, and dispatches a
      * formatted pipeline string token payload to the configured AMQP message exchange.
+     * Checks if the abort flag is present in Redis prior to publishing each item.
      *
      * @param uuid       the tracing token associated with the root transaction task
      * @param dir        the target data directory path to scan through
@@ -135,78 +147,25 @@ public class MediaProducerService {
 
         log.info("Scanning directory: [{}] for message routing key emission: [{}]",
             dir.getFileName(), routingKey);
+
         try (Stream<Path> paths = Files.walk(dir)) {
-            paths.filter(Files::isRegularFile)
-                .forEach(file -> {
-                    String messagePayload = uuid + ":" + file.toAbsolutePath().toString();
+            for (Path file : (Iterable<Path>) paths.filter(Files::isRegularFile)::iterator) {
+                // Check if the batch task was aborted prior to pushing each message
+                if (coordinatorService.isAborted(uuid)) {
+                    log.warn("Task UUID [{}] has been ABORTED. Ceasing further message production for directory: {}", uuid, dir);
+                    break;
+                }
 
-                    if (log.isDebugEnabled()) {
-                        log.debug(
-                            "Dispatching AMQP frame payload mapping: [{}] onto routing address: [{}]",
-                            messagePayload, routingKey);
-                    }
+                String messagePayload = uuid + ":" + file.toAbsolutePath().toString();
 
-                    rabbitTemplate.convertAndSend(RabbitConfig.EXCHANGE, routingKey,
-                        messagePayload);
-                });
-        }
-    }
+                if (log.isDebugEnabled()) {
+                    log.debug(
+                        "Dispatching AMQP frame payload mapping: [{}] onto routing address: [{}]",
+                        messagePayload, routingKey);
+                }
 
-    /**
-     * Resets the task tracking context and re-dispatches all files back to the message broker. This
-     * allows a paused or broken batch processing run to completely start over.
-     */
-    public void startOver(String uuid) throws IOException {
-        log.info("Request received to START OVER processing for batch UUID: [{}]", uuid);
-        Path baseDir = storageConfig.getUploadDir().resolve(uuid);
-
-        // 1. Locate the input JSON path again
-        String inputJsonPath;
-        try (Stream<Path> list = Files.list(baseDir)) {
-            Optional<Path> jsonFile = list.filter(p -> p.toString().endsWith(".json")).findFirst();
-            if (jsonFile.isEmpty()) {
-                log.error("Start over failed. Cannot locate source JSON in directory: {}", baseDir);
-                throw new RuntimeException("无法找到聊天记录 JSON 文件，重头开始失败！");
+                rabbitTemplate.convertAndSend(RabbitConfig.EXCHANGE, routingKey, messagePayload);
             }
-            inputJsonPath = jsonFile.get().toAbsolutePath().toString();
-        }
-
-        String outputFilePath = storageConfig.getUploadDir()
-            .resolve("outputs")
-            .resolve(uuid + "_processed.md")
-            .toAbsolutePath()
-            .toString();
-
-        Path imagesDir = baseDir.resolve("images");
-        Path emojisDir = baseDir.resolve("emojis");
-        Path voicesDir = baseDir.resolve("voices");
-
-        int totalMediaFiles = countFiles(imagesDir) + countFiles(emojisDir) + countFiles(voicesDir);
-
-        // 2. Call coordinator service to wipe the slate clean and update state back to PROCESSING
-        boolean resetSuccessful = coordinatorService.startOverTask(uuid, inputJsonPath,
-            outputFilePath);
-
-        if (!resetSuccessful) {
-            log.error("Coordinator service rejected the start over request for UUID: [{}]", uuid);
-            throw new IllegalStateException(
-                "Redis operational reset failed. Task context may have expired.");
-        }
-
-        // 3. Re-queue all files back to RabbitMQ for workers to consume
-        if (totalMediaFiles > 0) {
-            log.info("Re-publishing all {} media items to RabbitMQ for batch UUID: [{}]",
-                totalMediaFiles, uuid);
-            scanAndPublish(uuid, imagesDir, RabbitConfig.IMAGE_ROUTING_KEY);
-            scanAndPublish(uuid, emojisDir, RabbitConfig.IMAGE_ROUTING_KEY);
-            scanAndPublish(uuid, voicesDir, RabbitConfig.AUDIO_ROUTING_KEY);
-            log.info("Start over process successfully fully re-queued for UUID: [{}]", uuid);
-        } else {
-            log.warn(
-                "Start over called on a batch with zero media attachments for UUID: [{}]. Completing immediately.",
-                uuid);
-            // If there are zero files, let completeTask handle the instant compilation check
-            coordinatorService.completeTask(uuid);
         }
     }
 }
