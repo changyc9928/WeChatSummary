@@ -8,7 +8,12 @@ import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.StandardOpenOption;
-import java.util.*;
+import java.util.ArrayList;
+import java.util.HashMap;
+import java.util.List;
+import java.util.Map;
+import java.util.Optional;
+import java.util.UUID;
 import java.util.concurrent.ConcurrentHashMap;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
@@ -69,7 +74,8 @@ public class ChatAnalysisService {
                 String initialTempContent = "-1\n" + previousContextSummary;
                 Files.writeString(tempProgressPath, initialTempContent, StandardCharsets.UTF_8,
                     StandardOpenOption.CREATE, StandardOpenOption.TRUNCATE_EXISTING);
-                log.info("Initialized pristine workspace progress snapshot file for task: {}", uuid);
+                log.info("Initialized pristine workspace progress snapshot file for task: {}",
+                    uuid);
             }
 
             // 2. Main Chunk Execution Workflow Loop
@@ -79,9 +85,11 @@ public class ChatAnalysisService {
                     return;
                 }
 
-                log.info("Processing segment ({}/{}) for task UUID: {}", i + 1, chunks.size(), uuid);
+                log.info("Processing segment ({}/{}) for task UUID: {}", i + 1, chunks.size(),
+                    uuid);
 
-                String rawModelOutput = aiService.callChatClientToSummarizeTextWithRetry(previousContextSummary, chunks.get(i));
+                String rawModelOutput = aiService.callChatClientToSummarizeTextWithRetry(
+                    previousContextSummary, chunks.get(i));
                 previousContextSummary = rawModelOutput.trim();
 
                 String tempFileContent = i + "\n" + previousContextSummary;
@@ -93,7 +101,8 @@ public class ChatAnalysisService {
             Files.writeString(resultTxtPath, previousContextSummary, StandardCharsets.UTF_8,
                 StandardOpenOption.CREATE, StandardOpenOption.TRUNCATE_EXISTING);
             Files.deleteIfExists(tempProgressPath);
-            log.info("Analysis task complete. Summary file generated successfully for trace: {}", uuid);
+            log.info("Analysis task complete. Summary file generated successfully for trace: {}",
+                uuid);
 
         } catch (Exception e) {
             if (e instanceof InterruptedException || Thread.currentThread().isInterrupted()) {
@@ -166,10 +175,12 @@ public class ChatAnalysisService {
                     int totalChunks = splitContent(rawContent).size();
 
                     if (totalChunks > 0) {
-                        progress = Math.min(99.9, ((double) (processedIndex + 1) / totalChunks) * 100);
+                        progress = Math.min(99.9,
+                            ((double) (processedIndex + 1) / totalChunks) * 100);
                     }
                 }
-            } catch (Exception ignored) {}
+            } catch (Exception ignored) {
+            }
 
             boolean isRunning = activeThreads.containsKey(uuid);
             response.put("status", isRunning ? AnalysisStatus.RUNNING : AnalysisStatus.PAUSED);
@@ -203,7 +214,8 @@ public class ChatAnalysisService {
                     return name.startsWith(filePrefix) && name.endsWith(fileSuffix);
                 })
                 .findFirst()
-                .orElseThrow(() -> new RuntimeException("Processed markdown source file not found for trace: " + filePrefix));
+                .orElseThrow(() -> new RuntimeException(
+                    "Processed markdown source file not found for trace: " + filePrefix));
         }
     }
 
@@ -215,7 +227,9 @@ public class ChatAnalysisService {
             int end = Math.min(start + MAX_CHUNK_CHARS, length);
             if (end < length) {
                 int nextNewLine = content.lastIndexOf('\n', end);
-                if (nextNewLine > start) end = nextNewLine;
+                if (nextNewLine > start) {
+                    end = nextNewLine;
+                }
             }
             chunks.add(content.substring(start, end).trim());
             start = end + 1;

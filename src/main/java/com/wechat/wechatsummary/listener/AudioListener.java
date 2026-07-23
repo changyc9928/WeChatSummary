@@ -13,7 +13,7 @@ import org.springframework.stereotype.Component;
 @Slf4j
 public class AudioListener {
 
-    private final AudioProcessorService audioSummaryService;
+    private final AudioProcessorService audioProcessorService;
     private final TaskTaskCoordinatorService coordinatorService;
 
     @RabbitListener(queues = RabbitConfig.AUDIO_QUEUE)
@@ -39,8 +39,7 @@ public class AudioListener {
         coordinatorService.registerThread(uuid, Thread.currentThread());
 
         try {
-            audioSummaryService.processAudioSummary(filePath);
-            log.info("Successfully processed audio summary for: {}", filePath);
+            audioProcessorService.processAudioSummary(filePath);
         } catch (Exception e) {
             log.error("Failed to process audio file, path: {}. Skipping.", filePath, e);
         } finally {

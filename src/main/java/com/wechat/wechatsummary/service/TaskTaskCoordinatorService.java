@@ -15,7 +15,8 @@ import org.springframework.stereotype.Service;
 
 /**
  * Orchestration service acting as a thread-safe distributed progress tracker using Redis keys,
- * maintaining active local JVM thread references per batch UUID with dynamic state checking and abortion support.
+ * maintaining active local JVM thread references per batch UUID with dynamic state checking and
+ * abortion support.
  */
 @Service
 @RequiredArgsConstructor
@@ -33,7 +34,8 @@ public class TaskTaskCoordinatorService {
     private final MessageProcessorService messageProcessorService;
     private final StorageConfig storageConfig;
 
-    public void initTaskContext(String uuid, int totalTasks, String inputJsonPath, String outputFilePath) {
+    public void initTaskContext(String uuid, int totalTasks, String inputJsonPath,
+        String outputFilePath) {
         // Clear any previous abort/paused state if re-initialized
         redisTemplate.delete(ABORTED_PREFIX + uuid);
 
@@ -45,8 +47,10 @@ public class TaskTaskCoordinatorService {
             return;
         }
 
-        redisTemplate.opsForValue().set(COUNTER_PREFIX + uuid, String.valueOf(totalTasks), 1, TimeUnit.DAYS);
-        redisTemplate.opsForValue().set(TOTAL_PREFIX + uuid, String.valueOf(totalTasks), 1, TimeUnit.DAYS);
+        redisTemplate.opsForValue()
+            .set(COUNTER_PREFIX + uuid, String.valueOf(totalTasks), 1, TimeUnit.DAYS);
+        redisTemplate.opsForValue()
+            .set(TOTAL_PREFIX + uuid, String.valueOf(totalTasks), 1, TimeUnit.DAYS);
 
         log.info(
             "Distributed transaction progress initialized for batch UUID: [{}] tracking total tasks: {}",
@@ -60,7 +64,9 @@ public class TaskTaskCoordinatorService {
      * @param thread The active worker thread instance.
      */
     public void registerThread(String uuid, Thread thread) {
-        if (thread == null) return;
+        if (thread == null) {
+            return;
+        }
 
         activeThreadsMap
             .computeIfAbsent(uuid, k -> Collections.newSetFromMap(new ConcurrentHashMap<>()))
@@ -70,8 +76,8 @@ public class TaskTaskCoordinatorService {
     }
 
     /**
-     * Instantly aborts all active worker threads, stores a flag in Redis,
-     * and purges active counter data for the given UUID.
+     * Instantly aborts all active worker threads, stores a flag in Redis, and purges active counter
+     * data for the given UUID.
      *
      * @param uuid The batch transaction identifier to abort.
      * @return true if tasks were aborted or state marked as aborted.
@@ -89,15 +95,19 @@ public class TaskTaskCoordinatorService {
         if (threads != null && !threads.isEmpty()) {
             for (Thread thread : threads) {
                 if (thread != null && thread.isAlive()) {
-                    log.info("Interrupting active thread [{}] for aborted/paused UUID: [{}]", thread.getName(), uuid);
+                    log.info("Interrupting active thread [{}] for aborted/paused UUID: [{}]",
+                        thread.getName(), uuid);
                     thread.interrupt();
                 }
             }
-            log.info("Successfully aborted all {} task thread(s) for batch UUID: [{}]", threads.size(), uuid);
+            log.info("Successfully aborted all {} task thread(s) for batch UUID: [{}]",
+                threads.size(), uuid);
             return true;
         }
 
-        log.warn("Abort triggered, marked UUID [{}] as paused in Redis (no active threads were running).", uuid);
+        log.warn(
+            "Abort triggered, marked UUID [{}] as paused in Redis (no active threads were running).",
+            uuid);
         return true;
     }
 
@@ -111,10 +121,13 @@ public class TaskTaskCoordinatorService {
         return Boolean.TRUE.equals(redisTemplate.hasKey(ABORTED_PREFIX + uuid));
     }
 
-    public void completeTask(String uuid, Thread thread, String inputJsonPath, String outputFilePath) {
+    public void completeTask(String uuid, Thread thread, String inputJsonPath,
+        String outputFilePath) {
         // Guard check: do not process final compile if batch was aborted/paused
         if (Boolean.TRUE.equals(redisTemplate.hasKey(ABORTED_PREFIX + uuid))) {
-            log.info("Task completion reported for UUID: [{}] but ignored because transaction was PAUSED.", uuid);
+            log.info(
+                "Task completion reported for UUID: [{}] but ignored because transaction was PAUSED.",
+                uuid);
             return;
         }
 
@@ -138,7 +151,9 @@ public class TaskTaskCoordinatorService {
         }
 
         if (log.isDebugEnabled()) {
-            log.debug("Task sub-component completed for transaction UUID: [{}]. Remaining tasks: {}", uuid, remaining);
+            log.debug(
+                "Task sub-component completed for transaction UUID: [{}]. Remaining tasks: {}",
+                uuid, remaining);
         }
 
         if (remaining <= 0) {
@@ -157,7 +172,8 @@ public class TaskTaskCoordinatorService {
     }
 
     /**
-     * Dynamically determines task progress based on pause flag, artifact presence, and live thread status.
+     * Dynamically determines task progress based on pause flag, artifact presence, and live thread
+     * status.
      */
     public TaskProgress getTaskProgress(String uuid) {
         // 1. Check if the task has been explicitly aborted/paused -> PAUSED

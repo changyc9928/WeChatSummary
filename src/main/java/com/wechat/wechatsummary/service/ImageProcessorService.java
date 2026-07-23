@@ -52,7 +52,8 @@ public class ImageProcessorService {
 
             // Strict State Check: If record exists, skip processing completely
             if (dbRecord.isPresent()) {
-                log.info("Trace match hit for image hash: [{}]. Skipping duplicate AI processing for file: {}",
+                log.info(
+                    "Trace match hit for image hash: [{}]. Skipping duplicate AI processing for file: {}",
                     hash, filePath);
                 return;
             }
@@ -60,7 +61,8 @@ public class ImageProcessorService {
             // Record is missing -> Proceed with Validation and AI Execution
             Path path = Paths.get(filePath);
             if (!Files.exists(path)) {
-                log.warn("Image file validation failed. Target resource does not exist on disk: {}", filePath);
+                log.warn("Image file validation failed. Target resource does not exist on disk: {}",
+                    filePath);
                 return;
             }
 
@@ -68,7 +70,8 @@ public class ImageProcessorService {
 
             // Constraint Check: 5MB maximum file payload ceiling
             if (imageBytes.length > 5_000_000) {
-                log.warn("Image analysis aborted. Payload size ({} bytes) exceeds the allowed 5MB structural limit for file: {}",
+                log.warn(
+                    "Image analysis aborted. Payload size ({} bytes) exceeds the allowed 5MB structural limit for file: {}",
                     imageBytes.length, filePath);
                 return;
             }
@@ -77,15 +80,21 @@ public class ImageProcessorService {
             if (mimeType == null) {
                 mimeType = "image/jpeg";
                 if (log.isDebugEnabled()) {
-                    log.debug("Probed MimeType resolved to null for file {}. Defaulting fallback header to image/jpeg.", filePath);
+                    log.debug(
+                        "Probed MimeType resolved to null for file {}. Defaulting fallback header to image/jpeg.",
+                        filePath);
                 }
             }
 
-            log.info("Cache/DB miss for image [{}]. Requesting multimodal vision summary from AI service...", hash);
+            log.info(
+                "Cache/DB miss for image [{}]. Requesting multimodal vision summary from AI service...",
+                hash);
             String summary = imageAiSummaryService.generateSummary(imageBytes, mimeType, filePath);
 
             if (summary == null || summary.isBlank()) {
-                log.warn("AI multimodal vision analysis returned a blank or empty summary layout text contract for file: {}", filePath);
+                log.warn(
+                    "AI multimodal vision analysis returned a blank or empty summary layout text contract for file: {}",
+                    filePath);
                 return;
             }
 
@@ -98,19 +107,23 @@ public class ImageProcessorService {
             entity.setCreatedAt(Instant.now());
 
             cacheService.saveImageSummary(entity);
-            log.info("Image processing pipeline executed successfully. Record persisted for hash: [{}]", hash);
+            log.info(
+                "Image processing pipeline executed successfully. Record persisted for hash: [{}]",
+                hash);
 
         } catch (Exception e) {
-            log.error("Fatal exception or structural IO crash encountered while processing image resource context: {}", filePath, e);
+            log.error(
+                "Fatal exception or structural IO crash encountered while processing image resource context: {}",
+                filePath, e);
         }
     }
 
     /**
-     * Retrieves image description records for a specific chat/session UUID,
-     * sanitized to hide full path structures, sorted by image timestamp extracted from the path,
-     * and paginated according to the provided Pageable options.
+     * Retrieves image description records for a specific chat/session UUID, sanitized to hide full
+     * path structures, sorted by image timestamp extracted from the path, and paginated according
+     * to the provided Pageable options.
      *
-     * @param uuid unique target session/chat identifier
+     * @param uuid     unique target session/chat identifier
      * @param pageable pagination parameters (page number and page size)
      * @return Page of {@link ImageSummaryEntity} records scoped to the provided UUID
      */
@@ -142,9 +155,8 @@ public class ImageProcessorService {
     }
 
     /**
-     * Creates a shallow copy of ImageSummaryEntity with a relative filePath.
-     * e.g., converts "/Users/.../uploads/{uuid}/emojis/20260618/file.gif"
-     * to "emojis/20260618/file.gif"
+     * Creates a shallow copy of ImageSummaryEntity with a relative filePath. e.g., converts
+     * "/Users/.../uploads/{uuid}/emojis/20260618/file.gif" to "emojis/20260618/file.gif"
      */
     private ImageSummaryEntity sanitizeFilePath(ImageSummaryEntity original, String uuid) {
         ImageSummaryEntity sanitized = new ImageSummaryEntity();
@@ -185,7 +197,8 @@ public class ImageProcessorService {
             String timestampStr = fileName.split("_")[0];
             return Long.parseLong(timestampStr);
         } catch (Exception e) {
-            log.warn("Failed to parse image creation timestamp from path: {}. Falling back to 0.", entity.getFilePath());
+            log.warn("Failed to parse image creation timestamp from path: {}. Falling back to 0.",
+                entity.getFilePath());
             return 0L;
         }
     }
@@ -230,7 +243,8 @@ public class ImageProcessorService {
      * Retrieves the image file resource and content type by record ID (hash).
      *
      * @param id target entity ID (image hash)
-     * @return Optional containing an array with [Resource, MediaType String] if found and exists on disk
+     * @return Optional containing an array with [Resource, MediaType String] if found and exists on
+     * disk
      */
     public Optional<ImageFileResource> getImageFileById(String id) {
         log.info("Fetching image file resource for ID: [{}]", id);
@@ -256,5 +270,7 @@ public class ImageProcessorService {
     /**
      * Simple record wrapper for image resource response payload.
      */
-    public record ImageFileResource(Resource resource, String contentType) {}
+    public record ImageFileResource(Resource resource, String contentType) {
+
+    }
 }

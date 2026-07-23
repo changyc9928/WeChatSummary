@@ -128,8 +128,8 @@ public class MediaProducerService {
 
     /**
      * Walks a given directory path recursively, filtering out regular files, and dispatches a
-     * formatted pipeline string token payload to the configured AMQP message exchange.
-     * Checks if the abort flag is present in Redis prior to publishing each item.
+     * formatted pipeline string token payload to the configured AMQP message exchange. Checks if
+     * the abort flag is present in Redis prior to publishing each item.
      *
      * @param uuid       the tracing token associated with the root transaction task
      * @param dir        the target data directory path to scan through
@@ -152,7 +152,9 @@ public class MediaProducerService {
             for (Path file : (Iterable<Path>) paths.filter(Files::isRegularFile)::iterator) {
                 // Check if the batch task was aborted prior to pushing each message
                 if (coordinatorService.isAborted(uuid)) {
-                    log.warn("Task UUID [{}] has been ABORTED. Ceasing further message production for directory: {}", uuid, dir);
+                    log.warn(
+                        "Task UUID [{}] has been ABORTED. Ceasing further message production for directory: {}",
+                        uuid, dir);
                     break;
                 }
 

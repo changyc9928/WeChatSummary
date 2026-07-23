@@ -2,22 +2,31 @@ package com.wechat.wechatsummary.service;
 
 import com.openai.models.audio.AudioResponseFormat;
 import com.wechat.wechatsummary.entity.AudioSummary;
-import com.wechat.wechatsummary.repository.AudioSummaryRepository;
 import java.nio.charset.StandardCharsets;
+import java.nio.file.Files;
+import java.nio.file.Path;
 import java.nio.file.Paths;
 import java.security.MessageDigest;
+import java.time.LocalDateTime;
+import java.util.Comparator;
 import java.util.HexFormat;
+import java.util.List;
 import java.util.Optional;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.ai.audio.transcription.AudioTranscriptionPrompt;
 import org.springframework.ai.openai.OpenAiAudioTranscriptionOptions;
 import org.springframework.core.io.FileSystemResource;
+import org.springframework.core.io.Resource;
+import org.springframework.core.io.UrlResource;
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.PageImpl;
+import org.springframework.data.domain.Pageable;
 import org.springframework.stereotype.Service;
 
 /**
- * Service orchestration class managing decoupled ASR and LLM lifecycles based on strict record states.
- * This implementation relies directly on DB lookups and triggers cache invalidation upon successful state mutations.
+ * Service orchestration class managing decoupled ASR and LLM lifecycles. Treats cacheService as the
+ * black-box abstraction for audio record persistence and retrieval.
  */
 @Service
 @RequiredArgsConstructor
@@ -26,75 +35,123 @@ public class AudioProcessorService {
 
     private final AiService audioAiSummaryService;
     private final WeChatSummaryCacheService cacheService;
-    private final AudioSummaryRepository repository;
 
     /**
-     * Processes audio summary with write-through cache invalidation:
+     * Processes an audio file based on strict record states:
      * <ol>
-     * <li>If DB record is missing: Runs ASR, saves the transcript, evicts the cache, and exits.</li>
-     * <li>If DB record exists and transcript is present but summary is missing: Runs LLM Summary, updates DB, evicts the cache, and returns.</li>
-     * <li>If DB record is fully complete, returns the existing summary text immediately.</li>
+     * <li>If DB record is missing: Runs ASR (Whisper) & LLM Summary, then persists.</li>
+     * <li>If DB record exists with transcript & summary: Skips processing completely.</li>
      * </ol>
      *
      * @param filePath system path pointing to the audio source file
-     * @return summarized content produced by the LLM or blank if processing is incomplete
      */
-    public String processAudioSummary(String filePath) {
-        String pathHash = sha256(filePath);
-        log.info("Initiating audio summary process for file path: [{}] with hash: [{}]", filePath, pathHash);
+    public void processAudioSummary(String filePath) {
+        log.info("Initiating audio processing pipeline execution for target file: [{}]", filePath);
+        try {
+            String hash = sha256(filePath);
 
-        // Database Lookup Only (Cache lookups removed)
-        Optional<AudioSummary> dbRecord = repository.findByFileHash(pathHash);
+            // Record Lookup through Cache Service
+            Optional<AudioSummary> dbRecord = cacheService.findAudioSummaryByHash(hash);
 
-        // CASE 1: No DB record found -> Run ASR ONLY, Save, and Evict Cache
-        if (dbRecord.isEmpty()) {
-            log.info("Database miss for hash: [{}]. Triggering ASR (Whisper) to create initial record...", pathHash);
+            // Case 1: Complete processing skip if both transcript and summary exist
+            if (dbRecord.isPresent() && dbRecord.get().getSummary() != null && !dbRecord.get()
+                .getSummary().isBlank()) {
+                log.info(
+                    "Trace match hit for audio hash: [{}]. Skipping duplicate AI processing for file: {}",
+                    hash, filePath);
+                return;
+            }
 
-            String transcript = executeTranscription(filePath);
+            Path path = Paths.get(filePath);
+            if (!Files.exists(path)) {
+                log.warn(
+                    "Audio processing aborted. Resource file does not exist on disk at path: {}",
+                    filePath);
+                return;
+            }
 
-            AudioSummary newAudioSummary = new AudioSummary();
-            newAudioSummary.setId(pathHash);
-            newAudioSummary.setFileHash(pathHash);
-            newAudioSummary.setFilePath(filePath);
-            newAudioSummary.setTranscript(transcript);
+            String transcript;
+            AudioSummary entity;
 
-            repository.save(newAudioSummary);
+            if (dbRecord.isPresent()) {
+                entity = dbRecord.get();
+                transcript = entity.getTranscript();
+            } else {
+                // Execute ASR (Whisper) transcription
+                log.info("Cache/DB miss for hash: [{}]. Triggering ASR (Whisper) execution...",
+                    hash);
+                transcript = executeTranscription(filePath);
 
-            // Invalidate cache following successful ASR record insert
-            cacheService.evictAudioSummary(pathHash);
-            log.info("ASR complete. Initial transcript saved and cache evicted for hash: [{}]. Exiting phase.", pathHash);
+                if (transcript == null || transcript.isBlank()) {
+                    log.warn("ASR transcription returned empty result for file: {}", filePath);
+                    return;
+                }
 
-            return "";
+                entity = new AudioSummary();
+                entity.setId(hash);
+                entity.setFileHash(hash);
+                entity.setFilePath(filePath);
+                entity.setTranscript(transcript);
+                entity.setCreatedAt(LocalDateTime.now());
+            }
+
+            // Execute LLM Summarization
+            log.info("Triggering LLM text summarization for hash: [{}]...", hash);
+            String summary = audioAiSummaryService.callChatClientToSummarizeAudioWithRetry(
+                transcript);
+
+            if (summary == null || summary.isBlank()) {
+                log.warn("LLM audio summarization returned empty output for file: {}", filePath);
+                return;
+            }
+
+            entity.setSummary(summary);
+            cacheService.saveAudioSummary(entity);
+            log.info(
+                "Audio processing pipeline executed successfully. Record persisted for hash: [{}]",
+                hash);
+
+        } catch (Exception e) {
+            log.error(
+                "Fatal exception or structural IO crash encountered while processing audio resource context: {}",
+                filePath, e);
+        }
+    }
+
+    /**
+     * Retrieves audio summary records for a specific chat/session UUID, sanitized to hide full path
+     * structures, sorted by audio timestamp extracted from the path, and paginated according to the
+     * provided Pageable options.
+     *
+     * @param uuid     unique target session/chat identifier
+     * @param pageable pagination parameters (page number and page size)
+     * @return Page of {@link AudioSummary} records scoped to the provided UUID
+     */
+    public Page<AudioSummary> getAudioSummariesByUuid(String uuid, Pageable pageable) {
+        log.info("Requesting audio summary records for session UUID: [{}] (page: {}, size: {})",
+            uuid, pageable.getPageNumber(), pageable.getPageSize());
+
+        // 1. Fetch full list (cached or DB)
+        List<AudioSummary> entities = cacheService.getAudioSummariesByUuid(uuid);
+
+        // 2. Sanitize file paths & sort by audio path timestamp
+        List<AudioSummary> processedList = entities.stream()
+            .map(entity -> sanitizeFilePath(entity, uuid))
+            .sorted(Comparator.comparingLong(this::extractAudioTimestamp))
+            .toList();
+
+        // 3. Slice list for pagination
+        int total = processedList.size();
+        int start = (int) pageable.getOffset();
+
+        if (start >= total) {
+            return new PageImpl<>(List.of(), pageable, total);
         }
 
-        // CASE 2: DB Record exists -> Evaluate LLM Summary condition
-        AudioSummary existingRecord = dbRecord.get();
-        String transcript = existingRecord.getTranscript();
+        int end = Math.min(start + pageable.getPageSize(), total);
+        List<AudioSummary> pageContent = processedList.subList(start, end);
 
-        if (transcript == null || transcript.isBlank()) {
-            log.warn("Database record exists for hash: [{}] but transcript is empty. Rules prevent ASR execution on existing records.", pathHash);
-            return "";
-        }
-
-        // Check if summary is missing
-        if (existingRecord.getSummary() == null || existingRecord.getSummary().isBlank()) {
-            log.info("Database record found with transcript for hash: [{}]. Triggering LLM text summarization...", pathHash);
-
-            String summary = audioAiSummaryService.callChatClientToSummarizeAudioWithRetry(transcript);
-            existingRecord.setSummary(summary);
-
-            repository.save(existingRecord);
-
-            // Invalidate cache following successful Summary updates
-            cacheService.evictAudioSummary(pathHash);
-            log.info("LLM summarization completed, database updated, and cache evicted for hash: [{}]", pathHash);
-
-            return summary;
-        }
-
-        // Case 3: Both transcript and summary already exist completely in DB
-        log.info("Database hit for complete transcript and summary record for hash: [{}]. Returning data.", pathHash);
-        return existingRecord.getSummary();
+        return new PageImpl<>(pageContent, pageable, total);
     }
 
     /**
@@ -102,10 +159,6 @@ public class AudioProcessorService {
      */
     private String executeTranscription(String filePath) {
         FileSystemResource audioResource = new FileSystemResource(Paths.get(filePath));
-        if (!audioResource.exists()) {
-            log.warn("Audio processing aborted. Resource file does not exist on disk at path: {}", filePath);
-            throw new IllegalArgumentException("Audio file does not exist: " + filePath);
-        }
 
         String localAIPrompt = "这是一段马来西亚华人的日常Rojak华语语音对话。";
 
@@ -115,14 +168,119 @@ public class AudioProcessorService {
             .responseFormat(AudioResponseFormat.JSON)
             .build();
 
-        AudioTranscriptionPrompt transcriptionPrompt = new AudioTranscriptionPrompt(audioResource, transcriptionOptions);
-        var transcriptionResponse = audioAiSummaryService.callTranscriptionWithRetry(transcriptionPrompt);
-        String transcript = transcriptionResponse.getResult().getOutput();
+        AudioTranscriptionPrompt transcriptionPrompt = new AudioTranscriptionPrompt(audioResource,
+            transcriptionOptions);
+        var transcriptionResponse = audioAiSummaryService.callTranscriptionWithRetry(
+            transcriptionPrompt);
+        return transcriptionResponse.getResult().getOutput();
+    }
 
-        if (transcript == null || transcript.isBlank()) {
-            throw new RuntimeException("Failed to transcribe audio: transcript is empty.");
+    /**
+     * Creates a shallow copy of AudioSummary with a relative filePath. e.g., converts
+     * "/Users/.../uploads/{uuid}/voice/20260618/file.mp3" to "voice/20260618/file.mp3"
+     */
+    private AudioSummary sanitizeFilePath(AudioSummary original, String uuid) {
+        AudioSummary sanitized = new AudioSummary();
+        sanitized.setId(original.getId());
+        sanitized.setFileHash(original.getFileHash());
+        sanitized.setTranscript(original.getTranscript());
+        sanitized.setSummary(original.getSummary());
+        sanitized.setCreatedAt(original.getCreatedAt());
+
+        String rawPath = original.getFilePath();
+        if (rawPath != null && !rawPath.isBlank()) {
+            String targetSegment = "/" + uuid + "/";
+            int index = rawPath.indexOf(targetSegment);
+
+            if (index != -1) {
+                sanitized.setFilePath(rawPath.substring(index + targetSegment.length()));
+            } else {
+                sanitized.setFilePath(rawPath);
+            }
         }
-        return transcript;
+
+        return sanitized;
+    }
+
+    /**
+     * Extracts the Unix timestamp integer from file paths.
+     */
+    private long extractAudioTimestamp(AudioSummary entity) {
+        if (entity.getFilePath() == null) {
+            return 0L;
+        }
+        try {
+            String fileName = Paths.get(entity.getFilePath()).getFileName().toString();
+            String timestampStr = fileName.split("_")[0];
+            return Long.parseLong(timestampStr);
+        } catch (Exception e) {
+            log.warn("Failed to parse audio creation timestamp from path: {}. Falling back to 0.",
+                entity.getFilePath());
+            return 0L;
+        }
+    }
+
+    /**
+     * Deletes a single audio summary record by its ID (hash).
+     *
+     * @param id target entity ID (audio hash) to delete
+     */
+    public void deleteAudioSummaryById(String id) {
+        cacheService.deleteAudioSummaryById(id);
+    }
+
+    /**
+     * Deletes multiple audio summary records by their IDs (hashes).
+     *
+     * @param ids list of target entity IDs (audio hashes) to delete
+     */
+    public void deleteAudioSummariesByIds(List<String> ids) {
+        cacheService.deleteAudioSummariesByIds(ids);
+    }
+
+    /**
+     * Retrieves the audio file resource and content type by record ID (hash).
+     *
+     * @param id target entity ID (audio hash)
+     * @return Optional containing an AudioFileResource wrapper if found and exists on disk
+     */
+    public Optional<AudioFileResource> getAudioFileById(String id) {
+        log.info("Fetching audio file resource for ID: [{}]", id);
+        return cacheService.findAudioSummaryByHash(id)
+            .map(AudioSummary::getFilePath)
+            .map(Paths::get)
+            .filter(Files::exists)
+            .map(path -> {
+                try {
+                    Resource resource = new UrlResource(path.toUri());
+                    String contentType = Files.probeContentType(path);
+                    if (contentType == null) {
+                        contentType = "audio/mpeg";
+                    }
+                    return new AudioFileResource(resource, contentType);
+                } catch (Exception e) {
+                    log.error("Failed to load audio file resource at path: {}", path, e);
+                    return null;
+                }
+            });
+    }
+
+    /**
+     * Clears only the summary text of a single audio record by its ID (hash).
+     *
+     * @param id target entity ID (audio hash)
+     */
+    public void clearAudioSummaryTextById(String id) {
+        cacheService.clearAudioSummaryTextById(id);
+    }
+
+    /**
+     * Clears only the summary text for multiple audio records by their IDs (hashes).
+     *
+     * @param ids list of target entity IDs (audio hashes)
+     */
+    public void clearAudioSummaryTextsByIds(List<String> ids) {
+        cacheService.clearAudioSummaryTextsByIds(ids);
     }
 
     private String sha256(String input) {
@@ -134,5 +292,12 @@ public class AudioProcessorService {
             log.error("Cryptographic configuration error initialization for SHA-256 failed.", e);
             throw new RuntimeException(e);
         }
+    }
+
+    /**
+     * Simple record wrapper for audio resource response payload.
+     */
+    public record AudioFileResource(Resource resource, String contentType) {
+
     }
 }

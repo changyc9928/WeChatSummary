@@ -13,8 +13,8 @@ import org.springframework.transaction.annotation.Transactional;
 public interface ChatAnalysisTaskRepository extends JpaRepository<ChatAnalysisTask, UUID> {
 
     /**
-     * Strictly responsible for logging internal service engine errors.
-     * No state tracking machine variables or structural assumptions belong here.
+     * Strictly responsible for logging internal service engine errors. No state tracking machine
+     * variables or structural assumptions belong here.
      */
     @Modifying
     @Transactional
