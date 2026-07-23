@@ -16,8 +16,7 @@ import org.springframework.stereotype.Service;
 
 /**
  * Service orchestration class responsible for managing the end-to-end image processing lifecycle.
- * Coordinates validation, lookup checks between the cache and persistence layers, and coordinates
- * multimodal AI vision requests for image description and text extraction.
+ * Relies directly on DB lookups to execute Vision AI processing and triggers cache invalidation upon success.
  */
 @Service
 @RequiredArgsConstructor
@@ -29,22 +28,33 @@ public class ImageProcessorService {
     private final ImageSummaryRepository imageSummaryRepository;
 
     /**
-     * Processes an image file by checking caches, parsing data payloads, probing media types,
-     * routing payloads to multimodal AI frameworks, and securely persisting results.
-     *
-     * <p>Gracefully catches and logs unexpected pipeline exceptions to prevent runtime cascading
-     * failures.</p>
+     * Processes an image file based on strict record states:
+     * <ol>
+     * <li>If DB record exists: Skipping duplicate processing immediately.</li>
+     * <li>If DB record is missing: Validates payload, runs Multimodal AI Vision, saves to DB, and evicts cache.</li>
+     * </ol>
      *
      * @param filePath system path pointing to the targeted image file resource
      */
     public void processImage(String filePath) {
         log.info("Initiating image processing pipeline execution for target file: [{}]", filePath);
         try {
-            Path path = Paths.get(filePath);
+            String hash = sha256(filePath);
 
+            // Database Lookup Only (Cache lookups removed)
+            Optional<ImageSummaryEntity> dbRecord = imageSummaryRepository.findByImageHash(hash);
+
+            // Strict State Check: If DB record exists, skip processing completely
+            if (dbRecord.isPresent()) {
+                log.info("Database trace match hit for image hash: [{}]. Skipping duplicate AI processing for file: {}",
+                    hash, filePath);
+                return;
+            }
+
+            // Record is missing -> Proceed with Validation and AI Execution
+            Path path = Paths.get(filePath);
             if (!Files.exists(path)) {
-                log.warn("Image file validation failed. Target resource does not exist on disk: {}",
-                    filePath);
+                log.warn("Image file validation failed. Target resource does not exist on disk: {}", filePath);
                 return;
             }
 
@@ -52,20 +62,8 @@ public class ImageProcessorService {
 
             // Constraint Check: 5MB maximum file payload ceiling
             if (imageBytes.length > 5_000_000) {
-                log.warn(
-                    "Image analysis aborted. Payload size ({} bytes) exceeds the allowed 5MB structural limit for file: {}",
+                log.warn("Image analysis aborted. Payload size ({} bytes) exceeds the allowed 5MB structural limit for file: {}",
                     imageBytes.length, filePath);
-                return;
-            }
-
-            String hash = sha256(filePath);
-
-            // Layered Cache & DB Verification Check
-            Optional<String> existingSummary = cacheService.getImageSummary(hash);
-            if (existingSummary.isPresent()) {
-                log.info(
-                    "Cache/Database trace match hit for image hash: [{}]. Skipping duplicate AI processing for file: {}",
-                    hash, filePath);
                 return;
             }
 
@@ -73,25 +71,19 @@ public class ImageProcessorService {
             if (mimeType == null) {
                 mimeType = "image/jpeg";
                 if (log.isDebugEnabled()) {
-                    log.debug(
-                        "Probed MimeType resolved to null for file {}. Defaulting fallback header to image/jpeg.",
-                        filePath);
+                    log.debug("Probed MimeType resolved to null for file {}. Defaulting fallback header to image/jpeg.", filePath);
                 }
             }
 
-            log.info(
-                "Cache miss for image [{}]. Requesting multimodal vision summary from AI service...",
-                hash);
+            log.info("Database miss for image [{}]. Requesting multimodal vision summary from AI service...", hash);
             String summary = imageAiSummaryService.generateSummary(imageBytes, mimeType, filePath);
 
             if (summary == null || summary.isBlank()) {
-                log.warn(
-                    "AI multimodal vision analysis returned a blank or empty summary layout text contract for file: {}",
-                    filePath);
+                log.warn("AI multimodal vision analysis returned a blank or empty summary layout text contract for file: {}", filePath);
                 return;
             }
 
-            // Persistence and Memory Mapping Storage Phase
+            // Persistence Phase
             ImageSummaryEntity entity = new ImageSummaryEntity();
             entity.setId(hash);
             entity.setImageHash(hash);
@@ -100,16 +92,13 @@ public class ImageProcessorService {
             entity.setCreatedAt(Instant.now());
 
             imageSummaryRepository.save(entity);
-            cacheService.putImageSummary(hash, summary);
 
-            log.info(
-                "Image processing pipeline executed successfully. Record saved and cached for hash: [{}]",
-                hash);
+            // Invalidate cache following successful database update
+            cacheService.evictImageSummary(hash);
+            log.info("Image processing pipeline executed successfully. Record saved and cache evicted for hash: [{}]", hash);
 
         } catch (Exception e) {
-            log.error(
-                "Fatal exception or structural IO crash encountered while processing image resource context: {}",
-                filePath, e);
+            log.error("Fatal exception or structural IO crash encountered while processing image resource context: {}", filePath, e);
         }
     }
 
