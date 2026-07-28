@@ -33,22 +33,23 @@ public class ChatAnalysisService {
     private final Map<UUID, Thread> activeThreads = new ConcurrentHashMap<>();
 
     @Async
-    public void analyzeChatLogAsync(UUID uuid) {
+    public void analyzeChatLogAsync(String userId, UUID uuid) {
         // Guardrail against double clicks: reject immediately if a thread is already running
         if (activeThreads.containsKey(uuid)) {
-            log.warn("Execution request rejected for task {}: Thread is already running.", uuid);
+            log.warn("Execution request rejected for user UUID: [{}] and task {}: Thread is already running.", userId, uuid);
             return;
         }
 
-        log.info("Starting worker thread for task UUID: {}", uuid);
+        log.info("Starting worker thread for user UUID: [{}] and task UUID: [{}]", userId, uuid);
         activeThreads.put(uuid, Thread.currentThread());
 
-        Path outputsDir = storageConfig.getUploadDir().resolve("outputs");
-        Path tempProgressPath = outputsDir.resolve(uuid + "_analysis.temp");
-        Path resultTxtPath = outputsDir.resolve(uuid + "_summary.txt");
+        Path userOutputsDir = storageConfig.getUploadDir().resolve(userId).resolve("outputs");
+        Path tempProgressPath = userOutputsDir.resolve(uuid + "_analysis.temp");
+        Path resultTxtPath = userOutputsDir.resolve(uuid + "_summary.txt");
 
         try {
-            Path targetFilePath = locateProcessedFile(outputsDir, uuid);
+            Files.createDirectories(userOutputsDir);
+            Path targetFilePath = locateProcessedFile(userOutputsDir, uuid);
             String rawContent = Files.readString(targetFilePath, StandardCharsets.UTF_8);
             List<String> chunks = splitContent(rawContent);
             if (chunks.isEmpty()) {
@@ -65,7 +66,7 @@ public class ChatAnalysisService {
                     int savedIndex = Integer.parseInt(lines.get(0).trim());
                     startIndex = savedIndex + 1;
                     previousContextSummary = String.join("\n", lines.subList(1, lines.size()));
-                    log.info("Resuming task {} from chunk index: {}", uuid, startIndex);
+                    log.info("Resuming user UUID: [{}] task {} from chunk index: {}", userId, uuid, startIndex);
                 } else {
                     previousContextSummary = "【以下是群聊数据的递进总结摘要：】";
                 }
@@ -74,19 +75,19 @@ public class ChatAnalysisService {
                 String initialTempContent = "-1\n" + previousContextSummary;
                 Files.writeString(tempProgressPath, initialTempContent, StandardCharsets.UTF_8,
                     StandardOpenOption.CREATE, StandardOpenOption.TRUNCATE_EXISTING);
-                log.info("Initialized pristine workspace progress snapshot file for task: {}",
-                    uuid);
+                log.info("Initialized pristine workspace progress snapshot file for user UUID: [{}] and task: {}",
+                    userId, uuid);
             }
 
             // 2. Main Chunk Execution Workflow Loop
             for (int i = startIndex; i < chunks.size(); i++) {
                 if (Thread.currentThread().isInterrupted()) {
-                    log.info("Pipeline thread detected interrupt signal. Exiting immediately.");
+                    log.info("Pipeline thread for user UUID: [{}] detected interrupt signal. Exiting immediately.", userId);
                     return;
                 }
 
-                log.info("Processing segment ({}/{}) for task UUID: {}", i + 1, chunks.size(),
-                    uuid);
+                log.info("Processing segment ({}/{}) for user UUID: [{}] and task UUID: {}", i + 1, chunks.size(),
+                    userId, uuid);
 
                 String rawModelOutput = aiService.callChatClientToSummarizeTextWithRetry(
                     previousContextSummary, chunks.get(i));
@@ -101,14 +102,14 @@ public class ChatAnalysisService {
             Files.writeString(resultTxtPath, previousContextSummary, StandardCharsets.UTF_8,
                 StandardOpenOption.CREATE, StandardOpenOption.TRUNCATE_EXISTING);
             Files.deleteIfExists(tempProgressPath);
-            log.info("Analysis task complete. Summary file generated successfully for trace: {}",
-                uuid);
+            log.info("Analysis task complete. Summary file generated successfully for user UUID: [{}] and trace: {}",
+                userId, uuid);
 
         } catch (Exception e) {
             if (e instanceof InterruptedException || Thread.currentThread().isInterrupted()) {
-                log.info("Thread for task {} was safely interrupted and halted.", uuid);
+                log.info("Thread for user UUID: [{}] and task {} was safely interrupted and halted.", userId, uuid);
             } else {
-                log.error("Fatal processing failure for task UUID: {}", uuid, e);
+                log.error("Fatal processing failure for user UUID: [{}] and task UUID: [{}]", userId, uuid, e);
                 taskRepository.logFailureReason(uuid, e.getMessage());
             }
         } finally {
@@ -126,27 +127,27 @@ public class ChatAnalysisService {
         }
     }
 
-    public void startOverAnalysis(UUID uuid) {
+    public void startOverAnalysis(String userId, UUID uuid) {
         // Force break active threads before touching files to block file-lock collisions
         pauseAnalysis(uuid);
 
-        Path outputsDir = storageConfig.getUploadDir().resolve("outputs");
+        Path userOutputsDir = storageConfig.getUploadDir().resolve(userId).resolve("outputs");
         try {
-            Files.deleteIfExists(outputsDir.resolve(uuid + "_summary.txt"));
-            Files.deleteIfExists(outputsDir.resolve(uuid + "_analysis.temp"));
-            log.info("Successfully wiped processing states for complete restart on task: {}", uuid);
+            Files.deleteIfExists(userOutputsDir.resolve(uuid + "_summary.txt"));
+            Files.deleteIfExists(userOutputsDir.resolve(uuid + "_analysis.temp"));
+            log.info("Successfully wiped processing states for complete restart on user UUID: [{}] and task: {}", userId, uuid);
         } catch (Exception e) {
             log.warn("Failed to wipe files during clean restart initialization", e);
         }
     }
 
-    public Map<String, Object> getStatusAndProgress(UUID uuid) {
+    public Map<String, Object> getStatusAndProgress(String userId, UUID uuid) {
         Map<String, Object> response = new HashMap<>();
         response.put("taskId", uuid);
 
-        Path outputsDir = storageConfig.getUploadDir().resolve("outputs");
-        Path resultTxtPath = outputsDir.resolve(uuid + "_summary.txt");
-        Path tempProgressPath = outputsDir.resolve(uuid + "_analysis.temp");
+        Path userOutputsDir = storageConfig.getUploadDir().resolve(userId).resolve("outputs");
+        Path resultTxtPath = userOutputsDir.resolve(uuid + "_summary.txt");
+        Path tempProgressPath = userOutputsDir.resolve(uuid + "_analysis.temp");
 
         // Rule 1: Summary file exists -> SUCCESS
         if (Files.exists(resultTxtPath)) {
@@ -170,7 +171,7 @@ public class ChatAnalysisService {
                 if (!lines.isEmpty()) {
                     int processedIndex = Integer.parseInt(lines.get(0).trim());
 
-                    Path targetFilePath = locateProcessedFile(outputsDir, uuid);
+                    Path targetFilePath = locateProcessedFile(userOutputsDir, uuid);
                     String rawContent = Files.readString(targetFilePath, StandardCharsets.UTF_8);
                     int totalChunks = splitContent(rawContent).size();
 
@@ -204,10 +205,13 @@ public class ChatAnalysisService {
         return response;
     }
 
-    private Path locateProcessedFile(Path outputsDir, UUID uuid) throws Exception {
+    private Path locateProcessedFile(Path userOutputsDir, UUID uuid) throws Exception {
         String filePrefix = uuid.toString();
         String fileSuffix = "_processed.md";
-        try (var stream = Files.list(outputsDir)) {
+        if (!Files.exists(userOutputsDir)) {
+            throw new RuntimeException("Processed markdown source directory not found for trace: " + filePrefix);
+        }
+        try (var stream = Files.list(userOutputsDir)) {
             return stream
                 .filter(path -> {
                     String name = path.getFileName().toString();

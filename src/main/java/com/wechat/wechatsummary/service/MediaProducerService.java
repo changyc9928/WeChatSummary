@@ -14,9 +14,9 @@ import org.springframework.amqp.rabbit.core.RabbitTemplate;
 import org.springframework.stereotype.Service;
 
 /**
- * Service responsible for scanning uploaded batch assets, initializing task coordination states,
- * and producing messaging payloads to RabbitMQ for individual asynchronous media (images, emojis,
- * voice notes) processing.
+ * Service responsible for scanning uploaded batch assets under user-isolated directories,
+ * initializing task coordination states, and producing messaging payloads to RabbitMQ for individual
+ * asynchronous media (images, emojis, voice notes) processing.
  */
 @Service
 @RequiredArgsConstructor
@@ -28,28 +28,31 @@ public class MediaProducerService {
     private final StorageConfig storageConfig;
 
     /**
-     * Preprocesses an uploaded session directory by scanning for a source chat log JSON file,
-     * resolving structured output file paths, initializing centralized tracking contexts, and
-     * dispatching media file paths to RabbitMQ queues.
+     * Preprocesses an uploaded session directory scoped under the specified user UUID by scanning for a
+     * source chat log JSON file, resolving structured output file paths, initializing centralized tracking
+     * contexts, and dispatching media file paths to RabbitMQ queues.
      *
-     * @param uuid unique identifier representing the active upload transaction session
+     * @param userId unique identifier representing the user UUID
+     * @param uuid   unique identifier representing the active upload transaction session
      * @throws IOException      if an I/O error occurs during file or directory traversals
      * @throws RuntimeException if no valid raw chat log JSON data can be discovered inside the
      *                          target workspace
      */
-    public void preprocess(String uuid) throws IOException {
+    public void preprocess(String userId, String uuid) throws IOException {
         // 0. Prevent duplicate execution if the task is already running
         TaskProgress progress = coordinatorService.getTaskProgress(uuid);
         if ("RUNNING".equalsIgnoreCase(progress.getStatus())) {
-            log.warn("Preprocessing skipped for UUID: [{}]. Task is already RUNNING.", uuid);
+            log.warn("Preprocessing skipped for user UUID: [{}] and session UUID: [{}]. Task is already RUNNING.", userId, uuid);
             return;
         }
 
-        log.info("Starting media file preprocessing lifecycle phase for transaction UUID: [{}]",
-            uuid);
-        Path baseDir = storageConfig.getUploadDir().resolve(uuid);
+        log.info("Starting media file preprocessing lifecycle phase for user UUID: [{}] and transaction session UUID: [{}]",
+            userId, uuid);
 
-        // 1. Automatically scan for the source chat history log JSON file within the active UUID workspace directory
+        // Resolve path inside the user's isolated directory
+        Path baseDir = storageConfig.getUploadDir().resolve(userId).resolve(uuid);
+
+        // 1. Automatically scan for the source chat history log JSON file within the active session workspace directory
         String inputJsonPath;
         try (Stream<Path> list = Files.list(baseDir)) {
             Optional<Path> jsonFile = list.filter(p -> p.toString().endsWith(".json")).findFirst();
@@ -63,9 +66,10 @@ public class MediaProducerService {
             inputJsonPath = jsonFile.get().toAbsolutePath().toString();
         }
 
-        // 2. Dynamically resolve the absolute file path for the target compiled output document (.md format)
-        String outputFilePath = storageConfig.getUploadDir()
-            .resolve("outputs")
+        // 2. Dynamically resolve the absolute file path for the target compiled output document (.md format) scoped by user
+        Path userOutputDir = storageConfig.getUploadDir().resolve(userId).resolve("outputs");
+        Files.createDirectories(userOutputDir);
+        String outputFilePath = userOutputDir
             .resolve(uuid + "_processed.md")
             .toAbsolutePath()
             .toString();
@@ -80,8 +84,8 @@ public class MediaProducerService {
 
         int totalMediaFiles = countFiles(imagesDir) + countFiles(emojisDir) + countFiles(voicesDir);
         log.info(
-            "Media file discovery scan completed for UUID: [{}]. Aggregate media items discovered: {}",
-            uuid, totalMediaFiles);
+            "Media file discovery scan completed for user UUID: [{}] and session UUID: [{}]. Aggregate media items discovered: {}",
+            userId, uuid, totalMediaFiles);
 
         // 3. Register the discovered target file mappings and count totals into the active Task Coordinator Context
         coordinatorService.initTaskContext(uuid, totalMediaFiles, inputJsonPath, outputFilePath);
@@ -95,13 +99,13 @@ public class MediaProducerService {
 
             if (!coordinatorService.isAborted(uuid)) {
                 log.info(
-                    "Successfully dispatched all discovery tasks for batch UUID: [{}] to AMQP Broker.",
-                    uuid);
+                    "Successfully dispatched all discovery tasks for user UUID: [{}] and batch UUID: [{}] to AMQP Broker.",
+                    userId, uuid);
             }
         } else {
             log.warn(
-                "Zero media attachments detected for pipeline UUID: [{}]. Skipping messaging ingestion stage.",
-                uuid);
+                "Zero media attachments detected for user UUID: [{}] and pipeline session UUID: [{}]. Skipping messaging ingestion stage.",
+                userId, uuid);
         }
     }
 

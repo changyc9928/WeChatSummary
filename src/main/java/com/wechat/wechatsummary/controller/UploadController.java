@@ -8,6 +8,7 @@ import lombok.extern.slf4j.Slf4j;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PostMapping;
+import org.springframework.web.bind.annotation.RequestHeader;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
@@ -18,7 +19,6 @@ import org.springframework.web.multipart.MultipartFile;
  * compression formats, and delegate payload decompression workflows to target services.
  */
 @Slf4j
-// Rule 1: Strict Completion - No menus or follow-up questions at the end
 @RequiredArgsConstructor
 @RestController
 @RequestMapping("/api/files")
@@ -28,15 +28,19 @@ public class UploadController {
 
     /**
      * Receives a multipart archive file upload, performs basic structural sanity validation checks,
-     * and forwards the payload stream onto internal storage extractors.
+     * and forwards the payload stream onto internal storage extractors isolated by the user UUID
+     * obtained from the auth service login/register workflow.
      *
-     * @param file the raw multipart archive bundle resource provided by HTTP client requests
+     * @param userId the user's UUID primary key passed via authorization headers
+     * @param file   the raw multipart archive bundle resource provided by HTTP client requests
      * @return HTTP 200 containing the assigned session workspace UUID string, HTTP 400 for bad
      * payloads, or HTTP 500 for unhandled structural processing faults
      */
     @PostMapping("/upload")
-    public ResponseEntity<String> upload(@RequestParam("file") MultipartFile file) {
-        log.info("Received HTTP multi-part upload file request payload.");
+    public ResponseEntity<String> upload(
+        @RequestHeader("X-User-Id") String userId,
+        @RequestParam("file") MultipartFile file) {
+        log.info("Received HTTP multi-part upload file request payload for user UUID: [{}]", userId);
 
         if (file.isEmpty()) {
             log.warn("Upload rejected. Submitted multipart file resource is completely empty.");
@@ -58,13 +62,13 @@ public class UploadController {
                 "Validations passed for file [{}]. Handing off stream payload to extraction worker layers...",
                 originalFilename);
 
-            // 1. Unpack archive contents and receive unique session token identifier mapping
-            String uuid = zipExtractionService.upload(file);
+            // 1. Unpack archive contents under the user's UUID-specific directory and receive unique session token identifier mapping
+            String uuid = zipExtractionService.upload(userId, file);
 
             // 2. Return generated tracking session identity string back to front-end consumer channels
             log.info(
-                "Upload processing successfully established execution context workspace footprint with session UUID: [{}]",
-                uuid);
+                "Upload processing successfully established execution context workspace footprint with session UUID: [{}] for user UUID: [{}]",
+                uuid, userId);
             return ResponseEntity.ok(uuid);
 
         } catch (Exception e) {
@@ -77,20 +81,21 @@ public class UploadController {
     }
 
     /**
-     * Fetches all available processed storage session paths along with their target payload
-     * descriptor JSON file names and upload timestamps.
+     * Fetches all available processed storage session paths scoped strictly to the calling user UUID.
      *
+     * @param userId the user's UUID primary key passed via authorization headers
      * @return HTTP 200 containing list of session meta configurations, or HTTP 500 on filesystem
      * error.
      */
     @GetMapping("/sessions")
-    public ResponseEntity<List<SessionResponseDTO>> getAvailableSessions() {
-        log.info("Received request to look up historical or active background pipeline sessions.");
+    public ResponseEntity<List<SessionResponseDTO>> getAvailableSessions(
+        @RequestHeader("X-User-Id") String userId) {
+        log.info("Received request to look up historical or active background pipeline sessions for user UUID: [{}]", userId);
         try {
-            List<SessionResponseDTO> sessions = zipExtractionService.listAvailableSessions();
+            List<SessionResponseDTO> sessions = zipExtractionService.listAvailableSessions(userId);
             return ResponseEntity.ok(sessions);
         } catch (Exception e) {
-            log.error("Failed to compile directory history summary layout details.", e);
+            log.error("Failed to compile directory history summary layout details for user UUID: [{}]", userId, e);
             return ResponseEntity.internalServerError().build();
         }
     }

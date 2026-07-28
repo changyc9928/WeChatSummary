@@ -29,7 +29,7 @@ import org.springframework.web.multipart.MultipartFile;
 
 /**
  * Service managing multipart file storage uploads, temporary archive caching, secure decompression,
- * directory-stripping logic, and line-ending normalizations.
+ * directory-stripping logic, and line-ending normalizations isolated per user UUID.
  */
 @Slf4j
 @Service
@@ -46,27 +46,27 @@ public class ZipExtractionService {
     private final ObjectMapper objectMapper;
 
     /**
-     * Stashes a multipart form upload file onto a temporary location, initializes a tracking UUID,
-     * extracts archive data sets safely to prevent path traversal vectors, and automatically
-     * recycles local file dumps.
+     * Stashes a multipart form upload file onto a temporary location, initializes a tracking UUID
+     * inside the user's UUID-specific directory subspace, extracts archive data sets safely, and recycles dumps.
      *
-     * @param file the raw multipart archive bundle resource provided by HTTP client requests
+     * @param userId the user's UUID primary key
+     * @param file   the raw multipart archive bundle resource provided by HTTP client requests
      * @return unique tracking string token assigned to the resulting output execution workspace
-     * @throws IOException if directory access permissions fail or unpacking exceptions interrupt
-     *                     operations
+     * @throws IOException if directory access permissions fail or unpacking exceptions interrupt operations
      */
-    public String upload(MultipartFile file) throws IOException {
-        Files.createDirectories(storageConfig.getUploadDir());
+    public String upload(String userId, MultipartFile file) throws IOException {
+        Path userDir = storageConfig.getUploadDir().resolve(userId);
+        Files.createDirectories(userDir);
 
         Path tempZip = Files.createTempFile("upload-", ".zip");
         file.transferTo(tempZip);
 
         String uuid = UUID.randomUUID().toString();
-        Path extractDir = storageConfig.getUploadDir().resolve(uuid);
+        Path extractDir = userDir.resolve(uuid);
 
         log.info(
-            "Successfully received uploaded file [{}]. Generated processing session UUID: [{}], unpacking target path: [{}]",
-            file.getOriginalFilename(), uuid, extractDir.toAbsolutePath());
+            "Successfully received uploaded file [{}]. Generated processing session UUID: [{}], unpacking target path: [{}] for user UUID: [{}]",
+            file.getOriginalFilename(), uuid, extractDir.toAbsolutePath(), userId);
 
         Files.createDirectories(extractDir);
 
@@ -81,7 +81,6 @@ public class ZipExtractionService {
                 uuid, e);
             throw e;
         } finally {
-            // Guarantee that intermediate temporary cached storage uploads get destroyed safely
             boolean deleted = Files.deleteIfExists(tempZip);
             if (log.isDebugEnabled()) {
                 log.debug(
@@ -96,10 +95,6 @@ public class ZipExtractionService {
     /**
      * Iterates through an unpacked archive payload sequence, validating that file components don't
      * violate underlying location boundaries, and flattens out nested baseline paths.
-     *
-     * @param zipFile   local absolute system path referencing the source zip file resource
-     * @param targetDir target baseline folder mapping where contents should be placed
-     * @throws IOException if a malformed payload breaks boundaries or filesystem writes fail
      */
     private void extractZipSafely(Path zipFile, Path targetDir) throws IOException {
         try (
@@ -113,7 +108,6 @@ public class ZipExtractionService {
             while ((entry = zis.getNextEntry()) != null) {
                 String entryName = entry.getName();
 
-                // Flatten out the folder hierarchy layout inside the archive to match structure scopes
                 String strippedName = stripFirstDirectory(entryName);
                 if (strippedName.isEmpty()) {
                     if (log.isDebugEnabled()) {
@@ -126,7 +120,6 @@ public class ZipExtractionService {
 
                 Path resolvedPath = targetDir.resolve(strippedName).normalize();
 
-                // Prevent Zip Slip vulnerability path traversal attacks
                 if (!resolvedPath.startsWith(targetDir)) {
                     log.error(
                         "Security boundary violation detected! Malicious path manipulation found in file entry: {}",
@@ -139,25 +132,13 @@ public class ZipExtractionService {
                 } else {
                     Files.createDirectories(resolvedPath.getParent());
                     Files.copy(zis, resolvedPath, StandardCopyOption.REPLACE_EXISTING);
-
-                    // Re-align text documents to uniform line ending formats
                     normalizeTextFile(resolvedPath);
                 }
             }
         }
     }
 
-    /**
-     * Strips away the topmost prefix directory node from a given relative path string. Prevents
-     * unexpected root container nesting when users wrap exports in sub-folders. * <p>Example:
-     * "root_dir/sub_folder/file.txt" becomes "sub_folder/file.txt"</p>
-     *
-     * @param path the original nested archive entry relative path string
-     * @return stripped path string segment or an empty string if the input represents a top-level
-     * directory root
-     */
     private String stripFirstDirectory(String path) {
-        // Enforce unified slash separators to prevent matching breaks across distinct operating systems
         path = path.replace("\\", "/");
         int firstSlash = path.indexOf('/');
         if (firstSlash != -1) {
@@ -166,34 +147,26 @@ public class ZipExtractionService {
         return path;
     }
 
-    /**
-     * Normalizes line break feeds within plain-text elements down to canonical platform formats.
-     * Gracefully ignores errors when processing image/audio binaries.
-     *
-     * @param file target path referencing file item to parse and normalize
-     */
     private void normalizeTextFile(Path file) {
         try {
             String content = Files.readString(file, StandardCharsets.UTF_8);
-            // Translate windows-based CRLF break lines to UNIX style layout standards
             content = content.replace("\r\n", "\n");
             Files.writeString(file, content, StandardCharsets.UTF_8);
         } catch (Exception ignored) {
-            // Catch structural parsing failures quietly to skip adjustments over binary media streams
         }
     }
 
     /**
-     * Scans the base upload directory for active session subdirectories. Returns sorted
+     * Scans the specific user's UUID subdirectory for active session subdirectories. Returns sorted
      * SessionResponseDTO objects with separated upload timestamps.
      */
-    public List<SessionResponseDTO> listAvailableSessions() throws IOException {
-        Path uploadDir = storageConfig.getUploadDir();
-        if (!Files.exists(uploadDir)) {
+    public List<SessionResponseDTO> listAvailableSessions(String userId) throws IOException {
+        Path userDir = storageConfig.getUploadDir().resolve(userId);
+        if (!Files.exists(userDir)) {
             return List.of();
         }
 
-        try (Stream<Path> stream = Files.list(uploadDir)) {
+        try (Stream<Path> stream = Files.list(userDir)) {
             return stream
                 .filter(Files::isDirectory)
                 .filter(dir -> {
@@ -224,9 +197,6 @@ public class ZipExtractionService {
         }
     }
 
-    /**
-     * Extracts folder creation attribute as a standalone string.
-     */
     private String getFolderCreationTime(Path directory) {
         try {
             BasicFileAttributes attr = Files.readAttributes(directory, BasicFileAttributes.class);
@@ -238,10 +208,6 @@ public class ZipExtractionService {
         }
     }
 
-    /**
-     * Looks inside a session directory, finds the primary chat data JSON file, and compiles the
-     * Chat Group Name alongside its history coverage timeline window.
-     */
     private String buildChatDisplayTitle(Path directory) {
         try (Stream<Path> files = Files.list(directory)) {
             Optional<Path> jsonFileOpt = files
