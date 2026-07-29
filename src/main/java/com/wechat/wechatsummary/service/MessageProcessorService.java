@@ -16,8 +16,10 @@ import java.util.HashMap;
 import java.util.HexFormat;
 import java.util.List;
 import java.util.Map;
+import java.util.Optional;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
+import java.util.stream.Stream;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
@@ -56,24 +58,36 @@ public class MessageProcessorService {
     /**
      * Parses the underlying raw chat JSON archive, structures content models, injects resolved
      * multi-media descriptions from cache layers, maps user identifiers, and outputs a normalized
-     * text layout document.
+     * text layout document by building paths dynamically using userId and uuid on the fly.
      *
-     * @param uuid              active tracking identifier for the execution pipeline
-     * @param inputJsonFilePath raw system path targeting source JSON export
-     * @param outputTxtFilePath system path mapping where processed text should persist
-     * @throws RuntimeException if JSON transformations or file creation phases break down
+     * @param userId unique user identifier isolating the file directories
+     * @param uuid   active tracking transaction identifier for the execution pipeline
      */
-    public void processJsonAndSave(String uuid, String inputJsonFilePath,
-        String outputTxtFilePath) {
-        log.info("Starting JSON extraction and normalization pipeline for task UUID: [{}]", uuid);
+    public void processJsonAndSave(String userId, String uuid) {
+        log.info("Starting JSON extraction and normalization pipeline for user: [{}] task UUID: [{}]", userId, uuid);
         try {
-            Path inputPath = Paths.get(inputJsonFilePath);
-            if (!Files.exists(inputPath)) {
-                log.error(
-                    "Aborting processing pipeline. Source chat JSON structure does not exist at location: {}",
-                    inputJsonFilePath);
+            // Correct user-isolated directory structure: uploadDir / userId / uuid
+            Path sessionDir = storageConfig.getUploadDir().resolve(userId).resolve(uuid);
+            Path inputPath;
+
+            if (!Files.exists(sessionDir)) {
+                log.error("Aborting processing pipeline. Session workspace directory does not exist: {}", sessionDir);
                 return;
             }
+
+            try (Stream<Path> list = Files.list(sessionDir)) {
+                Optional<Path> jsonFile = list.filter(p -> p.toString().endsWith(".json")).findFirst();
+                if (jsonFile.isEmpty()) {
+                    log.error("Aborting processing pipeline. No raw chat JSON structure located inside directory: {}", sessionDir);
+                    return;
+                }
+                inputPath = jsonFile.get();
+            }
+
+            // Correct user-isolated output directory structure: uploadDir / userId / outputs
+            Path userOutputDir = storageConfig.getUploadDir().resolve(userId).resolve("outputs");
+            Files.createDirectories(userOutputDir);
+            Path outputPath = userOutputDir.resolve(uuid + "_processed.md");
 
             objectMapper.configure(DeserializationFeature.FAIL_ON_UNKNOWN_PROPERTIES, false);
             String jsonStr = Files.readString(inputPath, StandardCharsets.UTF_8);
@@ -87,15 +101,11 @@ public class MessageProcessorService {
             );
 
             if (messages == null || messages.isEmpty()) {
-                log.warn(
-                    "Terminating processing cycle. Zero chat messages found inside JSON collection for context UUID: {}",
-                    uuid);
+                log.warn("Terminating processing cycle. Zero chat messages found inside JSON collection for context UUID: {}", uuid);
                 return;
             }
 
-            log.info(
-                "Discovered {} text and multimedia frames. Initializing profile identity mappings...",
-                messages.size());
+            log.info("Discovered {} text and multimedia frames. Initializing profile identity mappings...", messages.size());
             Map<String, String> userMap = buildUserMap(messages);
             StringBuilder textBuilder = new StringBuilder();
 
@@ -129,28 +139,17 @@ public class MessageProcessorService {
 
                 processedCount++;
                 if (processedCount % 500 == 0 && log.isDebugEnabled()) {
-                    log.debug(
-                        "Task UUID: {} iteratively normalized {} messages out of {} total logs.",
-                        uuid, processedCount, messages.size());
+                    log.debug("Task UUID: {} iteratively normalized {} messages out of {} total logs.", uuid, processedCount, messages.size());
                 }
-            }
-
-            Path outputPath = Paths.get(outputTxtFilePath);
-            if (outputPath.getParent() != null) {
-                Files.createDirectories(outputPath.getParent());
             }
 
             Files.writeString(outputPath, textBuilder.toString(), StandardCharsets.UTF_8,
                 StandardOpenOption.CREATE, StandardOpenOption.TRUNCATE_EXISTING);
 
-            log.info(
-                "Chat visualization extraction successful. Document compiled with WXID translations saved at: {}",
-                outputTxtFilePath);
+            log.info("Chat visualization extraction successful. Document compiled saved at: {}", outputPath.toAbsolutePath());
 
         } catch (IOException e) {
-            log.error(
-                "Fatal I/O pipeline exception encountered while compiling file structure for UUID: {}",
-                uuid, e);
+            log.error("Fatal I/O pipeline exception encountered while compiling file structure for UUID: {}", uuid, e);
             throw new RuntimeException("数据转换纯文本失败", e);
         }
     }
@@ -315,10 +314,8 @@ public class MessageProcessorService {
         if (!StringUtils.hasText(hash)) {
             return "未知表情";
         }
-        // 1. Prioritize looking up the computed digest track mapping token in cache memory profiles
         return cacheService.getImageSummary(hash)
             .or(() -> {
-                // 2. Extract embedded legacy MD5 structures as fallback lookup handles if cache missed
                 if (sourceContent != null) {
                     Matcher m = MD5_EXTRACT_PATTERN.matcher(sourceContent.toLowerCase());
                     if (m.find()) {
@@ -328,7 +325,6 @@ public class MessageProcessorService {
                 }
                 return java.util.Optional.empty();
             })
-            // 3. Fallback placeholder if both lookups fail
             .orElse("经典表情/暂无描述");
     }
 

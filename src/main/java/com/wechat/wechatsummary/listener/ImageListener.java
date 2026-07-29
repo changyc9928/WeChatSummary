@@ -19,31 +19,29 @@ public class ImageListener {
     @RabbitListener(queues = RabbitConfig.IMAGE_QUEUE)
     public void receive(String message) {
         log.info("Received image message: {}", message);
-        String[] parts = message.split(":", 2);
-        if (parts.length < 2) {
+        String[] parts = message.split(":", 3); // Split into at most 3 parts
+        if (parts.length < 3) {
+            log.error("Malformed image queue message payload received: {}", message);
             return;
         }
 
-        String uuid = parts[0];
-        String filePath = parts[1];
+        String userId = parts[0];
+        String uuid = parts[1];
+        String filePath = parts[2];
 
-        // 1. Check directly if the abort flag key exists in Redis
         if (coordinatorService.isAborted(uuid)) {
-            log.warn(
-                "Task UUID [{}] has been explicitly ABORTED. DROPPING message safely.",
-                uuid);
+            log.warn("Task UUID [{}] has been explicitly ABORTED. DROPPING message safely.", uuid);
             return;
         }
 
-        // 2. Register current thread with the coordinator
         coordinatorService.registerThread(uuid, Thread.currentThread());
 
         try {
+            // Pass userId down so downstream processor can handle path fallbacks securely if needed
             imageProcessorService.processImage(filePath);
         } catch (Exception e) {
             log.error("Failed to process image file, path: {}. Skipping.", filePath, e);
         } finally {
-            // 3. Clean up thread registration and decrement progress
             coordinatorService.completeTask(uuid, Thread.currentThread(), null, null);
         }
     }

@@ -2,6 +2,7 @@ package com.wechat.wechatsummary.service;
 
 import com.wechat.wechatsummary.config.StorageConfig;
 import com.wechat.wechatsummary.dto.TaskProgress;
+import com.wechat.wechatsummary.dto.TaskStatus;
 import java.io.File;
 import java.util.Collections;
 import java.util.Map;
@@ -34,27 +35,19 @@ public class TaskTaskCoordinatorService {
     private final MessageProcessorService messageProcessorService;
     private final StorageConfig storageConfig;
 
-    public void initTaskContext(String uuid, int totalTasks, String inputJsonPath,
-        String outputFilePath) {
-        // Clear any previous abort/paused state if re-initialized
+    public void initTaskContext(String userId, String uuid, int totalTasks, String inputJsonPath, String outputFilePath) {
         redisTemplate.delete(ABORTED_PREFIX + uuid);
 
         if (totalTasks <= 0) {
-            log.info(
-                "No media processing tasks required for batch UUID: [{}]. Bypassing queue wait; compiling transcript summary documents immediately.",
-                uuid);
-            messageProcessorService.processJsonAndSave(uuid, inputJsonPath, outputFilePath);
+            log.info("No media processing tasks required for batch UUID: [{}]. Compiling summary immediately.", uuid);
+            messageProcessorService.processJsonAndSave(userId, uuid);
             return;
         }
 
-        redisTemplate.opsForValue()
-            .set(COUNTER_PREFIX + uuid, String.valueOf(totalTasks), 1, TimeUnit.DAYS);
-        redisTemplate.opsForValue()
-            .set(TOTAL_PREFIX + uuid, String.valueOf(totalTasks), 1, TimeUnit.DAYS);
-
-        log.info(
-            "Distributed transaction progress initialized for batch UUID: [{}] tracking total tasks: {}",
-            uuid, totalTasks);
+        // Store userId in Redis mapping for this uuid so completion can fetch it if needed, or pass it directly
+        redisTemplate.opsForValue().set("task:user:" + uuid, userId, 1, TimeUnit.DAYS);
+        redisTemplate.opsForValue().set(COUNTER_PREFIX + uuid, String.valueOf(totalTasks), 1, TimeUnit.DAYS);
+        redisTemplate.opsForValue().set(TOTAL_PREFIX + uuid, String.valueOf(totalTasks), 1, TimeUnit.DAYS);
     }
 
     /**
@@ -157,17 +150,19 @@ public class TaskTaskCoordinatorService {
         }
 
         if (remaining <= 0) {
-            log.info(
-                "All concurrent child tasks completed for transaction UUID: [{}]. Dispatching final processing...",
-                uuid);
+            log.info("All concurrent child tasks completed for transaction UUID: [{}]. Dispatching final processing...", uuid);
 
-            messageProcessorService.processJsonAndSave(uuid, inputJsonPath, outputFilePath);
+            String userId = redisTemplate.opsForValue().get("task:user:" + uuid);
+            if (userId != null) {
+                messageProcessorService.processJsonAndSave(userId, uuid);
+            } else {
+                log.error("Failed to resolve userId from Redis for completed task UUID: [{}]", uuid);
+            }
 
             redisTemplate.delete(counterKey);
             redisTemplate.delete(TOTAL_PREFIX + uuid);
+            redisTemplate.delete("task:user:" + uuid);
             activeThreadsMap.remove(uuid);
-
-            log.info("Distributed progress counter cleaned up for identity: [{}]", uuid);
         }
     }
 
@@ -178,7 +173,7 @@ public class TaskTaskCoordinatorService {
     public TaskProgress getTaskProgress(String uuid) {
         // 1. Check if the task has been explicitly aborted/paused -> PAUSED
         if (Boolean.TRUE.equals(redisTemplate.hasKey(ABORTED_PREFIX + uuid))) {
-            return new TaskProgress("PAUSED", 0, 0);
+            return new TaskProgress(TaskStatus.PAUSED, 0, 0);
         }
 
         // 2. Check if {uuid}_processed.md exists on disk -> COMPLETED
@@ -189,7 +184,7 @@ public class TaskTaskCoordinatorService {
             .toString();
 
         if (new File(expectedOutputPath).exists()) {
-            return new TaskProgress("COMPLETED", 0, 0);
+            return new TaskProgress(TaskStatus.COMPLETED, 0, 0);
         }
 
         // Fetch counts for payload reporting if still in progress
@@ -201,10 +196,10 @@ public class TaskTaskCoordinatorService {
         // 3. Check if active threads exist for this UUID -> RUNNING
         Set<Thread> activeThreads = activeThreadsMap.get(uuid);
         if (activeThreads != null && !activeThreads.isEmpty()) {
-            return new TaskProgress("RUNNING", total, remaining);
+            return new TaskProgress(TaskStatus.RUNNING, total, remaining);
         }
 
         // 4. Otherwise -> IDLING
-        return new TaskProgress("IDLING", total, remaining);
+        return new TaskProgress(TaskStatus.IDLING, total, remaining);
     }
 }

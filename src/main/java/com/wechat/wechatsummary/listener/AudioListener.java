@@ -19,23 +19,21 @@ public class AudioListener {
     @RabbitListener(queues = RabbitConfig.AUDIO_QUEUE)
     public void receiveAudio(String message) {
         log.info("Received audio message: {}", message);
-        String[] parts = message.split(":", 2);
-        if (parts.length < 2) {
+        String[] parts = message.split(":", 3);
+        if (parts.length < 3) {
+            log.error("Malformed audio queue message payload received: {}", message);
             return;
         }
 
-        String uuid = parts[0];
-        String filePath = parts[1];
+        String userId = parts[0];
+        String uuid = parts[1];
+        String filePath = parts[2];
 
-        // 1. Check directly if the abort flag key exists in Redis
         if (coordinatorService.isAborted(uuid)) {
-            log.warn(
-                "Task UUID [{}] has been explicitly ABORTED. DROPPING message safely.",
-                uuid);
+            log.warn("Task UUID [{}] has been explicitly ABORTED. DROPPING message safely.", uuid);
             return;
         }
 
-        // 2. Register current thread with the coordinator
         coordinatorService.registerThread(uuid, Thread.currentThread());
 
         try {
@@ -43,7 +41,6 @@ public class AudioListener {
         } catch (Exception e) {
             log.error("Failed to process audio file, path: {}. Skipping.", filePath, e);
         } finally {
-            // 3. Clean up thread registration and decrement progress
             coordinatorService.completeTask(uuid, Thread.currentThread(), null, null);
         }
     }

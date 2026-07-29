@@ -10,13 +10,13 @@ import lombok.ToString;
 @ToString
 public class TaskProgress {
 
-    private final String status;
+    private final TaskStatus status;
     private final int totalTasks;
     private final int remainingTasks;
     private final int completedTasks;
     private final double progressPercentage;
 
-    public TaskProgress(String status, int totalTasks, int remainingTasks) {
+    public TaskProgress(TaskStatus status, int totalTasks, int remainingTasks) {
         this.status = status;
         this.totalTasks = totalTasks;
         this.remainingTasks = Math.max(0, remainingTasks);

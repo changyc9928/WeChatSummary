@@ -2,7 +2,8 @@ package com.wechat.wechatsummary.service;
 
 import com.openai.errors.InternalServerException;
 import com.openai.errors.RateLimitException;
-import lombok.RequiredArgsConstructor;
+import java.net.URI;
+import java.util.Base64;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.ai.audio.transcription.AudioTranscriptionPrompt;
 import org.springframework.ai.audio.transcription.AudioTranscriptionResponse;
@@ -12,6 +13,7 @@ import org.springframework.ai.chat.model.ChatResponse;
 import org.springframework.ai.chat.prompt.Prompt;
 import org.springframework.ai.content.Media;
 import org.springframework.ai.openai.OpenAiAudioTranscriptionModel;
+import org.springframework.beans.factory.annotation.Qualifier;
 import org.springframework.retry.annotation.Backoff;
 import org.springframework.retry.annotation.Retryable;
 import org.springframework.stereotype.Service;
@@ -23,11 +25,20 @@ import org.springframework.util.MimeType;
  */
 @Service
 @Slf4j
-@RequiredArgsConstructor
 public class AiService {
 
     private final ChatClient chatClient;
+    private final ChatClient multimodalChatClient;
     private final OpenAiAudioTranscriptionModel transcriptionModel;
+
+    public AiService(
+        ChatClient chatClient,
+        @Qualifier("multimodalChatClient") ChatClient multimodalChatClient,
+        OpenAiAudioTranscriptionModel transcriptionModel) {
+        this.chatClient = chatClient;
+        this.multimodalChatClient = multimodalChatClient;
+        this.transcriptionModel = transcriptionModel;
+    }
 
     /**
      * Calls the Whisper transcription model with automatic retry support.
@@ -254,20 +265,20 @@ public class AiService {
                 (imageBytes != null ? imageBytes.length : 0));
         }
 
-        UserMessage userMessage = new UserMessage(
-            "Describe this image in a short sentence. If there is text, extract all text accurately."
-        );
+        // Convert the image bytes into a Base64 data URI string for guaranteed compatibility
+        String base64Encoded = Base64.getEncoder().encodeToString(imageBytes);
+        String dataUri = "data:" + mimeType + ";base64," + base64Encoded;
 
-        userMessage.getMedia().add(
-            Media.builder()
-                .mimeType(MimeType.valueOf(mimeType))
-                .data(imageBytes)
-                .build()
-        );
+        // Build the UserMessage utilizing the official Spring AI builder pattern with Media
+        UserMessage userMessage = UserMessage.builder()
+            .text(
+                "Describe this image in a short sentence. If there is text, extract all text accurately.")
+            .media(new Media(MimeType.valueOf(mimeType), URI.create(dataUri)))
+            .build();
 
         Prompt prompt = new Prompt(userMessage);
 
-        ChatResponse response = chatClient.prompt(prompt)
+        ChatResponse response = multimodalChatClient.prompt(prompt)
             .call()
             .chatResponse();
 

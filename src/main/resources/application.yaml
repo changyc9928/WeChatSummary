@@ -53,7 +53,7 @@ custom-ai:
   multimodal:
     base-url: https://integrate.api.nvidia.com/v1
     api-key: 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
-    model: nvidia/nemotron-nano-12b-v2-vl
+    model: meta/llama-3.2-90b-vision-instruct
 
 storage:
   upload-dir: ${HOME}/uploads

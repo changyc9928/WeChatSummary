@@ -3,6 +3,7 @@ package com.wechat.wechatsummary.service;
 import com.wechat.wechatsummary.config.RabbitConfig;
 import com.wechat.wechatsummary.config.StorageConfig;
 import com.wechat.wechatsummary.dto.TaskProgress;
+import com.wechat.wechatsummary.dto.TaskStatus;
 import java.io.IOException;
 import java.nio.file.Files;
 import java.nio.file.Path;
@@ -41,7 +42,7 @@ public class MediaProducerService {
     public void preprocess(String userId, String uuid) throws IOException {
         // 0. Prevent duplicate execution if the task is already running
         TaskProgress progress = coordinatorService.getTaskProgress(uuid);
-        if ("RUNNING".equalsIgnoreCase(progress.getStatus())) {
+        if (TaskStatus.RUNNING.equals(progress.getStatus())) {
             log.warn("Preprocessing skipped for user UUID: [{}] and session UUID: [{}]. Task is already RUNNING.", userId, uuid);
             return;
         }
@@ -87,15 +88,15 @@ public class MediaProducerService {
             "Media file discovery scan completed for user UUID: [{}] and session UUID: [{}]. Aggregate media items discovered: {}",
             userId, uuid, totalMediaFiles);
 
-        // 3. Register the discovered target file mappings and count totals into the active Task Coordinator Context
-        coordinatorService.initTaskContext(uuid, totalMediaFiles, inputJsonPath, outputFilePath);
+        // 3. Register userId, session uuid, target file mappings, and counts into the active Task Coordinator Context
+        coordinatorService.initTaskContext(userId, uuid, totalMediaFiles, inputJsonPath, outputFilePath);
 
         if (totalMediaFiles > 0) {
             log.info(
                 "Publishing media parsing items to message broker exchange for parallel ingestion routing...");
-            scanAndPublish(uuid, imagesDir, RabbitConfig.IMAGE_ROUTING_KEY);
-            scanAndPublish(uuid, emojisDir, RabbitConfig.IMAGE_ROUTING_KEY);
-            scanAndPublish(uuid, voicesDir, RabbitConfig.AUDIO_ROUTING_KEY);
+            scanAndPublish(userId, uuid, imagesDir, RabbitConfig.IMAGE_ROUTING_KEY);
+            scanAndPublish(userId, uuid, emojisDir, RabbitConfig.IMAGE_ROUTING_KEY);
+            scanAndPublish(userId, uuid, voicesDir, RabbitConfig.AUDIO_ROUTING_KEY);
 
             if (!coordinatorService.isAborted(uuid)) {
                 log.info(
@@ -135,39 +136,33 @@ public class MediaProducerService {
      * formatted pipeline string token payload to the configured AMQP message exchange. Checks if
      * the abort flag is present in Redis prior to publishing each item.
      *
+     * @param userId     unique user identifier isolating the file directories
      * @param uuid       the tracing token associated with the root transaction task
      * @param dir        the target data directory path to scan through
      * @param routingKey standard AMQP binding criteria defining target processing queue endpoints
      * @throws IOException if file streaming or scanning steps encounter an unexpected IO system
      *                     break
      */
-    private void scanAndPublish(String uuid, Path dir, String routingKey) throws IOException {
+    private void scanAndPublish(String userId, String uuid, Path dir, String routingKey) throws IOException {
         if (!Files.exists(dir)) {
-            log.warn(
-                "Aborting asset message routing phase for directory mapping. Path does not exist: {}",
-                dir);
+            log.warn("Aborting asset message routing phase for directory mapping. Path does not exist: {}", dir);
             return;
         }
 
-        log.info("Scanning directory: [{}] for message routing key emission: [{}]",
-            dir.getFileName(), routingKey);
+        log.info("Scanning directory: [{}] for message routing key emission: [{}]", dir.getFileName(), routingKey);
 
         try (Stream<Path> paths = Files.walk(dir)) {
             for (Path file : (Iterable<Path>) paths.filter(Files::isRegularFile)::iterator) {
-                // Check if the batch task was aborted prior to pushing each message
                 if (coordinatorService.isAborted(uuid)) {
-                    log.warn(
-                        "Task UUID [{}] has been ABORTED. Ceasing further message production for directory: {}",
-                        uuid, dir);
+                    log.warn("Task UUID [{}] has been ABORTED. Ceasing further message production for directory: {}", uuid, dir);
                     break;
                 }
 
-                String messagePayload = uuid + ":" + file.toAbsolutePath().toString();
+                // Include userId in the message payload string: "userId:uuid:absoluteFilePath"
+                String messagePayload = userId + ":" + uuid + ":" + file.toAbsolutePath().toString();
 
                 if (log.isDebugEnabled()) {
-                    log.debug(
-                        "Dispatching AMQP frame payload mapping: [{}] onto routing address: [{}]",
-                        messagePayload, routingKey);
+                    log.debug("Dispatching AMQP frame payload mapping: [{}] onto routing address: [{}]", messagePayload, routingKey);
                 }
 
                 rabbitTemplate.convertAndSend(RabbitConfig.EXCHANGE, routingKey, messagePayload);
