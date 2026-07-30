@@ -16,8 +16,8 @@ import org.springframework.stereotype.Service;
 
 /**
  * Service responsible for scanning uploaded batch assets under user-isolated directories,
- * initializing task coordination states, and producing messaging payloads to RabbitMQ for individual
- * asynchronous media (images, emojis, voice notes) processing.
+ * initializing task coordination states, and producing messaging payloads to RabbitMQ for
+ * individual asynchronous media (images, emojis, voice notes) processing.
  */
 @Service
 @RequiredArgsConstructor
@@ -29,9 +29,9 @@ public class MediaProducerService {
     private final StorageConfig storageConfig;
 
     /**
-     * Preprocesses an uploaded session directory scoped under the specified user UUID by scanning for a
-     * source chat log JSON file, resolving structured output file paths, initializing centralized tracking
-     * contexts, and dispatching media file paths to RabbitMQ queues.
+     * Preprocesses an uploaded session directory scoped under the specified user UUID by scanning
+     * for a source chat log JSON file, resolving structured output file paths, initializing
+     * centralized tracking contexts, and dispatching media file paths to RabbitMQ queues.
      *
      * @param userId unique identifier representing the user UUID
      * @param uuid   unique identifier representing the active upload transaction session
@@ -43,11 +43,14 @@ public class MediaProducerService {
         // 0. Prevent duplicate execution if the task is already running
         TaskProgress progress = coordinatorService.getTaskProgress(uuid, userId);
         if (TaskStatus.RUNNING.equals(progress.getStatus())) {
-            log.warn("Preprocessing skipped for user UUID: [{}] and session UUID: [{}]. Task is already RUNNING.", userId, uuid);
+            log.warn(
+                "Preprocessing skipped for user UUID: [{}] and session UUID: [{}]. Task is already RUNNING.",
+                userId, uuid);
             return;
         }
 
-        log.info("Starting media file preprocessing lifecycle phase for user UUID: [{}] and transaction session UUID: [{}]",
+        log.info(
+            "Starting media file preprocessing lifecycle phase for user UUID: [{}] and transaction session UUID: [{}]",
             userId, uuid);
 
         // Resolve path inside the user's isolated directory
@@ -89,7 +92,8 @@ public class MediaProducerService {
             userId, uuid, totalMediaFiles);
 
         // 3. Register userId, session uuid, target file mappings, and counts into the active Task Coordinator Context
-        coordinatorService.initTaskContext(userId, uuid, totalMediaFiles, inputJsonPath, outputFilePath);
+        coordinatorService.initTaskContext(userId, uuid, totalMediaFiles, inputJsonPath,
+            outputFilePath);
 
         if (totalMediaFiles > 0) {
             log.info(
@@ -143,26 +147,34 @@ public class MediaProducerService {
      * @throws IOException if file streaming or scanning steps encounter an unexpected IO system
      *                     break
      */
-    private void scanAndPublish(String userId, String uuid, Path dir, String routingKey) throws IOException {
+    private void scanAndPublish(String userId, String uuid, Path dir, String routingKey)
+        throws IOException {
         if (!Files.exists(dir)) {
-            log.warn("Aborting asset message routing phase for directory mapping. Path does not exist: {}", dir);
+            log.warn(
+                "Aborting asset message routing phase for directory mapping. Path does not exist: {}",
+                dir);
             return;
         }
 
-        log.info("Scanning directory: [{}] for message routing key emission: [{}]", dir.getFileName(), routingKey);
+        log.info("Scanning directory: [{}] for message routing key emission: [{}]",
+            dir.getFileName(), routingKey);
 
         try (Stream<Path> paths = Files.walk(dir)) {
             for (Path file : (Iterable<Path>) paths.filter(Files::isRegularFile)::iterator) {
                 if (coordinatorService.isAborted(uuid)) {
-                    log.warn("Task UUID [{}] has been ABORTED. Ceasing further message production for directory: {}", uuid, dir);
+                    log.warn(
+                        "Task UUID [{}] has been ABORTED. Ceasing further message production for directory: {}",
+                        uuid, dir);
                     break;
                 }
 
                 // Include userId in the message payload string: "userId:uuid:absoluteFilePath"
-                String messagePayload = userId + ":" + uuid + ":" + file.toAbsolutePath().toString();
+                String messagePayload = userId + ":" + uuid + ":" + file.toAbsolutePath();
 
                 if (log.isDebugEnabled()) {
-                    log.debug("Dispatching AMQP frame payload mapping: [{}] onto routing address: [{}]", messagePayload, routingKey);
+                    log.debug(
+                        "Dispatching AMQP frame payload mapping: [{}] onto routing address: [{}]",
+                        messagePayload, routingKey);
                 }
 
                 rabbitTemplate.convertAndSend(RabbitConfig.EXCHANGE, routingKey, messagePayload);

@@ -20,14 +20,14 @@ import lombok.Setter;
 @NoArgsConstructor
 @AllArgsConstructor
 @Builder
-public class ChatAnalysisTask {
+public class ChatSummaryTask {
 
     @Id
     @Column(length = 36)
     private UUID id; // 存 UUID.toString()
 
     @Column(nullable = false, length = 20)
-    private String status; // PROCESSING, SUCCESS, FAILED
+    private ChatSummaryStatus status;
 
     // 💡 针对 Postgres 的优化：直接声明为 text 属性，去掉易报错的 @Lob
     @Column(columnDefinition = "text")

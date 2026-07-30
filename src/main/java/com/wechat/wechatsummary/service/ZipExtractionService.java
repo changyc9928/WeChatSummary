@@ -47,12 +47,14 @@ public class ZipExtractionService {
 
     /**
      * Stashes a multipart form upload file onto a temporary location, initializes a tracking UUID
-     * inside the user's UUID-specific directory subspace, extracts archive data sets safely, and recycles dumps.
+     * inside the user's UUID-specific directory subspace, extracts archive data sets safely, and
+     * recycles dumps.
      *
      * @param userId the user's UUID primary key
      * @param file   the raw multipart archive bundle resource provided by HTTP client requests
      * @return unique tracking string token assigned to the resulting output execution workspace
-     * @throws IOException if directory access permissions fail or unpacking exceptions interrupt operations
+     * @throws IOException if directory access permissions fail or unpacking exceptions interrupt
+     *                     operations
      */
     public String upload(String userId, MultipartFile file) throws IOException {
         Path userDir = storageConfig.getUploadDir().resolve(userId);

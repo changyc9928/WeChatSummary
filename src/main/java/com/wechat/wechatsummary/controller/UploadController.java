@@ -40,7 +40,8 @@ public class UploadController {
     public ResponseEntity<String> upload(
         @RequestHeader("X-User-Id") String userId,
         @RequestParam("file") MultipartFile file) {
-        log.info("Received HTTP multi-part upload file request payload for user UUID: [{}]", userId);
+        log.info("Received HTTP multi-part upload file request payload for user UUID: [{}]",
+            userId);
 
         if (file.isEmpty()) {
             log.warn("Upload rejected. Submitted multipart file resource is completely empty.");
@@ -81,7 +82,8 @@ public class UploadController {
     }
 
     /**
-     * Fetches all available processed storage session paths scoped strictly to the calling user UUID.
+     * Fetches all available processed storage session paths scoped strictly to the calling user
+     * UUID.
      *
      * @param userId the user's UUID primary key passed via authorization headers
      * @return HTTP 200 containing list of session meta configurations, or HTTP 500 on filesystem
@@ -90,12 +92,16 @@ public class UploadController {
     @GetMapping("/sessions")
     public ResponseEntity<List<SessionResponseDTO>> getAvailableSessions(
         @RequestHeader("X-User-Id") String userId) {
-        log.info("Received request to look up historical or active background pipeline sessions for user UUID: [{}]", userId);
+        log.info(
+            "Received request to look up historical or active background pipeline sessions for user UUID: [{}]",
+            userId);
         try {
             List<SessionResponseDTO> sessions = zipExtractionService.listAvailableSessions(userId);
             return ResponseEntity.ok(sessions);
         } catch (Exception e) {
-            log.error("Failed to compile directory history summary layout details for user UUID: [{}]", userId, e);
+            log.error(
+                "Failed to compile directory history summary layout details for user UUID: [{}]",
+                userId, e);
             return ResponseEntity.internalServerError().build();
         }
     }

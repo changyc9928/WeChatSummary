@@ -62,7 +62,8 @@ public class PreprocessController {
 
         producerService.preprocess(userId, uuid);
 
-        log.info("Successfully scheduled preprocessing orchestration tasks for user UUID: [{}] and session UUID: [{}]",
+        log.info(
+            "Successfully scheduled preprocessing orchestration tasks for user UUID: [{}] and session UUID: [{}]",
             userId, uuid);
         return "Submitted preprocessing for session " + uuid;
     }
@@ -71,7 +72,9 @@ public class PreprocessController {
     public ResponseEntity<String> abortTask(
         @RequestHeader("X-User-Id") String userId,
         @PathVariable String uuid) {
-        log.info("REST endpoint invoked to ABORT processing for user UUID: [{}] and batch UUID: [{}]", userId, uuid);
+        log.info(
+            "REST endpoint invoked to ABORT processing for user UUID: [{}] and batch UUID: [{}]",
+            userId, uuid);
         boolean success = taskCoordinatorService.abortTask(uuid);
 
         if (success) {
@@ -88,7 +91,9 @@ public class PreprocessController {
     public ResponseEntity<TaskProgress> getProgress(
         @RequestHeader("X-User-Id") String userId,
         @PathVariable String uuid) {
-        log.debug("Fetching preprocessing progress state metrics for user UUID: [{}] and batch UUID: [{}]", userId, uuid);
+        log.debug(
+            "Fetching preprocessing progress state metrics for user UUID: [{}] and batch UUID: [{}]",
+            userId, uuid);
         TaskProgress progress = taskCoordinatorService.getTaskProgress(uuid, userId);
         return ResponseEntity.ok(progress);
     }
@@ -104,7 +109,9 @@ public class PreprocessController {
         @RequestParam(defaultValue = "0") int page,
         @RequestParam(defaultValue = "20") int size) {
 
-        log.info("REST endpoint invoked to retrieve image summaries for user UUID: [{}] and session UUID: [{}]", userId, uuid);
+        log.info(
+            "REST endpoint invoked to retrieve image summaries for user UUID: [{}] and session UUID: [{}]",
+            userId, uuid);
         Pageable pageable = PageRequest.of(page, size);
         Page<ImageSummaryEntity> summaries = imageProcessorService.getImageSummariesByUuid(uuid,
             pageable);
@@ -116,7 +123,9 @@ public class PreprocessController {
     public ResponseEntity<Void> deleteImageSummaryById(
         @RequestHeader("X-User-Id") String userId,
         @PathVariable String id) {
-        log.info("REST endpoint invoked to delete image summary record with ID: [{}] for user UUID: [{}]", id, userId);
+        log.info(
+            "REST endpoint invoked to delete image summary record with ID: [{}] for user UUID: [{}]",
+            id, userId);
         imageProcessorService.deleteImageSummaryById(id);
         return ResponseEntity.noContent().build();
     }
@@ -125,7 +134,8 @@ public class PreprocessController {
     public ResponseEntity<Void> deleteImageSummariesByIds(
         @RequestHeader("X-User-Id") String userId,
         @RequestBody List<String> ids) {
-        log.info("REST endpoint invoked to batch delete [{}] image summary records for user UUID: [{}]",
+        log.info(
+            "REST endpoint invoked to batch delete [{}] image summary records for user UUID: [{}]",
             ids != null ? ids.size() : 0, userId);
         imageProcessorService.deleteImageSummariesByIds(ids);
         return ResponseEntity.noContent().build();
@@ -135,7 +145,9 @@ public class PreprocessController {
     public ResponseEntity<Void> deleteAllImageSummariesByUuid(
         @RequestHeader("X-User-Id") String userId,
         @RequestParam("uuid") String uuid) {
-        log.info("REST endpoint invoked to delete ALL image summary records for user UUID: [{}] and session UUID: [{}]", userId, uuid);
+        log.info(
+            "REST endpoint invoked to delete ALL image summary records for user UUID: [{}] and session UUID: [{}]",
+            userId, uuid);
         imageProcessorService.deleteAllImageSummariesByUuid(uuid);
         return ResponseEntity.noContent().build();
     }
@@ -144,7 +156,8 @@ public class PreprocessController {
     public ResponseEntity<Resource> getImageFileById(
         @RequestHeader("X-User-Id") String userId,
         @PathVariable String id) {
-        log.info("REST endpoint invoked to fetch image file for ID: [{}] and user UUID: [{}]", id, userId);
+        log.info("REST endpoint invoked to fetch image file for ID: [{}] and user UUID: [{}]", id,
+            userId);
 
         return imageProcessorService.getImageFileById(id)
             .map(fileRes -> ResponseEntity.ok()
@@ -187,7 +200,9 @@ public class PreprocessController {
     public ResponseEntity<Void> clearAudioSummaryTextById(
         @RequestHeader("X-User-Id") String userId,
         @PathVariable String id) {
-        log.info("REST endpoint invoked to clear audio summary text for ID: [{}] and user UUID: [{}]", id, userId);
+        log.info(
+            "REST endpoint invoked to clear audio summary text for ID: [{}] and user UUID: [{}]",
+            id, userId);
         audioProcessorService.clearAudioSummaryTextById(id);
         return ResponseEntity.noContent().build();
     }
@@ -203,7 +218,8 @@ public class PreprocessController {
     public ResponseEntity<Void> clearAudioSummaryTextsByIds(
         @RequestHeader("X-User-Id") String userId,
         @RequestBody List<String> ids) {
-        log.info("REST endpoint invoked to batch clear [{}] audio summary texts for user UUID: [{}]",
+        log.info(
+            "REST endpoint invoked to batch clear [{}] audio summary texts for user UUID: [{}]",
             ids != null ? ids.size() : 0, userId);
         audioProcessorService.clearAudioSummaryTextsByIds(ids);
         return ResponseEntity.noContent().build();
@@ -213,7 +229,9 @@ public class PreprocessController {
     public ResponseEntity<Void> deleteAudioSummaryById(
         @RequestHeader("X-User-Id") String userId,
         @PathVariable String id) {
-        log.info("REST endpoint invoked to delete full audio record with ID: [{}] for user UUID: [{}]", id, userId);
+        log.info(
+            "REST endpoint invoked to delete full audio record with ID: [{}] for user UUID: [{}]",
+            id, userId);
         audioProcessorService.deleteAudioSummaryById(id);
         return ResponseEntity.noContent().build();
     }
@@ -222,7 +240,8 @@ public class PreprocessController {
     public ResponseEntity<Void> deleteAudioSummariesByIds(
         @RequestHeader("X-User-Id") String userId,
         @RequestBody List<String> ids) {
-        log.info("REST endpoint invoked to batch delete [{}] full audio records for user UUID: [{}]",
+        log.info(
+            "REST endpoint invoked to batch delete [{}] full audio records for user UUID: [{}]",
             ids != null ? ids.size() : 0, userId);
         audioProcessorService.deleteAudioSummariesByIds(ids);
         return ResponseEntity.noContent().build();
@@ -232,7 +251,9 @@ public class PreprocessController {
     public ResponseEntity<Void> deleteAllAudioSummariesByUuid(
         @RequestHeader("X-User-Id") String userId,
         @RequestParam("uuid") String uuid) {
-        log.info("REST endpoint invoked to delete ALL full audio records for user UUID: [{}] and session UUID: [{}]", userId, uuid);
+        log.info(
+            "REST endpoint invoked to delete ALL full audio records for user UUID: [{}] and session UUID: [{}]",
+            userId, uuid);
         audioProcessorService.deleteAllAudioSummariesByUuid(uuid);
         return ResponseEntity.noContent().build();
     }
@@ -241,7 +262,8 @@ public class PreprocessController {
     public ResponseEntity<Resource> getAudioFileById(
         @RequestHeader("X-User-Id") String userId,
         @PathVariable String id) {
-        log.info("REST endpoint invoked to fetch audio file for ID: [{}] and user UUID: [{}]", id, userId);
+        log.info("REST endpoint invoked to fetch audio file for ID: [{}] and user UUID: [{}]", id,
+            userId);
 
         return audioProcessorService.getAudioFileById(id)
             .map(fileRes -> ResponseEntity.ok()

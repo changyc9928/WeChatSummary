@@ -30,7 +30,8 @@ public class SecurityConfig {
                     "/swagger-ui.html"
                 ).permitAll()
                 // Require authentication/authorization for other endpoints as per your design
-                .anyRequest().permitAll() // Change to .authenticated() if you want to lock down the rest later
+                .anyRequest()
+                .permitAll() // Change to .authenticated() if you want to lock down the rest later
             );
 
         return http.build();

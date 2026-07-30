@@ -1,6 +1,6 @@
 package com.wechat.wechatsummary.repository;
 
-import com.wechat.wechatsummary.entity.ChatAnalysisTask;
+import com.wechat.wechatsummary.entity.ChatSummaryTask;
 import java.util.UUID;
 import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.data.jpa.repository.Modifying;
@@ -10,7 +10,7 @@ import org.springframework.stereotype.Repository;
 import org.springframework.transaction.annotation.Transactional;
 
 @Repository
-public interface ChatAnalysisTaskRepository extends JpaRepository<ChatAnalysisTask, UUID> {
+public interface ChatSummaryTaskRepository extends JpaRepository<ChatSummaryTask, UUID> {
 
     /**
      * Strictly responsible for logging internal service engine errors. No state tracking machine

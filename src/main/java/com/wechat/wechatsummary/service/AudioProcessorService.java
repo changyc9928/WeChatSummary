@@ -47,13 +47,15 @@ public class AudioProcessorService {
 
             if (dbRecord.isPresent() && dbRecord.get().getSummary() != null && !dbRecord.get()
                 .getSummary().isBlank()) {
-                log.info("Trace match hit for audio hash: [{}]. Skipping duplicate AI processing.", hash);
+                log.info("Trace match hit for audio hash: [{}]. Skipping duplicate AI processing.",
+                    hash);
                 return;
             }
 
             Path path = Paths.get(filePath);
             if (!Files.exists(path)) {
-                log.warn("Audio processing aborted. Resource file does not exist at path: {}", filePath);
+                log.warn("Audio processing aborted. Resource file does not exist at path: {}",
+                    filePath);
                 return;
             }
 
@@ -78,7 +80,8 @@ public class AudioProcessorService {
                 entity.setCreatedAt(LocalDateTime.now());
             }
 
-            String summary = audioAiSummaryService.callChatClientToSummarizeAudioWithRetry(transcript);
+            String summary = audioAiSummaryService.callChatClientToSummarizeAudioWithRetry(
+                transcript);
             if (summary == null || summary.isBlank()) {
                 log.warn("LLM audio summarization returned empty output for file: {}", filePath);
                 return;
@@ -89,7 +92,8 @@ public class AudioProcessorService {
             log.info("Audio processing pipeline executed successfully for hash: [{}]", hash);
 
         } catch (Exception e) {
-            log.error("Fatal exception encountered while processing audio resource context: {}", filePath, e);
+            log.error("Fatal exception encountered while processing audio resource context: {}",
+                filePath, e);
         }
     }
 
@@ -124,8 +128,10 @@ public class AudioProcessorService {
             .responseFormat(AudioResponseFormat.JSON)
             .build();
 
-        AudioTranscriptionPrompt transcriptionPrompt = new AudioTranscriptionPrompt(audioResource, transcriptionOptions);
-        var transcriptionResponse = audioAiSummaryService.callTranscriptionWithRetry(transcriptionPrompt);
+        AudioTranscriptionPrompt transcriptionPrompt = new AudioTranscriptionPrompt(audioResource,
+            transcriptionOptions);
+        var transcriptionResponse = audioAiSummaryService.callTranscriptionWithRetry(
+            transcriptionPrompt);
         return transcriptionResponse.getResult().getOutput();
     }
 
@@ -172,7 +178,8 @@ public class AudioProcessorService {
     public void deleteAudioSummariesByIds(List<String> ids) {
         if (ids != null && !ids.isEmpty()) {
             for (String id : ids) {
-                cacheService.findAudioSummaryByHash(id).ifPresent(this::invalidateProcessedMarkdown);
+                cacheService.findAudioSummaryByHash(id)
+                    .ifPresent(this::invalidateProcessedMarkdown);
             }
         }
         cacheService.deleteAudioSummariesByIds(ids);
@@ -184,7 +191,9 @@ public class AudioProcessorService {
     private void invalidateProcessedMarkdown(AudioSummary entity) {
         try {
             String filePath = entity.getFilePath();
-            if (filePath == null || filePath.isBlank()) return;
+            if (filePath == null || filePath.isBlank()) {
+                return;
+            }
 
             Path path = Paths.get(filePath);
             Path parent = path.getParent();
@@ -196,14 +205,17 @@ public class AudioProcessorService {
                     Path processedMd = userIdDir.resolve("outputs").resolve(uuid + "_processed.md");
                     if (Files.exists(processedMd)) {
                         Files.delete(processedMd);
-                        log.info("Successfully invalidated/deleted processed markdown file for audio: [{}]", processedMd);
+                        log.info(
+                            "Successfully invalidated/deleted processed markdown file for audio: [{}]",
+                            processedMd);
                     }
                     return;
                 }
                 parent = parent.getParent();
             }
         } catch (Exception e) {
-            log.error("Failed to invalidate processed markdown file for audio path: {}", entity.getFilePath(), e);
+            log.error("Failed to invalidate processed markdown file for audio path: {}",
+                entity.getFilePath(), e);
         }
     }
 
@@ -235,7 +247,8 @@ public class AudioProcessorService {
     public void clearAudioSummaryTextsByIds(List<String> ids) {
         if (ids != null && !ids.isEmpty()) {
             for (String id : ids) {
-                cacheService.findAudioSummaryByHash(id).ifPresent(this::invalidateProcessedMarkdown);
+                cacheService.findAudioSummaryByHash(id)
+                    .ifPresent(this::invalidateProcessedMarkdown);
             }
         }
         cacheService.clearAudioSummaryTextsByIds(ids);
@@ -269,5 +282,7 @@ public class AudioProcessorService {
         }
     }
 
-    public record AudioFileResource(Resource resource, String contentType) {}
+    public record AudioFileResource(Resource resource, String contentType) {
+
+    }
 }

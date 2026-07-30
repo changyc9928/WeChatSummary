@@ -73,7 +73,8 @@ public class ImageProcessorService {
             String summary = imageAiSummaryService.generateSummary(imageBytes, mimeType, filePath);
 
             if (summary == null || summary.isBlank()) {
-                log.warn("AI multimodal vision analysis returned a blank summary for file: {}", filePath);
+                log.warn("AI multimodal vision analysis returned a blank summary for file: {}",
+                    filePath);
                 return;
             }
 
@@ -85,10 +86,13 @@ public class ImageProcessorService {
             entity.setCreatedAt(Instant.now());
 
             cacheService.saveImageSummary(entity);
-            log.info("Image processing pipeline executed successfully. Record persisted for hash: [{}]", hash);
+            log.info(
+                "Image processing pipeline executed successfully. Record persisted for hash: [{}]",
+                hash);
 
         } catch (Exception e) {
-            log.error("Fatal exception encountered while processing image resource context: {}", filePath, e);
+            log.error("Fatal exception encountered while processing image resource context: {}",
+                filePath, e);
         }
     }
 
@@ -157,7 +161,8 @@ public class ImageProcessorService {
     public void deleteImageSummariesByIds(List<String> ids) {
         if (ids != null && !ids.isEmpty()) {
             for (String id : ids) {
-                cacheService.findImageSummaryByHash(id).ifPresent(this::invalidateProcessedMarkdown);
+                cacheService.findImageSummaryByHash(id)
+                    .ifPresent(this::invalidateProcessedMarkdown);
             }
         }
         cacheService.deleteImageSummariesByIds(ids);
@@ -169,7 +174,9 @@ public class ImageProcessorService {
     private void invalidateProcessedMarkdown(ImageSummaryEntity entity) {
         try {
             String filePath = entity.getFilePath();
-            if (filePath == null || filePath.isBlank()) return;
+            if (filePath == null || filePath.isBlank()) {
+                return;
+            }
 
             Path path = Paths.get(filePath);
             Path parent = path.getParent();
@@ -182,14 +189,16 @@ public class ImageProcessorService {
                     Path processedMd = userIdDir.resolve("outputs").resolve(uuid + "_processed.md");
                     if (Files.exists(processedMd)) {
                         Files.delete(processedMd);
-                        log.info("Successfully invalidated/deleted processed markdown file: [{}]", processedMd);
+                        log.info("Successfully invalidated/deleted processed markdown file: [{}]",
+                            processedMd);
                     }
                     return;
                 }
                 parent = parent.getParent();
             }
         } catch (Exception e) {
-            log.error("Failed to invalidate processed markdown file for image path: {}", entity.getFilePath(), e);
+            log.error("Failed to invalidate processed markdown file for image path: {}",
+                entity.getFilePath(), e);
         }
     }
 
@@ -243,5 +252,7 @@ public class ImageProcessorService {
             });
     }
 
-    public record ImageFileResource(Resource resource, String contentType) {}
+    public record ImageFileResource(Resource resource, String contentType) {
+
+    }
 }

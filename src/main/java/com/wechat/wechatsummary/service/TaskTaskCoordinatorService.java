@@ -35,19 +35,24 @@ public class TaskTaskCoordinatorService {
     private final MessageProcessorService messageProcessorService;
     private final StorageConfig storageConfig;
 
-    public void initTaskContext(String userId, String uuid, int totalTasks, String inputJsonPath, String outputFilePath) {
+    public void initTaskContext(String userId, String uuid, int totalTasks, String inputJsonPath,
+        String outputFilePath) {
         redisTemplate.delete(ABORTED_PREFIX + uuid);
 
         if (totalTasks <= 0) {
-            log.info("No media processing tasks required for batch UUID: [{}]. Compiling summary immediately.", uuid);
+            log.info(
+                "No media processing tasks required for batch UUID: [{}]. Compiling summary immediately.",
+                uuid);
             messageProcessorService.processJsonAndSave(userId, uuid);
             return;
         }
 
         // Store userId in Redis mapping for this uuid so completion can fetch it if needed, or pass it directly
         redisTemplate.opsForValue().set("task:user:" + uuid, userId, 1, TimeUnit.DAYS);
-        redisTemplate.opsForValue().set(COUNTER_PREFIX + uuid, String.valueOf(totalTasks), 1, TimeUnit.DAYS);
-        redisTemplate.opsForValue().set(TOTAL_PREFIX + uuid, String.valueOf(totalTasks), 1, TimeUnit.DAYS);
+        redisTemplate.opsForValue()
+            .set(COUNTER_PREFIX + uuid, String.valueOf(totalTasks), 1, TimeUnit.DAYS);
+        redisTemplate.opsForValue()
+            .set(TOTAL_PREFIX + uuid, String.valueOf(totalTasks), 1, TimeUnit.DAYS);
     }
 
     /**
@@ -150,13 +155,16 @@ public class TaskTaskCoordinatorService {
         }
 
         if (remaining <= 0) {
-            log.info("All concurrent child tasks completed for transaction UUID: [{}]. Dispatching final processing...", uuid);
+            log.info(
+                "All concurrent child tasks completed for transaction UUID: [{}]. Dispatching final processing...",
+                uuid);
 
             String userId = redisTemplate.opsForValue().get("task:user:" + uuid);
             if (userId != null) {
                 messageProcessorService.processJsonAndSave(userId, uuid);
             } else {
-                log.error("Failed to resolve userId from Redis for completed task UUID: [{}]", uuid);
+                log.error("Failed to resolve userId from Redis for completed task UUID: [{}]",
+                    uuid);
             }
 
             redisTemplate.delete(counterKey);

@@ -1,10 +1,11 @@
 package com.wechat.wechatsummary.service;
 
 import com.wechat.wechatsummary.entity.AudioSummary;
-import com.wechat.wechatsummary.entity.ChatAnalysisTask;
+import com.wechat.wechatsummary.entity.ChatSummaryStatus;
+import com.wechat.wechatsummary.entity.ChatSummaryTask;
 import com.wechat.wechatsummary.entity.ImageSummaryEntity;
 import com.wechat.wechatsummary.repository.AudioSummaryRepository;
-import com.wechat.wechatsummary.repository.ChatAnalysisTaskRepository;
+import com.wechat.wechatsummary.repository.ChatSummaryTaskRepository;
 import com.wechat.wechatsummary.repository.ImageSummaryRepository;
 import java.util.HashMap;
 import java.util.List;
@@ -31,7 +32,7 @@ public class WeChatSummaryCacheService {
 
     private final ImageSummaryRepository imageSummaryRepository;
     private final AudioSummaryRepository audioSummaryRepository;
-    private final ChatAnalysisTaskRepository taskRepository;
+    private final ChatSummaryTaskRepository taskRepository;
     private final StringRedisTemplate redisTemplate;
     private final CacheManager cacheManager;
 
@@ -261,15 +262,15 @@ public class WeChatSummaryCacheService {
     // =========================================================================
 
     @Cacheable(cacheNames = "chat_analysis", key = "#uuid.toString()", sync = true)
-    public Optional<ChatAnalysisTask> getCachedTask(UUID uuid) {
+    public Optional<ChatSummaryTask> getCachedTask(UUID uuid) {
         log.info(
             "Cache miss for rolling chat task sequence. Extracting profile from DB for UUID: {}",
             uuid);
         return taskRepository.findById(uuid);
     }
 
-    public ChatAnalysisTask saveAndCacheTask(ChatAnalysisTask task) {
-        ChatAnalysisTask savedTask = taskRepository.save(task);
+    public ChatSummaryTask saveAndCacheTask(ChatSummaryTask task) {
+        ChatSummaryTask savedTask = taskRepository.save(task);
 
         if (task.getStatus() != null) {
             setTaskStatus(task.getId(), task.getStatus());
@@ -317,9 +318,9 @@ public class WeChatSummaryCacheService {
         return metrics;
     }
 
-    public void setTaskStatus(UUID uuid, String status) {
+    public void setTaskStatus(UUID uuid, ChatSummaryStatus status) {
         String key = STATUS_KEY_PREFIX + uuid.toString();
-        redisTemplate.opsForValue().set(key, status.toUpperCase());
+        redisTemplate.opsForValue().set(key, status.name());
     }
 
     public String getTaskStatus(UUID uuid) {
@@ -331,6 +332,6 @@ public class WeChatSummaryCacheService {
         log.info("Clearing real-time progress indicators out of Redis memory mappings for UUID: {}",
             uuid);
         redisTemplate.delete(STATUS_KEY_PREFIX + uuid.toString());
-        redisTemplate.delete(PROGRESS_KEY_PREFIX + uuid.toString());
+        redisTemplate.delete(PROGRESS_KEY_PREFIX + uuid);
     }
 }

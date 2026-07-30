@@ -9,7 +9,6 @@ import java.io.IOException;
 import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
 import java.nio.file.Path;
-import java.nio.file.Paths;
 import java.nio.file.StandardOpenOption;
 import java.security.MessageDigest;
 import java.util.HashMap;
@@ -64,21 +63,28 @@ public class MessageProcessorService {
      * @param uuid   active tracking transaction identifier for the execution pipeline
      */
     public void processJsonAndSave(String userId, String uuid) {
-        log.info("Starting JSON extraction and normalization pipeline for user: [{}] task UUID: [{}]", userId, uuid);
+        log.info(
+            "Starting JSON extraction and normalization pipeline for user: [{}] task UUID: [{}]",
+            userId, uuid);
         try {
             // Correct user-isolated directory structure: uploadDir / userId / uuid
             Path sessionDir = storageConfig.getUploadDir().resolve(userId).resolve(uuid);
             Path inputPath;
 
             if (!Files.exists(sessionDir)) {
-                log.error("Aborting processing pipeline. Session workspace directory does not exist: {}", sessionDir);
+                log.error(
+                    "Aborting processing pipeline. Session workspace directory does not exist: {}",
+                    sessionDir);
                 return;
             }
 
             try (Stream<Path> list = Files.list(sessionDir)) {
-                Optional<Path> jsonFile = list.filter(p -> p.toString().endsWith(".json")).findFirst();
+                Optional<Path> jsonFile = list.filter(p -> p.toString().endsWith(".json"))
+                    .findFirst();
                 if (jsonFile.isEmpty()) {
-                    log.error("Aborting processing pipeline. No raw chat JSON structure located inside directory: {}", sessionDir);
+                    log.error(
+                        "Aborting processing pipeline. No raw chat JSON structure located inside directory: {}",
+                        sessionDir);
                     return;
                 }
                 inputPath = jsonFile.get();
@@ -101,11 +107,15 @@ public class MessageProcessorService {
             );
 
             if (messages == null || messages.isEmpty()) {
-                log.warn("Terminating processing cycle. Zero chat messages found inside JSON collection for context UUID: {}", uuid);
+                log.warn(
+                    "Terminating processing cycle. Zero chat messages found inside JSON collection for context UUID: {}",
+                    uuid);
                 return;
             }
 
-            log.info("Discovered {} text and multimedia frames. Initializing profile identity mappings...", messages.size());
+            log.info(
+                "Discovered {} text and multimedia frames. Initializing profile identity mappings...",
+                messages.size());
             Map<String, String> userMap = buildUserMap(messages);
             StringBuilder textBuilder = new StringBuilder();
 
@@ -139,17 +149,22 @@ public class MessageProcessorService {
 
                 processedCount++;
                 if (processedCount % 500 == 0 && log.isDebugEnabled()) {
-                    log.debug("Task UUID: {} iteratively normalized {} messages out of {} total logs.", uuid, processedCount, messages.size());
+                    log.debug(
+                        "Task UUID: {} iteratively normalized {} messages out of {} total logs.",
+                        uuid, processedCount, messages.size());
                 }
             }
 
             Files.writeString(outputPath, textBuilder.toString(), StandardCharsets.UTF_8,
                 StandardOpenOption.CREATE, StandardOpenOption.TRUNCATE_EXISTING);
 
-            log.info("Chat visualization extraction successful. Document compiled saved at: {}", outputPath.toAbsolutePath());
+            log.info("Chat visualization extraction successful. Document compiled saved at: {}",
+                outputPath.toAbsolutePath());
 
         } catch (IOException e) {
-            log.error("Fatal I/O pipeline exception encountered while compiling file structure for UUID: {}", uuid, e);
+            log.error(
+                "Fatal I/O pipeline exception encountered while compiling file structure for UUID: {}",
+                uuid, e);
             throw new RuntimeException("数据转换纯文本失败", e);
         }
     }

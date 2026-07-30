@@ -1,6 +1,7 @@
 package com.wechat.wechatsummary.controller;
 
-import com.wechat.wechatsummary.service.ChatAnalysisService;
+import com.wechat.wechatsummary.entity.ChatSummaryStatus;
+import com.wechat.wechatsummary.service.ChatSummaryService;
 import java.util.Map;
 import java.util.UUID;
 import lombok.RequiredArgsConstructor;
@@ -15,45 +16,48 @@ import org.springframework.web.bind.annotation.RestController;
 
 @Slf4j
 @RestController
-@RequestMapping("/api/analysis")
+@RequestMapping("/api/summary")
 @RequiredArgsConstructor
-public class ChatAnalysisController {
+public class ChatSummaryController {
 
-    private final ChatAnalysisService chatAnalysisService;
+    private final ChatSummaryService chatSummaryService;
 
     @PostMapping("/{uuid}")
-    public ResponseEntity<?> startAnalysis(
+    public ResponseEntity<?> startSummary(
         @RequestHeader("X-User-Id") String userId,
         @PathVariable UUID uuid) {
-        log.info("Starting chat analysis pipeline for user UUID: [{}] and task UUID: [{}]", userId, uuid);
-        chatAnalysisService.analyzeChatLogAsync(userId, uuid);
-        return ResponseEntity.ok(Map.of("status", "RUNNING", "taskId", uuid));
+        log.info("Starting chat summary pipeline for user UUID: [{}] and task UUID: [{}]", userId,
+            uuid);
+        chatSummaryService.summarizeChatLogAsync(userId, uuid);
+        return ResponseEntity.ok(Map.of("status", ChatSummaryStatus.RUNNING, "taskId", uuid));
     }
 
     @GetMapping("/status-pool/{uuid}")
     public ResponseEntity<Map<String, Object>> getStatusAndProgress(
         @RequestHeader("X-User-Id") String userId,
         @PathVariable UUID uuid) {
-        return ResponseEntity.ok(chatAnalysisService.getStatusAndProgress(userId, uuid));
+        return ResponseEntity.ok(chatSummaryService.getStatusAndProgress(userId, uuid));
     }
 
     @PostMapping("/pause/{uuid}")
-    public ResponseEntity<Map<String, String>> pauseAnalysis(
+    public ResponseEntity<Map<String, String>> pauseSummary(
         @RequestHeader("X-User-Id") String userId,
         @PathVariable UUID uuid) {
-        log.info("Request received to pause pipeline for user UUID: [{}] and task UUID: [{}]", userId, uuid);
-        chatAnalysisService.pauseAnalysis(uuid);
+        log.info("Request received to pause pipeline for user UUID: [{}] and task UUID: [{}]",
+            userId, uuid);
+        chatSummaryService.pauseSummary(uuid);
         return ResponseEntity.ok(
             Map.of("message", "Pause signal sent immediately.", "taskId", uuid.toString()));
     }
 
     @PostMapping("/restart/{uuid}")
-    public ResponseEntity<Map<String, String>> restartAnalysis(
+    public ResponseEntity<Map<String, String>> restartSummary(
         @RequestHeader("X-User-Id") String userId,
         @PathVariable UUID uuid) {
-        log.info("Request received to clear and restart user UUID: [{}] and task UUID: [{}]", userId, uuid);
-        chatAnalysisService.startOverAnalysis(userId, uuid);
-        chatAnalysisService.analyzeChatLogAsync(userId, uuid);
+        log.info("Request received to clear and restart user UUID: [{}] and task UUID: [{}]",
+            userId, uuid);
+        chatSummaryService.startOverSummary(userId, uuid);
+        chatSummaryService.summarizeChatLogAsync(userId, uuid);
         return ResponseEntity.ok(
             Map.of("message", "Task restarted successfully.", "taskId", uuid.toString()));
     }
