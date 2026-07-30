@@ -8,7 +8,25 @@ export const styles = {
   timestampBadge: { fontSize: '0.82rem', color: '#868e96', fontWeight: 'normal' },
   refreshButton: { background: 'none', border: 'none', color: '#2563eb', cursor: 'pointer', fontSize: '0.85rem', fontWeight: '600' },
   select: { width: '100%', padding: '10px 14px', borderRadius: '8px', border: '1px solid #d1d5db', backgroundColor: '#fff', fontSize: '0.95rem', color: '#111827' },
+
+  // NEW: Row 1 grid for Step 1 and Step 2 side-by-side
+  topRowGrid: {
+    display: 'grid',
+    gridTemplateColumns: 'repeat(auto-fit, minmax(320px, 1fr))',
+    gap: '20px',
+    marginBottom: '20px'
+  },
+
+  // NEW: Full-width container layout for Step 3 underneath
+  fullWidthSummaryContainer: {
+    width: '100%',
+    display: 'flex',
+    flexDirection: 'column'
+  },
+
+  // (Optional: kept as fallback if grid is used elsewhere)
   grid: { display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(300px, 1fr))', gap: '20px' },
+
   card: { background: '#fff', padding: '20px', borderRadius: '12px', boxShadow: '0 1px 3px rgba(0,0,0,0.05)', display: 'flex', flexDirection: 'column', gap: '15px' },
   cardHeader: { display: 'flex', justifyContent: 'space-between', alignItems: 'center' },
   cardTitle: { fontSize: '1.1rem', fontWeight: '700', color: '#111827', margin: 0 },
@@ -29,9 +47,25 @@ export const styles = {
   progressBarFill: { height: '100%', transition: 'width 0.3s ease' },
   errorText: { color: '#dc2626', fontSize: '0.82rem', marginTop: '4px' },
   dbErrorBox: { backgroundColor: '#fef2f2', border: '1px solid #fecaca', padding: '10px', borderRadius: '6px', color: '#991b1b', fontSize: '0.82rem' },
-  summaryContainer: { marginTop: '10px', display: 'flex', flexDirection: 'column', gap: '6px' },
+  summaryContainer: { marginTop: '10px', display: 'flex', flexDirection: 'column', gap: '6px', flex: 1 },
   summaryLabel: { fontSize: '0.85rem', fontWeight: '700', color: '#111827' },
-  cleanSummaryOutput: { backgroundColor: '#f3f4f6', padding: '12px', borderRadius: '8px', fontSize: '0.85rem', color: '#1f2937', whiteSpace: 'pre-wrap', maxHeight: '200px', overflowY: 'auto' },
+
+  // MODIFIED: Expanded large box layout for full page readability
+  cleanSummaryOutput: {
+    backgroundColor: '#f3f4f6',
+    padding: '16px',
+    borderRadius: '8px',
+    fontSize: '0.95rem',
+    color: '#1f2937',
+    whiteSpace: 'pre-wrap',
+    minHeight: '400px',
+    maxHeight: '70vh',
+    overflowY: 'auto',
+    width: '100%',
+    boxSizing: 'border-box',
+    lineHeight: '1.6'
+  },
+
   tableWrapper: { overflowX: 'auto', border: '1px solid #e5e7eb', borderRadius: '8px' },
   table: { width: '100%', borderCollapse: 'collapse', textAlign: 'left', fontSize: '0.85rem' },
   th: { backgroundColor: '#f9fafb', padding: '12px 16px', borderBottom: '1px solid #e5e7eb', fontWeight: '600', color: '#374151' },

@@ -668,27 +668,34 @@ export default function App() {
         fetchSessions={fetchSessions}
       />
 
-      <div style={styles.grid}>
-        <StepUpload
-          file={file}
-          setFile={setFile}
-          handleUpload={handleUpload}
-          loading={loading.upload}
-          errorUpload={errors.upload}
-        />
+      {/* Row 1: Step 1 and Step 2 Side-by-Side */}
+      <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '20px', marginBottom: '20px' }}>
+        <div style={{ width: '100%' }}>
+          <StepUpload
+            file={file}
+            setFile={setFile}
+            handleUpload={handleUpload}
+            loading={loading.upload}
+            errorUpload={errors.upload}
+          />
+        </div>
+        <div style={{ width: '100%' }}>
+          <StepPreprocess
+            uuidInput={uuidInput}
+            isPreprocessFinished={isPreprocessFinished}
+            preprocessProgress={preprocessProgress}
+            handleStartPreprocess={handleStartPreprocess}
+            handleAbortPreprocess={handleAbortPreprocess}
+            loading={loading}
+            errorPreprocess={errors.preprocess}
+            onNavigateToImages={() => setCurrentView('images')}
+            onNavigateToAudios={() => setCurrentView('audios')}
+          />
+        </div>
+      </div>
 
-        <StepPreprocess
-          uuidInput={uuidInput}
-          isPreprocessFinished={isPreprocessFinished}
-          preprocessProgress={preprocessProgress}
-          handleStartPreprocess={handleStartPreprocess}
-          handleAbortPreprocess={handleAbortPreprocess}
-          loading={loading}
-          errorPreprocess={errors.preprocess}
-          onNavigateToImages={() => setCurrentView('images')}
-          onNavigateToAudios={() => setCurrentView('audios')}
-        />
-
+      {/* Row 2: Step 3 Full Width Underneath */}
+      <div style={{ width: '100%', display: 'block', marginTop: '20px' }}>
         <StepSummary
           uuidInput={uuidInput}
           isPreprocessFinished={isPreprocessFinished}
