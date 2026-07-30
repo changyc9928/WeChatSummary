@@ -34,6 +34,18 @@ services:
     volumes:
       - whisper_models:/root/.cache/huggingface # 挂载模型目录，避免每次重启重复下载
 
+  frontend:
+    build:
+      context: ./frontend
+      dockerfile: Dockerfile
+    container_name: wechat-frontend
+    ports:
+      - "3001:80" # Maps port 3001 on your host to Nginx port 80
+    depends_on:
+      - postgres
+      - rabbitmq
+    restart: unless-stopped
+
 volumes:
   pgdata:
   whisper_models:
