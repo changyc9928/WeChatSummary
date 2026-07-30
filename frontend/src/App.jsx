@@ -21,6 +21,10 @@ export default function App() {
   // View state: 'dashboard' | 'images' | 'audios'
   const [currentView, setCurrentView] = useState('dashboard');
 
+  // Date/Time Window Selection States
+  const [selectedStartTime, setSelectedStartTime] = useState('');
+  const [selectedEndTime, setSelectedEndTime] = useState('');
+
   // Image states
   const [imageSummaries, setImageSummaries] = useState([]);
   const [selectedImageIds, setSelectedImageIds] = useState([]);
@@ -107,14 +111,15 @@ export default function App() {
     return () => window.removeEventListener('keydown', handleKeyDown);
   }, []);
 
-  // When dataset (uuidInput) changes, fetch tables ONCE, and query progress status immediately
   useEffect(() => {
     if (uuidInput && currentUser) {
       setPreprocessProgress(null);
       setIsPreprocessFinished(false);
       setSummaryState({ status: 'INITIAL_STATE', progress: 0.0, result: null, errorMessage: null });
+      
+      setSelectedStartTime('');
+      setSelectedEndTime('');
 
-      // Only call BE once upon entering/selecting the session
       fetchImageSummaries(uuidInput, 0, imagePagination.size);
       fetchAudioSummaries(uuidInput, 0, audioPagination.size);
 
@@ -140,6 +145,8 @@ export default function App() {
       setAudioSummaries([]);
       setSelectedImageIds([]);
       setSelectedAudioIds([]);
+      setSelectedStartTime('');
+      setSelectedEndTime('');
       setImagePagination({ page: 0, size: 20, totalPages: 0, totalElements: 0, isFirst: true, isLast: true });
       setAudioPagination({ page: 0, size: 20, totalPages: 0, totalElements: 0, isFirst: true, isLast: true });
       stopSummaryPolling();
@@ -273,8 +280,6 @@ export default function App() {
       });
       if (res.ok) {
         const data = await res.json();
-        console.log("Status pool response:", data);
-
         const payload = (data && (data.status || data.result))
           ? data
           : (Object.values(data)[0] || {});
@@ -283,7 +288,6 @@ export default function App() {
         let rawProgress = payload.progress ?? payload.progressPercentage ?? 0;
         const progress = rawProgress > 1 ? rawProgress / 100 : rawProgress;
 
-        // Preserve existing result if the new payload doesn't provide one
         const result = payload.result || summaryState.result || null;
 
         setSummaryState(prevState => ({
@@ -374,13 +378,17 @@ export default function App() {
     }
   };
 
-  const handleStartSummary = async () => {
+  const handleStartSummary = async (payload = {}) => {
     if (!uuidInput) return;
     setLoading(prev => ({ ...prev, start: true }));
     try {
       const res = await fetch(`${API_BASE_URL}/api/summary/${uuidInput}`, {
         method: 'POST',
-        headers: { 'X-User-Id': currentUser.uuid }
+        headers: {
+          'Content-Type': 'application/json',
+          'X-User-Id': currentUser.uuid
+        },
+        body: JSON.stringify(payload)
       });
       if (!res.ok) throw new Error("Failed to start summary engine.");
       fetchSummaryStatus(uuidInput);
@@ -388,6 +396,27 @@ export default function App() {
       setErrors(prev => ({ ...prev, summary: err.message }));
     } finally {
       setLoading(prev => ({ ...prev, start: false }));
+    }
+  };
+
+  const handleRestartSummary = async (payload = {}) => {
+    if (!uuidInput) return;
+    setLoading(prev => ({ ...prev, restartSummary: true }));
+    try {
+      const res = await fetch(`${API_BASE_URL}/api/summary/restart/${uuidInput}`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'X-User-Id': currentUser.uuid
+        },
+        body: JSON.stringify(payload)
+      });
+      if (!res.ok) throw new Error("Failed to restart summary.");
+      fetchSummaryStatus(uuidInput);
+    } catch (err) {
+      console.error(err);
+    } finally {
+      setLoading(prev => ({ ...prev, restartSummary: false }));
     }
   };
 
@@ -405,178 +434,6 @@ export default function App() {
       console.error(err);
     } finally {
       setLoading(prev => ({ ...prev, pauseSummary: false }));
-    }
-  };
-
-  const handleRestartSummary = async () => {
-    if (!uuidInput) return;
-    setLoading(prev => ({ ...prev, restartSummary: true }));
-    try {
-      const res = await fetch(`${API_BASE_URL}/api/summary/restart/${uuidInput}`, {
-        method: 'POST',
-        headers: { 'X-User-Id': currentUser.uuid }
-      });
-      if (!res.ok) throw new Error("Failed to restart summary.");
-      fetchSummaryStatus(uuidInput);
-    } catch (err) {
-      console.error(err);
-    } finally {
-      setLoading(prev => ({ ...prev, restartSummary: false }));
-    }
-  };
-
-  const handleDeleteImage = async (id) => {
-    if (!currentUser) return;
-    setLoading(prev => ({ ...prev, deleteImage: true }));
-    try {
-      const response = await fetch(`${API_BASE_URL}/api/preprocess/images/summaries/${id}`, {
-        method: 'DELETE',
-        headers: { 'X-User-Id': currentUser.uuid }
-      });
-      if (!response.ok) throw new Error("Failed to delete image summary.");
-
-      setSelectedImageIds(prev => prev.filter(item => item !== id));
-      fetchImageSummaries(uuidInput, imagePagination.page, imagePagination.size);
-
-      if (uuidInput) {
-        await checkPreprocessProgress(uuidInput);
-      }
-    } catch (err) {
-      setErrors(prev => ({ ...prev, images: err.message }));
-    } finally {
-      setLoading(prev => ({ ...prev, deleteImage: false }));
-    }
-  };
-
-  const handleBatchDeleteImages = async () => {
-    if (!currentUser || selectedImageIds.length === 0) return;
-    setLoading(prev => ({ ...prev, batchDeleteImages: true }));
-    try {
-      const response = await fetch(`${API_BASE_URL}/api/preprocess/images/summaries`, {
-        method: 'DELETE',
-        headers: {
-          'Content-Type': 'application/json',
-          'X-User-Id': currentUser.uuid
-        },
-        body: JSON.stringify(selectedImageIds)
-      });
-      if (!response.ok) throw new Error("Failed to batch delete image summaries.");
-
-      setSelectedImageIds([]);
-      fetchImageSummaries(uuidInput, 0, imagePagination.size);
-
-      if (uuidInput) {
-        await checkPreprocessProgress(uuidInput);
-      }
-    } catch (err) {
-      setErrors(prev => ({ ...prev, images: err.message }));
-    } finally {
-      setLoading(prev => ({ ...prev, batchDeleteImages: false }));
-    }
-  };
-
-  const handleDeleteAllImages = async () => {
-    if (!currentUser || !uuidInput) return;
-    try {
-      const response = await fetch(`${API_BASE_URL}/api/preprocess/images/summaries/all?uuid=${uuidInput}`, {
-        method: 'DELETE',
-        headers: { 'X-User-Id': currentUser.uuid }
-      });
-      if (!response.ok) throw new Error("Failed to delete all image summaries.");
-
-      setSelectedImageIds([]);
-      fetchImageSummaries(uuidInput, 0, imagePagination.size);
-
-      await checkPreprocessProgress(uuidInput);
-    } catch (err) {
-      setErrors(prev => ({ ...prev, images: err.message }));
-    }
-  };
-
-  const handleDeleteAudio = async (id) => {
-    if (!currentUser) return;
-    setLoading(prev => ({ ...prev, deleteAudio: true }));
-    try {
-      const response = await fetch(`${API_BASE_URL}/api/preprocess/audios/summaries/${id}`, {
-        method: 'DELETE',
-        headers: { 'X-User-Id': currentUser.uuid }
-      });
-      if (!response.ok) throw new Error("Failed to delete audio summary.");
-
-      setSelectedAudioIds(prev => prev.filter(item => item !== id));
-      fetchAudioSummaries(uuidInput, audioPagination.page, audioPagination.size);
-      if (uuidInput) await checkPreprocessProgress(uuidInput);
-    } catch (err) {
-      setErrors(prev => ({ ...prev, audios: err.message }));
-    } finally {
-      setLoading(prev => ({ ...prev, deleteAudio: false }));
-    }
-  };
-
-  const handleBatchDeleteAudios = async () => {
-    if (!currentUser || selectedAudioIds.length === 0) return;
-    setLoading(prev => ({ ...prev, batchDeleteAudios: true }));
-    try {
-      const response = await fetch(`${API_BASE_URL}/api/preprocess/audios/summaries`, {
-        method: 'DELETE',
-        headers: {
-          'Content-Type': 'application/json',
-          'X-User-Id': currentUser.uuid
-        },
-        body: JSON.stringify(selectedAudioIds)
-      });
-      if (!response.ok) throw new Error("Failed to batch delete audio summaries.");
-
-      setSelectedAudioIds([]);
-      fetchAudioSummaries(uuidInput, 0, audioPagination.size);
-      if (uuidInput) await checkPreprocessProgress(uuidInput);
-    } catch (err) {
-      setErrors(prev => ({ ...prev, audios: err.message }));
-    } finally {
-      setLoading(prev => ({ ...prev, batchDeleteAudios: false }));
-    }
-  };
-
-  const handleClearAudioText = async (id) => {
-    if (!currentUser) return;
-    setLoading(prev => ({ ...prev, clearAudioText: true }));
-    try {
-      const response = await fetch(`${API_BASE_URL}/api/preprocess/audios/summaries/${id}/text`, {
-        method: 'DELETE',
-        headers: { 'X-User-Id': currentUser.uuid }
-      });
-      if (!response.ok) throw new Error("Failed to clear audio transcript text.");
-
-      fetchAudioSummaries(uuidInput, audioPagination.page, audioPagination.size);
-      if (uuidInput) await checkPreprocessProgress(uuidInput);
-    } catch (err) {
-      setErrors(prev => ({ ...prev, audios: err.message }));
-    } finally {
-      setLoading(prev => ({ ...prev, clearAudioText: false }));
-    }
-  };
-
-  const handleBatchClearAudioTexts = async () => {
-    if (!currentUser || selectedAudioIds.length === 0) return;
-    setLoading(prev => ({ ...prev, batchClearAudioTexts: true }));
-    try {
-      const response = await fetch(`${API_BASE_URL}/api/preprocess/audios/summaries/text`, {
-        method: 'DELETE',
-        headers: {
-          'Content-Type': 'application/json',
-          'X-User-Id': currentUser.uuid
-        },
-        body: JSON.stringify(selectedAudioIds)
-      });
-      if (!response.ok) throw new Error("Failed to batch clear audio transcript texts.");
-
-      setSelectedAudioIds([]);
-      fetchAudioSummaries(uuidInput, 0, audioPagination.size);
-      if (uuidInput) await checkPreprocessProgress(uuidInput);
-    } catch (err) {
-      setErrors(prev => ({ ...prev, audios: err.message }));
-    } finally {
-      setLoading(prev => ({ ...prev, batchClearAudioTexts: false }));
     }
   };
 
@@ -607,8 +464,35 @@ export default function App() {
           fetchImageSummaries={fetchImageSummaries}
           selectedImageIds={selectedImageIds}
           setSelectedImageIds={setSelectedImageIds}
-          handleDeleteImage={handleDeleteImage}
-          handleBatchDeleteImages={handleBatchDeleteImages}
+          handleDeleteImage={async (id) => {
+            if (!currentUser) return;
+            try {
+              await fetch(`${API_BASE_URL}/api/preprocess/images/summaries/${id}`, {
+                method: 'DELETE',
+                headers: { 'X-User-Id': currentUser.uuid }
+              });
+              setSelectedImageIds(prev => prev.filter(item => item !== id));
+              fetchImageSummaries(uuidInput, imagePagination.page, imagePagination.size);
+              if (uuidInput) await checkPreprocessProgress(uuidInput);
+            } catch (err) {
+              setErrors(prev => ({ ...prev, images: err.message }));
+            }
+          }}
+          handleBatchDeleteImages={async () => {
+            if (!currentUser || selectedImageIds.length === 0) return;
+            try {
+              await fetch(`${API_BASE_URL}/api/preprocess/images/summaries`, {
+                method: 'DELETE',
+                headers: { 'Content-Type': 'application/json', 'X-User-Id': currentUser.uuid },
+                body: JSON.stringify(selectedImageIds)
+              });
+              setSelectedImageIds([]);
+              fetchImageSummaries(uuidInput, 0, imagePagination.size);
+              if (uuidInput) await checkPreprocessProgress(uuidInput);
+            } catch (err) {
+              setErrors(prev => ({ ...prev, images: err.message }));
+            }
+          }}
           setActiveModalImage={setActiveModalImage}
           loading={loading}
           errorImages={errors.images}
@@ -635,10 +519,63 @@ export default function App() {
           fetchAudioSummaries={fetchAudioSummaries}
           selectedAudioIds={selectedAudioIds}
           setSelectedAudioIds={setSelectedAudioIds}
-          handleDeleteAudio={handleDeleteAudio}
-          handleClearAudioText={handleClearAudioText}
-          handleBatchDeleteAudios={handleBatchDeleteAudios}
-          handleBatchClearAudioTexts={handleBatchClearAudioTexts}
+          handleDeleteAudio={async (id) => {
+            if (!currentUser) return;
+            try {
+              await fetch(`${API_BASE_URL}/api/preprocess/audios/summaries/${id}`, {
+                method: 'DELETE',
+                headers: { 'X-User-Id': currentUser.uuid }
+              });
+              setSelectedAudioIds(prev => prev.filter(item => item !== id));
+              fetchAudioSummaries(uuidInput, audioPagination.page, audioPagination.size);
+              if (uuidInput) await checkPreprocessProgress(uuidInput);
+            } catch (err) {
+              setErrors(prev => ({ ...prev, audios: err.message }));
+            }
+          }}
+          handleClearAudioText={async (id) => {
+            if (!currentUser) return;
+            try {
+              await fetch(`${API_BASE_URL}/api/preprocess/audios/summaries/${id}/text`, {
+                method: 'DELETE',
+                headers: { 'X-User-Id': currentUser.uuid }
+              });
+              fetchAudioSummaries(uuidInput, audioPagination.page, audioPagination.size);
+              if (uuidInput) await checkPreprocessProgress(uuidInput);
+            } catch (err) {
+              setErrors(prev => ({ ...prev, audios: err.message }));
+            }
+          }}
+          handleBatchDeleteAudios={async () => {
+            if (!currentUser || selectedAudioIds.length === 0) return;
+            try {
+              await fetch(`${API_BASE_URL}/api/preprocess/audios/summaries`, {
+                method: 'DELETE',
+                headers: { 'Content-Type': 'application/json', 'X-User-Id': currentUser.uuid },
+                body: JSON.stringify(selectedAudioIds)
+              });
+              setSelectedAudioIds([]);
+              fetchAudioSummaries(uuidInput, 0, audioPagination.size);
+              if (uuidInput) await checkPreprocessProgress(uuidInput);
+            } catch (err) {
+              setErrors(prev => ({ ...prev, audios: err.message }));
+            }
+          }}
+          handleBatchClearAudioTexts={async () => {
+            if (!currentUser || selectedAudioIds.length === 0) return;
+            try {
+              await fetch(`${API_BASE_URL}/api/preprocess/audios/summaries/text`, {
+                method: 'DELETE',
+                headers: { 'Content-Type': 'application/json', 'X-User-Id': currentUser.uuid },
+                body: JSON.stringify(selectedAudioIds)
+              });
+              setSelectedAudioIds([]);
+              fetchAudioSummaries(uuidInput, 0, audioPagination.size);
+              if (uuidInput) await checkPreprocessProgress(uuidInput);
+            } catch (err) {
+              setErrors(prev => ({ ...prev, audios: err.message }));
+            }
+          }}
           loading={loading}
           errorAudios={errors.audios}
         />
@@ -668,34 +605,40 @@ export default function App() {
         fetchSessions={fetchSessions}
       />
 
-      {/* Row 1: Step 1 and Step 2 Side-by-Side */}
-      <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '20px', marginBottom: '20px' }}>
-        <div style={{ width: '100%' }}>
-          <StepUpload
-            file={file}
-            setFile={setFile}
-            handleUpload={handleUpload}
-            loading={loading.upload}
-            errorUpload={errors.upload}
-          />
-        </div>
-        <div style={{ width: '100%' }}>
-          <StepPreprocess
-            uuidInput={uuidInput}
-            isPreprocessFinished={isPreprocessFinished}
-            preprocessProgress={preprocessProgress}
-            handleStartPreprocess={handleStartPreprocess}
-            handleAbortPreprocess={handleAbortPreprocess}
-            loading={loading}
-            errorPreprocess={errors.preprocess}
-            onNavigateToImages={() => setCurrentView('images')}
-            onNavigateToAudios={() => setCurrentView('audios')}
-          />
-        </div>
+      {/* Row 1: Step 1 (Full Width) */}
+      <div style={{ width: '100%', display: 'block', marginBottom: '20px' }}>
+        <StepUpload
+          file={file}
+          setFile={setFile}
+          handleUpload={handleUpload}
+          loading={loading.upload}
+          errorUpload={errors.upload}
+        />
       </div>
 
-      {/* Row 2: Step 3 Full Width Underneath */}
-      <div style={{ width: '100%', display: 'block', marginTop: '20px' }}>
+      {/* Row 2: Step 2 (Full Width) */}
+      <div style={{ width: '100%', display: 'block', marginBottom: '20px' }}>
+        <StepPreprocess
+          uuidInput={uuidInput}
+          isPreprocessFinished={isPreprocessFinished}
+          preprocessProgress={preprocessProgress}
+          handleStartPreprocess={handleStartPreprocess}
+          handleAbortPreprocess={handleAbortPreprocess}
+          loading={loading}
+          errorPreprocess={errors.preprocess}
+          onNavigateToImages={() => setCurrentView('images')}
+          onNavigateToAudios={() => setCurrentView('audios')}
+          apiUrl={API_BASE_URL}
+          currentUser={currentUser}
+          selectedStartTime={selectedStartTime}
+          setSelectedStartTime={setSelectedStartTime}
+          selectedEndTime={selectedEndTime}
+          setSelectedEndTime={setSelectedEndTime}
+        />
+      </div>
+
+      {/* Row 3: Step 3 (Full Width) */}
+      <div style={{ width: '100%', display: 'block' }}>
         <StepSummary
           uuidInput={uuidInput}
           isPreprocessFinished={isPreprocessFinished}
@@ -704,6 +647,8 @@ export default function App() {
           handlePauseSummary={handlePauseSummary}
           handleRestartSummary={handleRestartSummary}
           loading={loading}
+          selectedStartTime={selectedStartTime}
+          selectedEndTime={selectedEndTime}
         />
       </div>
 

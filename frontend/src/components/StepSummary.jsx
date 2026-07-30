@@ -8,10 +8,12 @@ export default function StepSummary({
   handleStartSummary,
   handlePauseSummary,
   handleRestartSummary,
-  loading = {}
+  loading = {},
+  selectedStartTime,
+  selectedEndTime
 }) {
   const currentStatus = (summaryState?.status || 'INITIAL_STATE').toUpperCase();
-  
+
   const isRunning = currentStatus === 'RUNNING';
   const isPaused = currentStatus === 'PAUSED';
   const isIdling = currentStatus === 'IDLING';
@@ -21,10 +23,40 @@ export default function StepSummary({
   const progressFraction = rawProg > 1 ? rawProg / 100 : rawProg;
   const progressPercent = Math.round(progressFraction * 100);
 
-  // Directly extract the string value or fall back to JSON stringification if it's an object
+  const formatFromDatetimeLocal = (localStr) => {
+    if (!localStr) return '';
+
+    // Convert 'T' to space to match backend's expected 'YYYY-MM-DD HH:mm:ss' format
+    let formatted = localStr.replace('T', ' ');
+
+    if (formatted.length === 16) {
+      formatted += ':00'; // Appends seconds if missing -> "YYYY-MM-DD HH:mm:ss"
+    } else if (formatted.length > 19) {
+      formatted = formatted.substring(0, 19);
+    }
+
+    return formatted; // Produces clean "2026-07-28 18:29:44"
+  };
+
+  const handleStartWithParams = (isRestart = false) => {
+    const payload = {};
+    if (selectedStartTime) {
+      payload.startTime = formatFromDatetimeLocal(selectedStartTime);
+    }
+    if (selectedEndTime) {
+      payload.endTime = formatFromDatetimeLocal(selectedEndTime);
+    }
+
+    if (isRestart) {
+      handleRestartSummary(payload);
+    } else {
+      handleStartSummary(payload);
+    }
+  };
+
   const rawResult = summaryState?.result;
-  const displayResultText = typeof rawResult === 'string' 
-    ? rawResult 
+  const displayResultText = typeof rawResult === 'string'
+    ? rawResult
     : (rawResult ? JSON.stringify(rawResult, null, 2) : '');
 
   return (
@@ -40,8 +72,9 @@ export default function StepSummary({
         <div style={styles.dbErrorBox}>Complete Step 2 preprocessing first.</div>
       ) : (
         <div style={styles.actionButtonGroup}>
+
           {(currentStatus === 'INITIAL_STATE' || isIdling) && (
-            <button type="button" onClick={handleStartSummary} disabled={loading.start} style={styles.button}>
+            <button type="button" onClick={() => handleStartWithParams(false)} disabled={loading.start} style={styles.button}>
               {loading.start ? 'Starting Engine...' : 'Run Summary Engine'}
             </button>
           )}
@@ -63,20 +96,19 @@ export default function StepSummary({
 
           {isPaused && (
             <div style={styles.actionButtonRow}>
-              <button type="button" onClick={handleStartSummary} disabled={loading.start} style={styles.button}>Resume</button>
-              <button type="button" onClick={handleRestartSummary} disabled={loading.restartSummary} style={styles.buttonWarningSmall}>Restart</button>
+              <button type="button" onClick={() => handleStartWithParams(false)} disabled={loading.start} style={styles.button}>Resume</button>
+              <button type="button" onClick={() => handleStartWithParams(true)} disabled={loading.restartSummary} style={styles.buttonWarningSmall}>Restart</button>
             </div>
           )}
 
-          {/* Render box whenever status is SUCCESS/COMPLETED, or if we happen to have result text stored */}
           {(isFinished || displayResultText) && (
             <div style={styles.summaryContainer}>
               <div style={styles.summaryLabel}>Final Generated Summary:</div>
-              <div style={{ 
-                ...styles.cleanSummaryOutput, 
-                whiteSpace: 'pre-wrap', 
-                wordBreak: 'break-word', 
-                maxHeight: '400px', 
+              <div style={{
+                ...styles.cleanSummaryOutput,
+                whiteSpace: 'pre-wrap',
+                wordBreak: 'break-word',
+                maxHeight: '400px',
                 overflowY: 'auto',
                 padding: '12px',
                 background: '#f8fafc',
@@ -88,8 +120,8 @@ export default function StepSummary({
               }}>
                 {displayResultText || 'Summary generation completed successfully.'}
               </div>
-              <button type="button" onClick={handleRestartSummary} style={{ ...styles.buttonWarningSmall, marginTop: '12px' }}>
-                Re-run Summary
+              <button type="button" onClick={() => handleStartWithParams(true)} style={{ ...styles.buttonWarningSmall, marginTop: '12px' }}>
+                Re-run Summary with Filters
               </button>
             </div>
           )}

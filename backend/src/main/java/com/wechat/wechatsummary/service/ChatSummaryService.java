@@ -8,6 +8,10 @@ import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.StandardOpenOption;
+import java.time.LocalDateTime;
+import java.time.format.DateTimeFormatter;
+import java.time.format.DateTimeFormatterBuilder;
+import java.time.temporal.ChronoField;
 import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
@@ -15,6 +19,8 @@ import java.util.Map;
 import java.util.Optional;
 import java.util.UUID;
 import java.util.concurrent.ConcurrentHashMap;
+import java.util.regex.Matcher;
+import java.util.regex.Pattern;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.scheduling.annotation.Async;
@@ -33,7 +39,7 @@ public class ChatSummaryService {
     private final Map<UUID, Thread> activeThreads = new ConcurrentHashMap<>();
 
     @Async
-    public void summarizeChatLogAsync(String userId, UUID uuid) {
+    public void summarizeChatLogAsync(String userId, UUID uuid, LocalDateTime startTime, LocalDateTime endTime) {
         if (activeThreads.containsKey(uuid)) {
             log.warn(
                 "Execution request rejected for user UUID: [{}] and task {}: Thread is already running.",
@@ -41,7 +47,8 @@ public class ChatSummaryService {
             return;
         }
 
-        log.info("Starting worker thread for user UUID: [{}] and task UUID: [{}]", userId, uuid);
+        log.info("Starting worker thread for user UUID: [{}] and task UUID: [{}] starting time: [{}], end time: [{}]",
+            userId, uuid, startTime, endTime);
         activeThreads.put(uuid, Thread.currentThread());
 
         Path userOutputsDir = storageConfig.getUploadDir().resolve(userId).resolve("outputs");
@@ -52,9 +59,15 @@ public class ChatSummaryService {
             Files.createDirectories(userOutputsDir);
             Path targetFilePath = locateProcessedFile(userOutputsDir, uuid);
             String rawContent = Files.readString(targetFilePath, StandardCharsets.UTF_8);
+
+            // If user specified a start or end timestamp window, filter the content
+            if (startTime != null || endTime != null) {
+                rawContent = filterContentTimeWindow(targetFilePath, startTime, endTime);
+            }
+
             List<String> chunks = splitContent(rawContent);
             if (chunks.isEmpty()) {
-                throw new RuntimeException("Cleaned log file is empty.");
+                throw new RuntimeException("Cleaned log file is empty after applying filters.");
             }
 
             int startIndex = 0;
@@ -122,6 +135,131 @@ public class ChatSummaryService {
         } finally {
             activeThreads.remove(uuid);
         }
+    }
+
+    private String filterContentTimeWindow(Path targetFilePath, LocalDateTime startTime, LocalDateTime endTime) throws Exception {
+        List<String> lines = Files.readAllLines(targetFilePath, StandardCharsets.UTF_8);
+        List<String> filteredLines = new ArrayList<>();
+
+        // Build a flexible formatter that handles optional milliseconds/fractional seconds
+        DateTimeFormatter formatter = new DateTimeFormatterBuilder()
+            .appendPattern("yyyy-MM-dd HH:mm:ss")
+            .optionalStart()
+            .appendFraction(ChronoField.MILLI_OF_SECOND, 1, 3, true)
+            .optionalEnd()
+            .toFormatter();
+
+        // Regex to extract timestamps whether they have milliseconds or not (e.g. [2026-07-28 13:41:08] or [2026-07-28 13:41:08.123])
+        Pattern timestampPattern = Pattern.compile("^\\[(\\d{4}-\\d{2}-\\d{2} \\d{2}:\\d{2}:\\d{2}(?:\\.\\d{1,3})?)]");
+
+        boolean keepLine = (startTime == null);
+
+        for (String line : lines) {
+            if (line.startsWith("---") || line.startsWith("群名称") || line.startsWith("总消息数")) {
+                filteredLines.add(line);
+                continue;
+            }
+
+            Matcher matcher = timestampPattern.matcher(line);
+            if (matcher.find()) {
+                LocalDateTime lineTime = LocalDateTime.parse(matcher.group(1), formatter);
+
+                if (!keepLine && startTime != null && !lineTime.isBefore(startTime)) {
+                    keepLine = true;
+                }
+
+                if (endTime != null && lineTime.isAfter(endTime)) {
+                    break;
+                }
+            }
+
+            if (keepLine) {
+                filteredLines.add(line);
+            }
+        }
+
+        if (filteredLines.isEmpty()) {
+            log.warn("No lines matched the criteria (startTime: {}, endTime: {}). Falling back to full content.",
+                startTime, endTime);
+            return String.join("\n", lines);
+        }
+
+        return String.join("\n", filteredLines);
+    }
+
+    public Map<String, Object> getChatPreviewData(String userId, UUID uuid) {
+        Path userOutputsDir = storageConfig.getUploadDir().resolve(userId).resolve("outputs");
+        Map<String, Object> result = new HashMap<>();
+        List<Map<String, String>> chatRows = new ArrayList<>();
+        Map<String, String> metadata = new HashMap<>();
+
+        try {
+            Path targetFilePath = locateProcessedFile(userOutputsDir, uuid);
+            List<String> lines = Files.readAllLines(targetFilePath, StandardCharsets.UTF_8);
+
+            int chatLineCounter = 1;
+            boolean parsingHeader = false;
+
+            for (String line : lines) {
+                if (line.isBlank()) {
+                    continue;
+                }
+
+                if (line.contains("--- 群聊基本信息 ---")) {
+                    parsingHeader = true;
+                    continue;
+                }
+                if (parsingHeader) {
+                    if (line.contains("--------------------")) {
+                        parsingHeader = false;
+                        continue;
+                    }
+                    String[] parts = line.split(":", 2);
+                    if (parts.length == 2) {
+                        metadata.put(parts[0].trim(), parts[1].trim());
+                    }
+                    continue;
+                }
+
+                Map<String, String> row = new HashMap<>();
+                row.put("lineId", String.valueOf(chatLineCounter++));
+
+                if (line.startsWith("[") && line.contains("] ")) {
+                    int closeBracketIdx = line.indexOf("] ");
+                    String timestamp = line.substring(1, closeBracketIdx);
+                    String remainder = line.substring(closeBracketIdx + 2);
+
+                    int colonIdx = remainder.indexOf(": ");
+                    if (colonIdx != -1) {
+                        String sender = remainder.substring(0, colonIdx);
+                        String content = remainder.substring(colonIdx + 2);
+
+                        row.put("timestamp", timestamp);
+                        row.put("sender", sender);
+                        row.put("content", content);
+                    } else {
+                        row.put("timestamp", timestamp);
+                        row.put("sender", "Unknown");
+                        row.put("content", remainder);
+                    }
+                } else {
+                    row.put("timestamp", "");
+                    row.put("sender", "");
+                    row.put("content", line);
+                }
+
+                chatRows.add(row);
+            }
+
+            result.put("metadata", metadata);
+            result.put("rows", chatRows);
+
+        } catch (Exception e) {
+            log.error("Failed to parse preview chat data for user UUID: [{}] and task UUID: [{}]", userId, uuid, e);
+            throw new RuntimeException("Failed to load chat preview: " + e.getMessage());
+        }
+
+        return result;
     }
 
     public void pauseSummary(UUID uuid) {
