@@ -41,7 +41,7 @@ public class MediaProducerService {
      */
     public void preprocess(String userId, String uuid) throws IOException {
         // 0. Prevent duplicate execution if the task is already running
-        TaskProgress progress = coordinatorService.getTaskProgress(uuid);
+        TaskProgress progress = coordinatorService.getTaskProgress(uuid, userId);
         if (TaskStatus.RUNNING.equals(progress.getStatus())) {
             log.warn("Preprocessing skipped for user UUID: [{}] and session UUID: [{}]. Task is already RUNNING.", userId, uuid);
             return;

@@ -89,7 +89,7 @@ public class PreprocessController {
         @RequestHeader("X-User-Id") String userId,
         @PathVariable String uuid) {
         log.debug("Fetching preprocessing progress state metrics for user UUID: [{}] and batch UUID: [{}]", userId, uuid);
-        TaskProgress progress = taskCoordinatorService.getTaskProgress(uuid);
+        TaskProgress progress = taskCoordinatorService.getTaskProgress(uuid, userId);
         return ResponseEntity.ok(progress);
     }
 
@@ -128,6 +128,15 @@ public class PreprocessController {
         log.info("REST endpoint invoked to batch delete [{}] image summary records for user UUID: [{}]",
             ids != null ? ids.size() : 0, userId);
         imageProcessorService.deleteImageSummariesByIds(ids);
+        return ResponseEntity.noContent().build();
+    }
+
+    @DeleteMapping("/images/summaries/all")
+    public ResponseEntity<Void> deleteAllImageSummariesByUuid(
+        @RequestHeader("X-User-Id") String userId,
+        @RequestParam("uuid") String uuid) {
+        log.info("REST endpoint invoked to delete ALL image summary records for user UUID: [{}] and session UUID: [{}]", userId, uuid);
+        imageProcessorService.deleteAllImageSummariesByUuid(uuid);
         return ResponseEntity.noContent().build();
     }
 
@@ -200,13 +209,6 @@ public class PreprocessController {
         return ResponseEntity.noContent().build();
     }
 
-    /**
-     * Deletes an ENTIRE audio summary record row (deletes both transcript & summary).
-     *
-     * @param userId caller user UUID header
-     * @param id     target entity ID (audio hash) to delete
-     * @return HTTP 204 No Content
-     */
     @DeleteMapping("/audios/summaries/{id}")
     public ResponseEntity<Void> deleteAudioSummaryById(
         @RequestHeader("X-User-Id") String userId,
@@ -216,13 +218,6 @@ public class PreprocessController {
         return ResponseEntity.noContent().build();
     }
 
-    /**
-     * Deletes ENTIRE audio summary record rows matching the provided list of IDs.
-     *
-     * @param userId caller user UUID header
-     * @param ids    list of target entity IDs (audio hashes) to delete
-     * @return HTTP 204 No Content
-     */
     @DeleteMapping("/audios/summaries")
     public ResponseEntity<Void> deleteAudioSummariesByIds(
         @RequestHeader("X-User-Id") String userId,
@@ -230,6 +225,15 @@ public class PreprocessController {
         log.info("REST endpoint invoked to batch delete [{}] full audio records for user UUID: [{}]",
             ids != null ? ids.size() : 0, userId);
         audioProcessorService.deleteAudioSummariesByIds(ids);
+        return ResponseEntity.noContent().build();
+    }
+
+    @DeleteMapping("/audios/summaries/all")
+    public ResponseEntity<Void> deleteAllAudioSummariesByUuid(
+        @RequestHeader("X-User-Id") String userId,
+        @RequestParam("uuid") String uuid) {
+        log.info("REST endpoint invoked to delete ALL full audio records for user UUID: [{}] and session UUID: [{}]", userId, uuid);
+        audioProcessorService.deleteAllAudioSummariesByUuid(uuid);
         return ResponseEntity.noContent().build();
     }
 

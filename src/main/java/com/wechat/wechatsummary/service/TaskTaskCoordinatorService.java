@@ -170,14 +170,14 @@ public class TaskTaskCoordinatorService {
      * Dynamically determines task progress based on pause flag, artifact presence, and live thread
      * status.
      */
-    public TaskProgress getTaskProgress(String uuid) {
+    public TaskProgress getTaskProgress(String uuid, String userId) {
         // 1. Check if the task has been explicitly aborted/paused -> PAUSED
         if (Boolean.TRUE.equals(redisTemplate.hasKey(ABORTED_PREFIX + uuid))) {
             return new TaskProgress(TaskStatus.PAUSED, 0, 0);
         }
 
         // 2. Check if {uuid}_processed.md exists on disk -> COMPLETED
-        String expectedOutputPath = storageConfig.getUploadDir()
+        String expectedOutputPath = storageConfig.getUploadDir().resolve(userId)
             .resolve("outputs")
             .resolve(uuid + "_processed.md")
             .toAbsolutePath()
