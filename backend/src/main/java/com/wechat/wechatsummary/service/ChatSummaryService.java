@@ -1,6 +1,5 @@
 package com.wechat.wechatsummary.service;
 
-import com.wechat.wechatsummary.config.StorageConfig;
 import com.wechat.wechatsummary.dto.ChatPreviewResponse;
 import com.wechat.wechatsummary.dto.ChatPreviewRow;
 import com.wechat.wechatsummary.dto.SummaryProgressResponse;
@@ -30,14 +29,14 @@ import lombok.extern.slf4j.Slf4j;
 import org.springframework.scheduling.annotation.Async;
 import org.springframework.stereotype.Service;
 
-@Slf4j
 @Service
 @RequiredArgsConstructor
+@Slf4j
 public class ChatSummaryService {
 
     private static final int MAX_CHUNK_CHARS = 15000;
     private final AiService aiService;
-    private final StorageConfig storageConfig;
+    private final StoragePaths storagePaths;
     private final ChatSummaryTaskRepository taskRepository;
 
     private final Map<UUID, Thread> activeThreads = new ConcurrentHashMap<>();
@@ -57,9 +56,9 @@ public class ChatSummaryService {
             userId, uuid, startTime, endTime);
         activeThreads.put(uuid, Thread.currentThread());
 
-        Path userOutputsDir = storageConfig.getUploadDir().resolve(userId).resolve("outputs");
-        Path tempProgressPath = userOutputsDir.resolve(uuid + "_summary.temp");
-        Path resultTxtPath = userOutputsDir.resolve(uuid + "_summary.txt");
+        Path userOutputsDir = storagePaths.outputDir(userId);
+        Path tempProgressPath = storagePaths.summaryTemp(userId, uuid.toString());
+        Path resultTxtPath = storagePaths.summaryTxt(userId, uuid.toString());
 
         try {
             Files.createDirectories(userOutputsDir);
@@ -198,7 +197,7 @@ public class ChatSummaryService {
     }
 
     public ChatPreviewResponse getChatPreviewData(String userId, UUID uuid) {
-        Path userOutputsDir = storageConfig.getUploadDir().resolve(userId).resolve("outputs");
+        Path userOutputsDir = storagePaths.outputDir(userId);
         Map<String, String> metadata = new HashMap<>();
         List<ChatPreviewRow> chatRows = new ArrayList<>();
 
@@ -276,10 +275,9 @@ public class ChatSummaryService {
     public void startOverSummary(String userId, UUID uuid) {
         pauseSummary(uuid);
 
-        Path userOutputsDir = storageConfig.getUploadDir().resolve(userId).resolve("outputs");
         try {
-            Files.deleteIfExists(userOutputsDir.resolve(uuid + "_summary.txt"));
-            Files.deleteIfExists(userOutputsDir.resolve(uuid + "_summary.temp"));
+            Files.deleteIfExists(storagePaths.summaryTxt(userId, uuid.toString()));
+            Files.deleteIfExists(storagePaths.summaryTemp(userId, uuid.toString()));
             log.info(
                 "Successfully wiped processing states for complete restart on user UUID: [{}] and task: {}",
                 userId, uuid);
@@ -289,9 +287,8 @@ public class ChatSummaryService {
     }
 
     public SummaryProgressResponse getStatusAndProgress(String userId, UUID uuid) {
-        Path userOutputsDir = storageConfig.getUploadDir().resolve(userId).resolve("outputs");
-        Path resultTxtPath = userOutputsDir.resolve(uuid + "_summary.txt");
-        Path tempProgressPath = userOutputsDir.resolve(uuid + "_summary.temp");
+        Path resultTxtPath = storagePaths.summaryTxt(userId, uuid.toString());
+        Path tempProgressPath = storagePaths.summaryTemp(userId, uuid.toString());
 
         if (Files.exists(resultTxtPath)) {
             try {
@@ -310,7 +307,8 @@ public class ChatSummaryService {
                 if (!lines.isEmpty()) {
                     int processedIndex = Integer.parseInt(lines.get(0).trim());
 
-                    Path targetFilePath = locateProcessedFile(userOutputsDir, uuid);
+Path targetFilePath = locateProcessedFile(storagePaths.outputDir(userId),
+                        uuid);
                     String rawContent = Files.readString(targetFilePath, StandardCharsets.UTF_8);
                     int totalChunks = splitContent(rawContent).size();
 

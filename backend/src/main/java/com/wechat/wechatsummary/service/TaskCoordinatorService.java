@@ -1,9 +1,8 @@
 package com.wechat.wechatsummary.service;
 
-import com.wechat.wechatsummary.config.StorageConfig;
 import com.wechat.wechatsummary.dto.TaskProgress;
 import com.wechat.wechatsummary.dto.TaskStatus;
-import java.io.File;
+import java.nio.file.Files;
 import java.util.Collections;
 import java.util.Map;
 import java.util.Set;
@@ -22,18 +21,19 @@ import org.springframework.stereotype.Service;
 @Service
 @RequiredArgsConstructor
 @Slf4j
-public class TaskTaskCoordinatorService {
+public class TaskCoordinatorService {
 
     private static final String COUNTER_PREFIX = "task:counter:";
     private static final String TOTAL_PREFIX = "task:total:";
     private static final String ABORTED_PREFIX = "task:aborted:";
+    private static final String USER_KEY_PREFIX = "task:user:";
 
     // Thread-safe map tracking active JVM threads for each UUID batch
     private final Map<String, Set<Thread>> activeThreadsMap = new ConcurrentHashMap<>();
 
     private final StringRedisTemplate redisTemplate;
     private final MessageProcessorService messageProcessorService;
-    private final StorageConfig storageConfig;
+    private final StoragePaths storagePaths;
 
     public void initTaskContext(String userId, String uuid, int totalTasks, String inputJsonPath,
         String outputFilePath) {
@@ -48,7 +48,7 @@ public class TaskTaskCoordinatorService {
         }
 
         // Store userId in Redis mapping for this uuid so completion can fetch it if needed, or pass it directly
-        redisTemplate.opsForValue().set("task:user:" + uuid, userId, 1, TimeUnit.DAYS);
+        redisTemplate.opsForValue().set(USER_KEY_PREFIX + uuid, userId, 1, TimeUnit.DAYS);
         redisTemplate.opsForValue()
             .set(COUNTER_PREFIX + uuid, String.valueOf(totalTasks), 1, TimeUnit.DAYS);
         redisTemplate.opsForValue()
@@ -119,8 +119,14 @@ public class TaskTaskCoordinatorService {
         return Boolean.TRUE.equals(redisTemplate.hasKey(ABORTED_PREFIX + uuid));
     }
 
-    public void completeTask(String uuid, Thread thread, String inputJsonPath,
-        String outputFilePath) {
+    /**
+     * Reports a finished sub-task for the given UUID and triggers the final markdown compilation
+     * once all sub-tasks have completed.
+     *
+     * @param uuid   The batch transaction identifier.
+     * @param thread The finished worker thread instance.
+     */
+    public void completeTask(String uuid, Thread thread) {
         // Guard check: do not process final compile if batch was aborted/paused
         if (Boolean.TRUE.equals(redisTemplate.hasKey(ABORTED_PREFIX + uuid))) {
             log.info(
@@ -159,7 +165,7 @@ public class TaskTaskCoordinatorService {
                 "All concurrent child tasks completed for transaction UUID: [{}]. Dispatching final processing...",
                 uuid);
 
-            String userId = redisTemplate.opsForValue().get("task:user:" + uuid);
+            String userId = redisTemplate.opsForValue().get(USER_KEY_PREFIX + uuid);
             if (userId != null) {
                 messageProcessorService.processJsonAndSave(userId, uuid);
             } else {
@@ -169,7 +175,7 @@ public class TaskTaskCoordinatorService {
 
             redisTemplate.delete(counterKey);
             redisTemplate.delete(TOTAL_PREFIX + uuid);
-            redisTemplate.delete("task:user:" + uuid);
+            redisTemplate.delete(USER_KEY_PREFIX + uuid);
             activeThreadsMap.remove(uuid);
         }
     }
@@ -185,13 +191,7 @@ public class TaskTaskCoordinatorService {
         }
 
         // 2. Check if {uuid}_processed.md exists on disk -> COMPLETED
-        String expectedOutputPath = storageConfig.getUploadDir().resolve(userId)
-            .resolve("outputs")
-            .resolve(uuid + "_processed.md")
-            .toAbsolutePath()
-            .toString();
-
-        if (new File(expectedOutputPath).exists()) {
+        if (Files.exists(storagePaths.processedMarkdown(userId, uuid))) {
             return new TaskProgress(TaskStatus.COMPLETED, 0, 0);
         }
 

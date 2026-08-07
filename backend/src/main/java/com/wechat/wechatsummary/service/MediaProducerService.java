@@ -1,7 +1,6 @@
 package com.wechat.wechatsummary.service;
 
 import com.wechat.wechatsummary.config.RabbitConfig;
-import com.wechat.wechatsummary.config.StorageConfig;
 import com.wechat.wechatsummary.dto.TaskProgress;
 import com.wechat.wechatsummary.dto.TaskStatus;
 import java.io.IOException;
@@ -25,8 +24,8 @@ import org.springframework.stereotype.Service;
 public class MediaProducerService {
 
     private final RabbitTemplate rabbitTemplate;
-    private final TaskTaskCoordinatorService coordinatorService;
-    private final StorageConfig storageConfig;
+    private final TaskCoordinatorService coordinatorService;
+    private final StoragePaths storagePaths;
 
     /**
      * Preprocesses an uploaded session directory scoped under the specified user UUID by scanning
@@ -54,7 +53,7 @@ public class MediaProducerService {
             userId, uuid);
 
         // Resolve path inside the user's isolated directory
-        Path baseDir = storageConfig.getUploadDir().resolve(userId).resolve(uuid);
+        Path baseDir = storagePaths.sessionDir(userId, uuid);
 
         // 1. Automatically scan for the source chat history log JSON file within the active session workspace directory
         String inputJsonPath;
@@ -71,10 +70,9 @@ public class MediaProducerService {
         }
 
         // 2. Dynamically resolve the absolute file path for the target compiled output document (.md format) scoped by user
-        Path userOutputDir = storageConfig.getUploadDir().resolve(userId).resolve("outputs");
+        Path userOutputDir = storagePaths.outputDir(userId);
         Files.createDirectories(userOutputDir);
-        String outputFilePath = userOutputDir
-            .resolve(uuid + "_processed.md")
+        String outputFilePath = storagePaths.processedMarkdown(userId, uuid)
             .toAbsolutePath()
             .toString();
 

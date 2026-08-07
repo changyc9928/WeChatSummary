@@ -3,16 +3,14 @@ package com.wechat.wechatsummary.service;
 import com.fasterxml.jackson.core.type.TypeReference;
 import com.fasterxml.jackson.databind.DeserializationFeature;
 import com.fasterxml.jackson.databind.ObjectMapper;
-import com.wechat.wechatsummary.config.StorageConfig;
 import com.wechat.wechatsummary.dto.WeChatMessageDto;
+import com.wechat.wechatsummary.util.HashUtils;
 import java.io.IOException;
 import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.StandardOpenOption;
-import java.security.MessageDigest;
 import java.util.HashMap;
-import java.util.HexFormat;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
@@ -52,7 +50,7 @@ public class MessageProcessorService {
 
     private final WeChatSummaryCacheService cacheService;
     private final ObjectMapper objectMapper;
-    private final StorageConfig storageConfig;
+    private final StoragePaths storagePaths;
 
     /**
      * Parses the underlying raw chat JSON archive, structures content models, injects resolved
@@ -68,7 +66,7 @@ public class MessageProcessorService {
             userId, uuid);
         try {
             // Correct user-isolated directory structure: uploadDir / userId / uuid
-            Path sessionDir = storageConfig.getUploadDir().resolve(userId).resolve(uuid);
+            Path sessionDir = storagePaths.sessionDir(userId, uuid);
             Path inputPath;
 
             if (!Files.exists(sessionDir)) {
@@ -91,9 +89,9 @@ public class MessageProcessorService {
             }
 
             // Correct user-isolated output directory structure: uploadDir / userId / outputs
-            Path userOutputDir = storageConfig.getUploadDir().resolve(userId).resolve("outputs");
+            Path userOutputDir = storagePaths.outputDir(userId);
             Files.createDirectories(userOutputDir);
-            Path outputPath = userOutputDir.resolve(uuid + "_processed.md");
+            Path outputPath = storagePaths.processedMarkdown(userId, uuid);
 
             objectMapper.configure(DeserializationFeature.FAIL_ON_UNKNOWN_PROPERTIES, false);
             String jsonStr = Files.readString(inputPath, StandardCharsets.UTF_8);
@@ -286,13 +284,12 @@ public class MessageProcessorService {
             || lowerPath.startsWith("voices")) {
 
             // Correct path construction: uploadDir / userId / uuid / relativePath
-            Path resolvedPath = storageConfig.getUploadDir().resolve(userId).resolve(uuid)
-                .resolve(relativePath);
-            return sha256(resolvedPath.toAbsolutePath().normalize().toString());
+            Path resolvedPath = storagePaths.sessionDir(userId, uuid).resolve(relativePath);
+            return HashUtils.sha256(resolvedPath.toAbsolutePath().normalize().toString());
         }
 
         String xmlHash = extractHashFromXml(rawContent);
-        return StringUtils.hasText(xmlHash) ? xmlHash : sha256(content.trim());
+        return StringUtils.hasText(xmlHash) ? xmlHash : HashUtils.sha256(content.trim());
     }
 
     /**
@@ -305,25 +302,10 @@ public class MessageProcessorService {
         }
         Matcher matcher = XML_CDNURL_PATTERN.matcher(rawContent);
         if (matcher.find()) {
-            return sha256(matcher.group(1).replace("&amp;", "&").trim());
+            return HashUtils.sha256(matcher.group(1).replace("&amp;", "&").trim());
         }
         Matcher md5Matcher = MD5_EXTRACT_PATTERN.matcher(rawContent.toLowerCase());
         return md5Matcher.find() ? md5Matcher.group(1) : "";
-    }
-
-    /**
-     * Computes SHA-256 representation string hashes over target identifiers.
-     */
-    private String sha256(String input) {
-        try {
-            MessageDigest digest = MessageDigest.getInstance("SHA-256");
-            return HexFormat.of().formatHex(digest.digest(input.getBytes(StandardCharsets.UTF_8)));
-        } catch (Exception e) {
-            log.error(
-                "Cryptographic messaging digest algorithm instantiation configuration collapsed for SHA-256.",
-                e);
-            throw new RuntimeException(e);
-        }
     }
 
     // ==========================================
@@ -343,7 +325,7 @@ public class MessageProcessorService {
                         return cacheService.getImageSummary(rawMd5);
                     }
                 }
-                return java.util.Optional.empty();
+                return Optional.empty();
             })
             .orElse("经典表情/暂无描述");
     }

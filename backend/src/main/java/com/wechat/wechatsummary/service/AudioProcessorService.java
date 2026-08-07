@@ -1,16 +1,15 @@
 package com.wechat.wechatsummary.service;
 
 import com.openai.models.audio.AudioResponseFormat;
-import com.wechat.wechatsummary.config.StorageConfig;
 import com.wechat.wechatsummary.entity.AudioSummary;
-import java.nio.charset.StandardCharsets;
+import com.wechat.wechatsummary.util.HashUtils;
+import com.wechat.wechatsummary.util.PageUtils;
+import com.wechat.wechatsummary.util.PathUtils;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.Paths;
-import java.security.MessageDigest;
 import java.time.LocalDateTime;
 import java.util.Comparator;
-import java.util.HexFormat;
 import java.util.List;
 import java.util.Optional;
 import lombok.RequiredArgsConstructor;
@@ -18,10 +17,7 @@ import lombok.extern.slf4j.Slf4j;
 import org.springframework.ai.audio.transcription.AudioTranscriptionPrompt;
 import org.springframework.ai.openai.OpenAiAudioTranscriptionOptions;
 import org.springframework.core.io.FileSystemResource;
-import org.springframework.core.io.Resource;
-import org.springframework.core.io.UrlResource;
 import org.springframework.data.domain.Page;
-import org.springframework.data.domain.PageImpl;
 import org.springframework.data.domain.Pageable;
 import org.springframework.stereotype.Service;
 
@@ -34,14 +30,17 @@ import org.springframework.stereotype.Service;
 @Slf4j
 public class AudioProcessorService {
 
+    private static final String AUDIO_MIME_TYPE = "audio/mpeg";
+
     private final AiService audioAiSummaryService;
     private final WeChatSummaryCacheService cacheService;
-    private final StorageConfig storageConfig;
+    private final MediaFileResourceLoader fileResourceLoader;
+    private final StoragePaths storagePaths;
 
     public void processAudioSummary(String filePath) {
         log.info("Initiating audio processing pipeline execution for target file: [{}]", filePath);
         try {
-            String hash = sha256(filePath);
+            String hash = HashUtils.sha256(filePath);
 
             Optional<AudioSummary> dbRecord = cacheService.findAudioSummaryByHash(hash);
 
@@ -102,20 +101,11 @@ public class AudioProcessorService {
 
         List<AudioSummary> processedList = entities.stream()
             .map(entity -> sanitizeFilePath(entity, uuid))
-            .sorted(Comparator.comparingLong(this::extractAudioTimestamp))
+            .sorted(Comparator.comparingLong(
+                entity -> PathUtils.extractTimestamp(entity.getFilePath())))
             .toList();
 
-        int total = processedList.size();
-        int start = (int) pageable.getOffset();
-
-        if (start >= total) {
-            return new PageImpl<>(List.of(), pageable, total);
-        }
-
-        int end = Math.min(start + pageable.getPageSize(), total);
-        List<AudioSummary> pageContent = processedList.subList(start, end);
-
-        return new PageImpl<>(pageContent, pageable, total);
+        return PageUtils.paginate(processedList, pageable);
     }
 
     private String executeTranscription(String filePath) {
@@ -142,32 +132,8 @@ public class AudioProcessorService {
         sanitized.setTranscript(original.getTranscript());
         sanitized.setSummary(original.getSummary());
         sanitized.setCreatedAt(original.getCreatedAt());
-
-        String rawPath = original.getFilePath();
-        if (rawPath != null && !rawPath.isBlank()) {
-            String targetSegment = "/" + uuid + "/";
-            int index = rawPath.indexOf(targetSegment);
-
-            if (index != -1) {
-                sanitized.setFilePath(rawPath.substring(index + targetSegment.length()));
-            } else {
-                sanitized.setFilePath(rawPath);
-            }
-        }
+        sanitized.setFilePath(PathUtils.relativizeToUuid(original.getFilePath(), uuid));
         return sanitized;
-    }
-
-    private long extractAudioTimestamp(AudioSummary entity) {
-        if (entity.getFilePath() == null) {
-            return 0L;
-        }
-        try {
-            String fileName = Paths.get(entity.getFilePath()).getFileName().toString();
-            String timestampStr = fileName.split("_")[0];
-            return Long.parseLong(timestampStr);
-        } catch (Exception e) {
-            return 0L;
-        }
     }
 
     public void deleteAudioSummaryById(String id) {
@@ -185,58 +151,17 @@ public class AudioProcessorService {
         cacheService.deleteAudioSummariesByIds(ids);
     }
 
-    /**
-     * Invalidates (deletes) the {uuid}_processed.md file linked to this audio storage path.
-     */
     private void invalidateProcessedMarkdown(AudioSummary entity) {
-        try {
-            String filePath = entity.getFilePath();
-            if (filePath == null || filePath.isBlank()) {
-                return;
-            }
-
-            Path path = Paths.get(filePath);
-            Path parent = path.getParent();
-
-            while (parent != null) {
-                Path userIdDir = parent.getParent();
-                if (userIdDir != null && Files.exists(userIdDir.resolve("outputs"))) {
-                    String uuid = parent.getFileName().toString();
-                    Path processedMd = userIdDir.resolve("outputs").resolve(uuid + "_processed.md");
-                    if (Files.exists(processedMd)) {
-                        Files.delete(processedMd);
-                        log.info(
-                            "Successfully invalidated/deleted processed markdown file for audio: [{}]",
-                            processedMd);
-                    }
-                    return;
-                }
-                parent = parent.getParent();
-            }
-        } catch (Exception e) {
-            log.error("Failed to invalidate processed markdown file for audio path: {}",
-                entity.getFilePath(), e);
+        if (entity.getFilePath() == null || entity.getFilePath().isBlank()) {
+            return;
         }
+        storagePaths.deleteProcessedMarkdownFor(Paths.get(entity.getFilePath()));
     }
 
-    public Optional<AudioFileResource> getAudioFileById(String id) {
+    public Optional<MediaFileResourceLoader.MediaFileResource> getAudioFileById(String id) {
         return cacheService.findAudioSummaryByHash(id)
             .map(AudioSummary::getFilePath)
-            .map(Paths::get)
-            .filter(Files::exists)
-            .map(path -> {
-                try {
-                    Resource resource = new UrlResource(path.toUri());
-                    String contentType = Files.probeContentType(path);
-                    if (contentType == null) {
-                        contentType = "audio/mpeg";
-                    }
-                    return new AudioFileResource(resource, contentType);
-                } catch (Exception e) {
-                    log.error("Failed to load audio file resource at path: {}", path, e);
-                    return null;
-                }
-            });
+            .flatMap(path -> fileResourceLoader.load(path, AUDIO_MIME_TYPE));
     }
 
     public void clearAudioSummaryTextById(String id) {
@@ -263,26 +188,10 @@ public class AudioProcessorService {
         log.info("Deleting all audio summaries for session UUID: [{}]", uuid);
         List<AudioSummary> entities = cacheService.getAudioSummariesByUuid(uuid);
         if (entities != null && !entities.isEmpty()) {
-            // Invalidate _processed.md using the first available valid file path context
             invalidateProcessedMarkdown(entities.get(0));
 
             List<String> ids = entities.stream().map(AudioSummary::getId).toList();
             cacheService.deleteAudioSummariesByIds(ids);
         }
-    }
-
-    private String sha256(String input) {
-        try {
-            MessageDigest digest = MessageDigest.getInstance("SHA-256");
-            byte[] hash = digest.digest(input.getBytes(StandardCharsets.UTF_8));
-            return HexFormat.of().formatHex(hash);
-        } catch (Exception e) {
-            log.error("SHA-256 failed.", e);
-            throw new RuntimeException(e);
-        }
-    }
-
-    public record AudioFileResource(Resource resource, String contentType) {
-
     }
 }

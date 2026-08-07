@@ -4,6 +4,7 @@ import com.openai.errors.InternalServerException;
 import com.openai.errors.RateLimitException;
 import java.net.URI;
 import java.util.Base64;
+import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.ai.audio.transcription.AudioTranscriptionPrompt;
 import org.springframework.ai.audio.transcription.AudioTranscriptionResponse;
@@ -24,21 +25,13 @@ import org.springframework.util.MimeType;
  * text summaries, rolling chat analysis, and image description.
  */
 @Service
+@RequiredArgsConstructor
 @Slf4j
 public class AiService {
 
     private final ChatClient chatClient;
-    private final ChatClient multimodalChatClient;
+    private final @Qualifier("multimodalChatClient") ChatClient multimodalChatClient;
     private final OpenAiAudioTranscriptionModel transcriptionModel;
-
-    public AiService(
-        ChatClient chatClient,
-        @Qualifier("multimodalChatClient") ChatClient multimodalChatClient,
-        OpenAiAudioTranscriptionModel transcriptionModel) {
-        this.chatClient = chatClient;
-        this.multimodalChatClient = multimodalChatClient;
-        this.transcriptionModel = transcriptionModel;
-    }
 
     /**
      * Calls the Whisper transcription model with automatic retry support.

@@ -10,9 +10,10 @@ import com.wechat.wechatsummary.exception.BusinessException;
 import com.wechat.wechatsummary.service.AudioProcessorService;
 import com.wechat.wechatsummary.service.ImageProcessorService;
 import com.wechat.wechatsummary.service.MediaProducerService;
-import com.wechat.wechatsummary.service.TaskTaskCoordinatorService;
+import com.wechat.wechatsummary.service.TaskCoordinatorService;
 import java.io.IOException;
 import java.util.List;
+import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.core.io.Resource;
 import org.springframework.data.domain.Page;
@@ -40,22 +41,13 @@ import org.springframework.web.bind.annotation.RestController;
 @Slf4j
 @RestController
 @RequestMapping("/api/preprocess")
+@RequiredArgsConstructor
 public class PreprocessController {
 
     private final MediaProducerService producerService;
-    private final TaskTaskCoordinatorService taskCoordinatorService;
+    private final TaskCoordinatorService taskCoordinatorService;
     private final ImageProcessorService imageProcessorService;
     private final AudioProcessorService audioProcessorService;
-
-    public PreprocessController(MediaProducerService producerService,
-        TaskTaskCoordinatorService taskCoordinatorService,
-        ImageProcessorService imageProcessorService,
-        AudioProcessorService audioProcessorService) {
-        this.producerService = producerService;
-        this.taskCoordinatorService = taskCoordinatorService;
-        this.imageProcessorService = imageProcessorService;
-        this.audioProcessorService = audioProcessorService;
-    }
 
     @PostMapping("/{uuid}")
     public ApiResponse<TaskAckResponse> preprocess(

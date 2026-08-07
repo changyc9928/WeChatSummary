@@ -2,7 +2,6 @@ package com.wechat.wechatsummary.service;
 
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
-import com.wechat.wechatsummary.config.StorageConfig;
 import com.wechat.wechatsummary.dto.SessionResponseDTO;
 import java.io.BufferedInputStream;
 import java.io.IOException;
@@ -31,9 +30,9 @@ import org.springframework.web.multipart.MultipartFile;
  * Service managing multipart file storage uploads, temporary archive caching, secure decompression,
  * directory-stripping logic, and line-ending normalizations isolated per user UUID.
  */
-@Slf4j
 @Service
 @RequiredArgsConstructor
+@Slf4j
 public class ZipExtractionService {
 
     private static final DateTimeFormatter CHAT_DATE_FORMATTER = DateTimeFormatter.ofPattern(
@@ -42,7 +41,7 @@ public class ZipExtractionService {
     private static final DateTimeFormatter UPLOAD_TIME_FORMATTER = DateTimeFormatter.ofPattern(
             "yyyy/MM/dd HH:mm")
         .withZone(ZoneId.systemDefault());
-    private final StorageConfig storageConfig;
+    private final StoragePaths storagePaths;
     private final ObjectMapper objectMapper;
 
     /**
@@ -57,14 +56,14 @@ public class ZipExtractionService {
      *                     operations
      */
     public String upload(String userId, MultipartFile file) throws IOException {
-        Path userDir = storageConfig.getUploadDir().resolve(userId);
+        Path userDir = storagePaths.userDir(userId);
         Files.createDirectories(userDir);
 
         Path tempZip = Files.createTempFile("upload-", ".zip");
         file.transferTo(tempZip);
 
         String uuid = UUID.randomUUID().toString();
-        Path extractDir = userDir.resolve(uuid);
+        Path extractDir = storagePaths.sessionDir(userId, uuid);
 
         log.info(
             "Successfully received uploaded file [{}]. Generated processing session UUID: [{}], unpacking target path: [{}] for user UUID: [{}]",
@@ -163,7 +162,7 @@ public class ZipExtractionService {
      * SessionResponseDTO objects with separated upload timestamps.
      */
     public List<SessionResponseDTO> listAvailableSessions(String userId) throws IOException {
-        Path userDir = storageConfig.getUploadDir().resolve(userId);
+        Path userDir = storagePaths.userDir(userId);
         if (!Files.exists(userDir)) {
             return List.of();
         }

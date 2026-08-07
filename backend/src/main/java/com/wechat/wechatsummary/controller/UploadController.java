@@ -29,10 +29,10 @@ import org.springframework.web.multipart.MultipartFile;
  * REST controller exposing endpoints to accept multi-part HTTP file submissions, validate
  * compression formats, and delegate payload decompression workflows to target services.
  */
-@Slf4j
-@RequiredArgsConstructor
 @RestController
 @RequestMapping("/api/files")
+@RequiredArgsConstructor
+@Slf4j
 public class UploadController {
 
     private final ZipExtractionService zipExtractionService;

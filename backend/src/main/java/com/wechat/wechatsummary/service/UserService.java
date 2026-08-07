@@ -4,21 +4,18 @@ import com.wechat.wechatsummary.entity.User;
 import com.wechat.wechatsummary.exception.BusinessException;
 import com.wechat.wechatsummary.exception.InvalidCredentialsException;
 import com.wechat.wechatsummary.repository.UserRepository;
-import org.springframework.http.HttpStatus;
 import java.util.UUID;
+import lombok.RequiredArgsConstructor;
+import org.springframework.http.HttpStatus;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Service;
 
 @Service
+@RequiredArgsConstructor
 public class UserService {
 
     private final UserRepository userRepository;
     private final PasswordEncoder passwordEncoder;
-
-    public UserService(UserRepository userRepository, PasswordEncoder passwordEncoder) {
-        this.userRepository = userRepository;
-        this.passwordEncoder = passwordEncoder;
-    }
 
     public String register(String username, String rawPassword) {
         userRepository.findByUsername(username)
