@@ -43,7 +43,7 @@ export default function StepPreprocess({
             xUserId: currentUser.uuid,
             uuid: uuidInput
           });
-          setPreviewData(data);
+          setPreviewData(data?.data || { metadata: {}, rows: [] });
         } catch (err) {
           console.error("Failed to load chat preview:", err);
         } finally {

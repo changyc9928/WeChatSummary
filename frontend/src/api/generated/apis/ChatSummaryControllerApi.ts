@@ -15,9 +15,21 @@
 
 import * as runtime from '../runtime';
 import type {
+  ApiResponseChatPreviewResponse,
+  ApiResponseSummaryProgressResponse,
+  ApiResponseTaskAckResponse,
+  ErrorResponse,
   SummaryRequestDTO,
 } from '../models/index';
 import {
+    ApiResponseChatPreviewResponseFromJSON,
+    ApiResponseChatPreviewResponseToJSON,
+    ApiResponseSummaryProgressResponseFromJSON,
+    ApiResponseSummaryProgressResponseToJSON,
+    ApiResponseTaskAckResponseFromJSON,
+    ApiResponseTaskAckResponseToJSON,
+    ErrorResponseFromJSON,
+    ErrorResponseToJSON,
     SummaryRequestDTOFromJSON,
     SummaryRequestDTOToJSON,
 } from '../models/index';
@@ -56,7 +68,7 @@ export class ChatSummaryControllerApi extends runtime.BaseAPI {
 
     /**
      */
-    async getChatPreviewRaw(requestParameters: GetChatPreviewRequest, initOverrides?: RequestInit | runtime.InitOverrideFunction): Promise<runtime.ApiResponse<{ [key: string]: any; }>> {
+    async getChatPreviewRaw(requestParameters: GetChatPreviewRequest, initOverrides?: RequestInit | runtime.InitOverrideFunction): Promise<runtime.ApiResponse<ApiResponseChatPreviewResponse>> {
         if (requestParameters['xUserId'] == null) {
             throw new runtime.RequiredError(
                 'xUserId',
@@ -90,19 +102,19 @@ export class ChatSummaryControllerApi extends runtime.BaseAPI {
             query: queryParameters,
         }, initOverrides);
 
-        return new runtime.JSONApiResponse<any>(response);
+        return new runtime.JSONApiResponse(response, (jsonValue) => ApiResponseChatPreviewResponseFromJSON(jsonValue));
     }
 
     /**
      */
-    async getChatPreview(requestParameters: GetChatPreviewRequest, initOverrides?: RequestInit | runtime.InitOverrideFunction): Promise<{ [key: string]: any; }> {
+    async getChatPreview(requestParameters: GetChatPreviewRequest, initOverrides?: RequestInit | runtime.InitOverrideFunction): Promise<ApiResponseChatPreviewResponse> {
         const response = await this.getChatPreviewRaw(requestParameters, initOverrides);
         return await response.value();
     }
 
     /**
      */
-    async getStatusAndProgressRaw(requestParameters: GetStatusAndProgressRequest, initOverrides?: RequestInit | runtime.InitOverrideFunction): Promise<runtime.ApiResponse<{ [key: string]: any; }>> {
+    async getStatusAndProgressRaw(requestParameters: GetStatusAndProgressRequest, initOverrides?: RequestInit | runtime.InitOverrideFunction): Promise<runtime.ApiResponse<ApiResponseSummaryProgressResponse>> {
         if (requestParameters['xUserId'] == null) {
             throw new runtime.RequiredError(
                 'xUserId',
@@ -136,19 +148,19 @@ export class ChatSummaryControllerApi extends runtime.BaseAPI {
             query: queryParameters,
         }, initOverrides);
 
-        return new runtime.JSONApiResponse<any>(response);
+        return new runtime.JSONApiResponse(response, (jsonValue) => ApiResponseSummaryProgressResponseFromJSON(jsonValue));
     }
 
     /**
      */
-    async getStatusAndProgress(requestParameters: GetStatusAndProgressRequest, initOverrides?: RequestInit | runtime.InitOverrideFunction): Promise<{ [key: string]: any; }> {
+    async getStatusAndProgress(requestParameters: GetStatusAndProgressRequest, initOverrides?: RequestInit | runtime.InitOverrideFunction): Promise<ApiResponseSummaryProgressResponse> {
         const response = await this.getStatusAndProgressRaw(requestParameters, initOverrides);
         return await response.value();
     }
 
     /**
      */
-    async pauseSummaryRaw(requestParameters: PauseSummaryRequest, initOverrides?: RequestInit | runtime.InitOverrideFunction): Promise<runtime.ApiResponse<{ [key: string]: string; }>> {
+    async pauseSummaryRaw(requestParameters: PauseSummaryRequest, initOverrides?: RequestInit | runtime.InitOverrideFunction): Promise<runtime.ApiResponse<ApiResponseTaskAckResponse>> {
         if (requestParameters['xUserId'] == null) {
             throw new runtime.RequiredError(
                 'xUserId',
@@ -182,19 +194,19 @@ export class ChatSummaryControllerApi extends runtime.BaseAPI {
             query: queryParameters,
         }, initOverrides);
 
-        return new runtime.JSONApiResponse<any>(response);
+        return new runtime.JSONApiResponse(response, (jsonValue) => ApiResponseTaskAckResponseFromJSON(jsonValue));
     }
 
     /**
      */
-    async pauseSummary(requestParameters: PauseSummaryRequest, initOverrides?: RequestInit | runtime.InitOverrideFunction): Promise<{ [key: string]: string; }> {
+    async pauseSummary(requestParameters: PauseSummaryRequest, initOverrides?: RequestInit | runtime.InitOverrideFunction): Promise<ApiResponseTaskAckResponse> {
         const response = await this.pauseSummaryRaw(requestParameters, initOverrides);
         return await response.value();
     }
 
     /**
      */
-    async restartSummaryRaw(requestParameters: RestartSummaryRequest, initOverrides?: RequestInit | runtime.InitOverrideFunction): Promise<runtime.ApiResponse<{ [key: string]: string; }>> {
+    async restartSummaryRaw(requestParameters: RestartSummaryRequest, initOverrides?: RequestInit | runtime.InitOverrideFunction): Promise<runtime.ApiResponse<ApiResponseTaskAckResponse>> {
         if (requestParameters['xUserId'] == null) {
             throw new runtime.RequiredError(
                 'xUserId',
@@ -231,19 +243,19 @@ export class ChatSummaryControllerApi extends runtime.BaseAPI {
             body: SummaryRequestDTOToJSON(requestParameters['summaryRequestDTO']),
         }, initOverrides);
 
-        return new runtime.JSONApiResponse<any>(response);
+        return new runtime.JSONApiResponse(response, (jsonValue) => ApiResponseTaskAckResponseFromJSON(jsonValue));
     }
 
     /**
      */
-    async restartSummary(requestParameters: RestartSummaryRequest, initOverrides?: RequestInit | runtime.InitOverrideFunction): Promise<{ [key: string]: string; }> {
+    async restartSummary(requestParameters: RestartSummaryRequest, initOverrides?: RequestInit | runtime.InitOverrideFunction): Promise<ApiResponseTaskAckResponse> {
         const response = await this.restartSummaryRaw(requestParameters, initOverrides);
         return await response.value();
     }
 
     /**
      */
-    async startSummaryRaw(requestParameters: StartSummaryRequest, initOverrides?: RequestInit | runtime.InitOverrideFunction): Promise<runtime.ApiResponse<object>> {
+    async startSummaryRaw(requestParameters: StartSummaryRequest, initOverrides?: RequestInit | runtime.InitOverrideFunction): Promise<runtime.ApiResponse<ApiResponseTaskAckResponse>> {
         if (requestParameters['xUserId'] == null) {
             throw new runtime.RequiredError(
                 'xUserId',
@@ -280,12 +292,12 @@ export class ChatSummaryControllerApi extends runtime.BaseAPI {
             body: SummaryRequestDTOToJSON(requestParameters['summaryRequestDTO']),
         }, initOverrides);
 
-        return new runtime.JSONApiResponse<any>(response);
+        return new runtime.JSONApiResponse(response, (jsonValue) => ApiResponseTaskAckResponseFromJSON(jsonValue));
     }
 
     /**
      */
-    async startSummary(requestParameters: StartSummaryRequest, initOverrides?: RequestInit | runtime.InitOverrideFunction): Promise<object> {
+    async startSummary(requestParameters: StartSummaryRequest, initOverrides?: RequestInit | runtime.InitOverrideFunction): Promise<ApiResponseTaskAckResponse> {
         const response = await this.startSummaryRaw(requestParameters, initOverrides);
         return await response.value();
     }

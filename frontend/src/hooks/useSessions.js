@@ -13,7 +13,7 @@ export default function useSessions(currentUser) {
       const data = await apiClient.upload.getAvailableSessions({
         xUserId: currentUser.uuid
       });
-      setSessions(data);
+      setSessions(data?.data || []);
       setError(null);
     } catch (err) {
       setError(err.message);

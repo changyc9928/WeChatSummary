@@ -1,8 +1,12 @@
 package com.wechat.wechatsummary.service;
 
 import com.wechat.wechatsummary.config.StorageConfig;
+import com.wechat.wechatsummary.dto.ChatPreviewResponse;
+import com.wechat.wechatsummary.dto.ChatPreviewRow;
+import com.wechat.wechatsummary.dto.SummaryProgressResponse;
 import com.wechat.wechatsummary.entity.ChatSummaryStatus;
 import com.wechat.wechatsummary.entity.ChatSummaryTask;
+import com.wechat.wechatsummary.exception.ResourceNotFoundException;
 import com.wechat.wechatsummary.repository.ChatSummaryTaskRepository;
 import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
@@ -193,11 +197,10 @@ public class ChatSummaryService {
         return String.join("\n", filteredLines);
     }
 
-    public Map<String, Object> getChatPreviewData(String userId, UUID uuid) {
+    public ChatPreviewResponse getChatPreviewData(String userId, UUID uuid) {
         Path userOutputsDir = storageConfig.getUploadDir().resolve(userId).resolve("outputs");
-        Map<String, Object> result = new HashMap<>();
-        List<Map<String, String>> chatRows = new ArrayList<>();
         Map<String, String> metadata = new HashMap<>();
+        List<ChatPreviewRow> chatRows = new ArrayList<>();
 
         try {
             Path targetFilePath = locateProcessedFile(userOutputsDir, uuid);
@@ -227,46 +230,37 @@ public class ChatSummaryService {
                     continue;
                 }
 
-                Map<String, String> row = new HashMap<>();
-                row.put("lineId", String.valueOf(chatLineCounter++));
+                String lineId = String.valueOf(chatLineCounter++);
+                String timestamp = "";
+                String sender = "";
+                String content = line;
 
                 if (line.startsWith("[") && line.contains("] ")) {
                     int closeBracketIdx = line.indexOf("] ");
-                    String timestamp = line.substring(1, closeBracketIdx);
+                    timestamp = line.substring(1, closeBracketIdx);
                     String remainder = line.substring(closeBracketIdx + 2);
 
                     int colonIdx = remainder.indexOf(": ");
                     if (colonIdx != -1) {
-                        String sender = remainder.substring(0, colonIdx);
-                        String content = remainder.substring(colonIdx + 2);
-
-                        row.put("timestamp", timestamp);
-                        row.put("sender", sender);
-                        row.put("content", content);
+                        sender = remainder.substring(0, colonIdx);
+                        content = remainder.substring(colonIdx + 2);
                     } else {
-                        row.put("timestamp", timestamp);
-                        row.put("sender", "Unknown");
-                        row.put("content", remainder);
+                        sender = "Unknown";
+                        content = remainder;
                     }
-                } else {
-                    row.put("timestamp", "");
-                    row.put("sender", "");
-                    row.put("content", line);
                 }
 
-                chatRows.add(row);
+                chatRows.add(new ChatPreviewRow(lineId, timestamp, sender, content));
             }
 
-            result.put("metadata", metadata);
-            result.put("rows", chatRows);
-
+            return new ChatPreviewResponse(metadata, chatRows);
+        } catch (ResourceNotFoundException e) {
+            throw e;
         } catch (Exception e) {
             log.error("Failed to parse preview chat data for user UUID: [{}] and task UUID: [{}]",
                 userId, uuid, e);
-            throw new RuntimeException("Failed to load chat preview: " + e.getMessage());
+            throw new ResourceNotFoundException("Failed to load chat preview");
         }
-
-        return result;
     }
 
     public void pauseSummary(UUID uuid) {
@@ -294,24 +288,18 @@ public class ChatSummaryService {
         }
     }
 
-    public Map<String, Object> getStatusAndProgress(String userId, UUID uuid) {
-        Map<String, Object> response = new HashMap<>();
-        response.put("taskId", uuid);
-
+    public SummaryProgressResponse getStatusAndProgress(String userId, UUID uuid) {
         Path userOutputsDir = storageConfig.getUploadDir().resolve(userId).resolve("outputs");
         Path resultTxtPath = userOutputsDir.resolve(uuid + "_summary.txt");
         Path tempProgressPath = userOutputsDir.resolve(uuid + "_summary.temp");
 
         if (Files.exists(resultTxtPath)) {
             try {
-                response.put("status", ChatSummaryStatus.SUCCESS);
-                response.put("progress", 100.0);
-                response.put("result", Files.readString(resultTxtPath, StandardCharsets.UTF_8));
-                return response;
+                return new SummaryProgressResponse(uuid, ChatSummaryStatus.SUCCESS, 100.0,
+                    Files.readString(resultTxtPath, StandardCharsets.UTF_8), null);
             } catch (Exception e) {
-                response.put("status", ChatSummaryStatus.FAILED);
-                response.put("errorMessage", "Error reading summary output: " + e.getMessage());
-                return response;
+                return new SummaryProgressResponse(uuid, ChatSummaryStatus.FAILED, 0.0, null,
+                    "Error reading summary output: " + e.getMessage());
             }
         }
 
@@ -335,31 +323,28 @@ public class ChatSummaryService {
             }
 
             boolean isRunning = activeThreads.containsKey(uuid);
-            response.put("status",
-                isRunning ? ChatSummaryStatus.RUNNING : ChatSummaryStatus.PAUSED);
-            response.put("progress", progress);
-            return response;
+            return new SummaryProgressResponse(uuid,
+                isRunning ? ChatSummaryStatus.RUNNING : ChatSummaryStatus.PAUSED, progress, null,
+                null);
         }
 
         Optional<ChatSummaryTask> loggedTask = taskRepository.findById(uuid);
         if (loggedTask.isPresent() && loggedTask.get().getStatus() == ChatSummaryStatus.FAILED) {
-            response.put("status", ChatSummaryStatus.FAILED);
-            response.put("progress", 0.0);
-            response.put("errorMessage", loggedTask.get().getErrorMessage() != null ?
-                loggedTask.get().getErrorMessage() : "An unexpected backend breakdown occurred.");
-            return response;
+            String errorMessage = loggedTask.get().getErrorMessage() != null
+                ? loggedTask.get().getErrorMessage()
+                : "An unexpected backend breakdown occurred.";
+            return new SummaryProgressResponse(uuid, ChatSummaryStatus.FAILED, 0.0, null,
+                errorMessage);
         }
 
-        response.put("status", ChatSummaryStatus.INITIAL_STATE);
-        response.put("progress", 0.0);
-        return response;
+        return new SummaryProgressResponse(uuid, ChatSummaryStatus.INITIAL_STATE, 0.0, null, null);
     }
 
     private Path locateProcessedFile(Path userOutputsDir, UUID uuid) throws Exception {
         String filePrefix = uuid.toString();
         String fileSuffix = "_processed.md";
         if (!Files.exists(userOutputsDir)) {
-            throw new RuntimeException(
+            throw new ResourceNotFoundException(
                 "Processed markdown source directory not found for trace: " + filePrefix);
         }
         try (var stream = Files.list(userOutputsDir)) {
@@ -369,7 +354,7 @@ public class ChatSummaryService {
                     return name.startsWith(filePrefix) && name.endsWith(fileSuffix);
                 })
                 .findFirst()
-                .orElseThrow(() -> new RuntimeException(
+                .orElseThrow(() -> new ResourceNotFoundException(
                     "Processed markdown source file not found for trace: " + filePrefix));
         }
     }

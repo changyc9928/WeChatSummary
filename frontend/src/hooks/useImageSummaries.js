@@ -32,14 +32,15 @@ export default function useImageSummaries({ uuidInput, currentUser }) {
         page,
         size
       });
-      setImageSummaries(data.content || []);
+      const pageData = data?.data;
+      setImageSummaries(pageData?.content || []);
       setImagePagination({
-        page: data.number,
-        size: data.size,
-        totalPages: data.totalPages,
-        totalElements: data.totalElements,
-        isFirst: data.first,
-        isLast: data.last
+        page: pageData?.number,
+        size: pageData?.size,
+        totalPages: pageData?.totalPages,
+        totalElements: pageData?.totalElements,
+        isFirst: pageData?.first,
+        isLast: pageData?.last
       });
     } catch (err) {
       setError(err.message);

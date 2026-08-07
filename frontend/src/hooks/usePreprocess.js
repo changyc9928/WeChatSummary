@@ -27,9 +27,9 @@ export default function usePreprocess({ uuidInput, currentUser, onCompleted }) {
         xUserId: currentUser?.uuid,
         uuid
       });
-      if (data) {
-        setProgress(data);
-        return data;
+      if (data?.data) {
+        setProgress(data.data);
+        return data.data;
       }
     } catch (err) {
       console.error(err);

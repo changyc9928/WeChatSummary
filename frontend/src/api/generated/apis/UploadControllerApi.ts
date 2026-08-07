@@ -15,11 +15,17 @@
 
 import * as runtime from '../runtime';
 import type {
-  SessionResponseDTO,
+  ApiResponseListSessionResponseDTO,
+  ApiResponseUploadSessionResponse,
+  ErrorResponse,
 } from '../models/index';
 import {
-    SessionResponseDTOFromJSON,
-    SessionResponseDTOToJSON,
+    ApiResponseListSessionResponseDTOFromJSON,
+    ApiResponseListSessionResponseDTOToJSON,
+    ApiResponseUploadSessionResponseFromJSON,
+    ApiResponseUploadSessionResponseToJSON,
+    ErrorResponseFromJSON,
+    ErrorResponseToJSON,
 } from '../models/index';
 
 export interface GetAvailableSessionsRequest {
@@ -38,7 +44,7 @@ export class UploadControllerApi extends runtime.BaseAPI {
 
     /**
      */
-    async getAvailableSessionsRaw(requestParameters: GetAvailableSessionsRequest, initOverrides?: RequestInit | runtime.InitOverrideFunction): Promise<runtime.ApiResponse<Array<SessionResponseDTO>>> {
+    async getAvailableSessionsRaw(requestParameters: GetAvailableSessionsRequest, initOverrides?: RequestInit | runtime.InitOverrideFunction): Promise<runtime.ApiResponse<ApiResponseListSessionResponseDTO>> {
         if (requestParameters['xUserId'] == null) {
             throw new runtime.RequiredError(
                 'xUserId',
@@ -64,19 +70,19 @@ export class UploadControllerApi extends runtime.BaseAPI {
             query: queryParameters,
         }, initOverrides);
 
-        return new runtime.JSONApiResponse(response, (jsonValue) => jsonValue.map(SessionResponseDTOFromJSON));
+        return new runtime.JSONApiResponse(response, (jsonValue) => ApiResponseListSessionResponseDTOFromJSON(jsonValue));
     }
 
     /**
      */
-    async getAvailableSessions(requestParameters: GetAvailableSessionsRequest, initOverrides?: RequestInit | runtime.InitOverrideFunction): Promise<Array<SessionResponseDTO>> {
+    async getAvailableSessions(requestParameters: GetAvailableSessionsRequest, initOverrides?: RequestInit | runtime.InitOverrideFunction): Promise<ApiResponseListSessionResponseDTO> {
         const response = await this.getAvailableSessionsRaw(requestParameters, initOverrides);
         return await response.value();
     }
 
     /**
      */
-    async uploadRaw(requestParameters: UploadRequest, initOverrides?: RequestInit | runtime.InitOverrideFunction): Promise<runtime.ApiResponse<string>> {
+    async uploadRaw(requestParameters: UploadRequest, initOverrides?: RequestInit | runtime.InitOverrideFunction): Promise<runtime.ApiResponse<ApiResponseUploadSessionResponse>> {
         if (requestParameters['xUserId'] == null) {
             throw new runtime.RequiredError(
                 'xUserId',
@@ -123,16 +129,12 @@ export class UploadControllerApi extends runtime.BaseAPI {
             body: formParams,
         }, initOverrides);
 
-        if (this.isJsonMime(response.headers.get('content-type'))) {
-            return new runtime.JSONApiResponse<string>(response);
-        } else {
-            return new runtime.TextApiResponse(response) as any;
-        }
+        return new runtime.JSONApiResponse(response, (jsonValue) => ApiResponseUploadSessionResponseFromJSON(jsonValue));
     }
 
     /**
      */
-    async upload(requestParameters: UploadRequest, initOverrides?: RequestInit | runtime.InitOverrideFunction): Promise<string> {
+    async upload(requestParameters: UploadRequest, initOverrides?: RequestInit | runtime.InitOverrideFunction): Promise<ApiResponseUploadSessionResponse> {
         const response = await this.uploadRaw(requestParameters, initOverrides);
         return await response.value();
     }

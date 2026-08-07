@@ -15,17 +15,26 @@
 
 import * as runtime from '../runtime';
 import type {
-  PageAudioSummary,
-  PageImageSummaryEntity,
-  TaskProgress,
+  ApiResponsePageAudioSummary,
+  ApiResponsePageImageSummaryEntity,
+  ApiResponseTaskAckResponse,
+  ApiResponseTaskProgress,
+  ApiResponseVoid,
+  ErrorResponse,
 } from '../models/index';
 import {
-    PageAudioSummaryFromJSON,
-    PageAudioSummaryToJSON,
-    PageImageSummaryEntityFromJSON,
-    PageImageSummaryEntityToJSON,
-    TaskProgressFromJSON,
-    TaskProgressToJSON,
+    ApiResponsePageAudioSummaryFromJSON,
+    ApiResponsePageAudioSummaryToJSON,
+    ApiResponsePageImageSummaryEntityFromJSON,
+    ApiResponsePageImageSummaryEntityToJSON,
+    ApiResponseTaskAckResponseFromJSON,
+    ApiResponseTaskAckResponseToJSON,
+    ApiResponseTaskProgressFromJSON,
+    ApiResponseTaskProgressToJSON,
+    ApiResponseVoidFromJSON,
+    ApiResponseVoidToJSON,
+    ErrorResponseFromJSON,
+    ErrorResponseToJSON,
 } from '../models/index';
 
 export interface AbortTaskRequest {
@@ -114,7 +123,7 @@ export class PreprocessControllerApi extends runtime.BaseAPI {
 
     /**
      */
-    async abortTaskRaw(requestParameters: AbortTaskRequest, initOverrides?: RequestInit | runtime.InitOverrideFunction): Promise<runtime.ApiResponse<string>> {
+    async abortTaskRaw(requestParameters: AbortTaskRequest, initOverrides?: RequestInit | runtime.InitOverrideFunction): Promise<runtime.ApiResponse<ApiResponseTaskAckResponse>> {
         if (requestParameters['xUserId'] == null) {
             throw new runtime.RequiredError(
                 'xUserId',
@@ -148,23 +157,19 @@ export class PreprocessControllerApi extends runtime.BaseAPI {
             query: queryParameters,
         }, initOverrides);
 
-        if (this.isJsonMime(response.headers.get('content-type'))) {
-            return new runtime.JSONApiResponse<string>(response);
-        } else {
-            return new runtime.TextApiResponse(response) as any;
-        }
+        return new runtime.JSONApiResponse(response, (jsonValue) => ApiResponseTaskAckResponseFromJSON(jsonValue));
     }
 
     /**
      */
-    async abortTask(requestParameters: AbortTaskRequest, initOverrides?: RequestInit | runtime.InitOverrideFunction): Promise<string> {
+    async abortTask(requestParameters: AbortTaskRequest, initOverrides?: RequestInit | runtime.InitOverrideFunction): Promise<ApiResponseTaskAckResponse> {
         const response = await this.abortTaskRaw(requestParameters, initOverrides);
         return await response.value();
     }
 
     /**
      */
-    async clearAudioSummaryTextByIdRaw(requestParameters: ClearAudioSummaryTextByIdRequest, initOverrides?: RequestInit | runtime.InitOverrideFunction): Promise<runtime.ApiResponse<void>> {
+    async clearAudioSummaryTextByIdRaw(requestParameters: ClearAudioSummaryTextByIdRequest, initOverrides?: RequestInit | runtime.InitOverrideFunction): Promise<runtime.ApiResponse<ApiResponseVoid>> {
         if (requestParameters['xUserId'] == null) {
             throw new runtime.RequiredError(
                 'xUserId',
@@ -198,18 +203,19 @@ export class PreprocessControllerApi extends runtime.BaseAPI {
             query: queryParameters,
         }, initOverrides);
 
-        return new runtime.VoidApiResponse(response);
+        return new runtime.JSONApiResponse(response, (jsonValue) => ApiResponseVoidFromJSON(jsonValue));
     }
 
     /**
      */
-    async clearAudioSummaryTextById(requestParameters: ClearAudioSummaryTextByIdRequest, initOverrides?: RequestInit | runtime.InitOverrideFunction): Promise<void> {
-        await this.clearAudioSummaryTextByIdRaw(requestParameters, initOverrides);
+    async clearAudioSummaryTextById(requestParameters: ClearAudioSummaryTextByIdRequest, initOverrides?: RequestInit | runtime.InitOverrideFunction): Promise<ApiResponseVoid> {
+        const response = await this.clearAudioSummaryTextByIdRaw(requestParameters, initOverrides);
+        return await response.value();
     }
 
     /**
      */
-    async clearAudioSummaryTextsByIdsRaw(requestParameters: ClearAudioSummaryTextsByIdsRequest, initOverrides?: RequestInit | runtime.InitOverrideFunction): Promise<runtime.ApiResponse<void>> {
+    async clearAudioSummaryTextsByIdsRaw(requestParameters: ClearAudioSummaryTextsByIdsRequest, initOverrides?: RequestInit | runtime.InitOverrideFunction): Promise<runtime.ApiResponse<ApiResponseVoid>> {
         if (requestParameters['xUserId'] == null) {
             throw new runtime.RequiredError(
                 'xUserId',
@@ -245,18 +251,19 @@ export class PreprocessControllerApi extends runtime.BaseAPI {
             body: requestParameters['requestBody'],
         }, initOverrides);
 
-        return new runtime.VoidApiResponse(response);
+        return new runtime.JSONApiResponse(response, (jsonValue) => ApiResponseVoidFromJSON(jsonValue));
     }
 
     /**
      */
-    async clearAudioSummaryTextsByIds(requestParameters: ClearAudioSummaryTextsByIdsRequest, initOverrides?: RequestInit | runtime.InitOverrideFunction): Promise<void> {
-        await this.clearAudioSummaryTextsByIdsRaw(requestParameters, initOverrides);
+    async clearAudioSummaryTextsByIds(requestParameters: ClearAudioSummaryTextsByIdsRequest, initOverrides?: RequestInit | runtime.InitOverrideFunction): Promise<ApiResponseVoid> {
+        const response = await this.clearAudioSummaryTextsByIdsRaw(requestParameters, initOverrides);
+        return await response.value();
     }
 
     /**
      */
-    async deleteAllAudioSummariesByUuidRaw(requestParameters: DeleteAllAudioSummariesByUuidRequest, initOverrides?: RequestInit | runtime.InitOverrideFunction): Promise<runtime.ApiResponse<void>> {
+    async deleteAllAudioSummariesByUuidRaw(requestParameters: DeleteAllAudioSummariesByUuidRequest, initOverrides?: RequestInit | runtime.InitOverrideFunction): Promise<runtime.ApiResponse<ApiResponseVoid>> {
         if (requestParameters['xUserId'] == null) {
             throw new runtime.RequiredError(
                 'xUserId',
@@ -293,18 +300,19 @@ export class PreprocessControllerApi extends runtime.BaseAPI {
             query: queryParameters,
         }, initOverrides);
 
-        return new runtime.VoidApiResponse(response);
+        return new runtime.JSONApiResponse(response, (jsonValue) => ApiResponseVoidFromJSON(jsonValue));
     }
 
     /**
      */
-    async deleteAllAudioSummariesByUuid(requestParameters: DeleteAllAudioSummariesByUuidRequest, initOverrides?: RequestInit | runtime.InitOverrideFunction): Promise<void> {
-        await this.deleteAllAudioSummariesByUuidRaw(requestParameters, initOverrides);
+    async deleteAllAudioSummariesByUuid(requestParameters: DeleteAllAudioSummariesByUuidRequest, initOverrides?: RequestInit | runtime.InitOverrideFunction): Promise<ApiResponseVoid> {
+        const response = await this.deleteAllAudioSummariesByUuidRaw(requestParameters, initOverrides);
+        return await response.value();
     }
 
     /**
      */
-    async deleteAllImageSummariesByUuidRaw(requestParameters: DeleteAllImageSummariesByUuidRequest, initOverrides?: RequestInit | runtime.InitOverrideFunction): Promise<runtime.ApiResponse<void>> {
+    async deleteAllImageSummariesByUuidRaw(requestParameters: DeleteAllImageSummariesByUuidRequest, initOverrides?: RequestInit | runtime.InitOverrideFunction): Promise<runtime.ApiResponse<ApiResponseVoid>> {
         if (requestParameters['xUserId'] == null) {
             throw new runtime.RequiredError(
                 'xUserId',
@@ -341,18 +349,19 @@ export class PreprocessControllerApi extends runtime.BaseAPI {
             query: queryParameters,
         }, initOverrides);
 
-        return new runtime.VoidApiResponse(response);
+        return new runtime.JSONApiResponse(response, (jsonValue) => ApiResponseVoidFromJSON(jsonValue));
     }
 
     /**
      */
-    async deleteAllImageSummariesByUuid(requestParameters: DeleteAllImageSummariesByUuidRequest, initOverrides?: RequestInit | runtime.InitOverrideFunction): Promise<void> {
-        await this.deleteAllImageSummariesByUuidRaw(requestParameters, initOverrides);
+    async deleteAllImageSummariesByUuid(requestParameters: DeleteAllImageSummariesByUuidRequest, initOverrides?: RequestInit | runtime.InitOverrideFunction): Promise<ApiResponseVoid> {
+        const response = await this.deleteAllImageSummariesByUuidRaw(requestParameters, initOverrides);
+        return await response.value();
     }
 
     /**
      */
-    async deleteAudioSummariesByIdsRaw(requestParameters: DeleteAudioSummariesByIdsRequest, initOverrides?: RequestInit | runtime.InitOverrideFunction): Promise<runtime.ApiResponse<void>> {
+    async deleteAudioSummariesByIdsRaw(requestParameters: DeleteAudioSummariesByIdsRequest, initOverrides?: RequestInit | runtime.InitOverrideFunction): Promise<runtime.ApiResponse<ApiResponseVoid>> {
         if (requestParameters['xUserId'] == null) {
             throw new runtime.RequiredError(
                 'xUserId',
@@ -388,18 +397,19 @@ export class PreprocessControllerApi extends runtime.BaseAPI {
             body: requestParameters['requestBody'],
         }, initOverrides);
 
-        return new runtime.VoidApiResponse(response);
+        return new runtime.JSONApiResponse(response, (jsonValue) => ApiResponseVoidFromJSON(jsonValue));
     }
 
     /**
      */
-    async deleteAudioSummariesByIds(requestParameters: DeleteAudioSummariesByIdsRequest, initOverrides?: RequestInit | runtime.InitOverrideFunction): Promise<void> {
-        await this.deleteAudioSummariesByIdsRaw(requestParameters, initOverrides);
+    async deleteAudioSummariesByIds(requestParameters: DeleteAudioSummariesByIdsRequest, initOverrides?: RequestInit | runtime.InitOverrideFunction): Promise<ApiResponseVoid> {
+        const response = await this.deleteAudioSummariesByIdsRaw(requestParameters, initOverrides);
+        return await response.value();
     }
 
     /**
      */
-    async deleteAudioSummaryByIdRaw(requestParameters: DeleteAudioSummaryByIdRequest, initOverrides?: RequestInit | runtime.InitOverrideFunction): Promise<runtime.ApiResponse<void>> {
+    async deleteAudioSummaryByIdRaw(requestParameters: DeleteAudioSummaryByIdRequest, initOverrides?: RequestInit | runtime.InitOverrideFunction): Promise<runtime.ApiResponse<ApiResponseVoid>> {
         if (requestParameters['xUserId'] == null) {
             throw new runtime.RequiredError(
                 'xUserId',
@@ -433,18 +443,19 @@ export class PreprocessControllerApi extends runtime.BaseAPI {
             query: queryParameters,
         }, initOverrides);
 
-        return new runtime.VoidApiResponse(response);
+        return new runtime.JSONApiResponse(response, (jsonValue) => ApiResponseVoidFromJSON(jsonValue));
     }
 
     /**
      */
-    async deleteAudioSummaryById(requestParameters: DeleteAudioSummaryByIdRequest, initOverrides?: RequestInit | runtime.InitOverrideFunction): Promise<void> {
-        await this.deleteAudioSummaryByIdRaw(requestParameters, initOverrides);
+    async deleteAudioSummaryById(requestParameters: DeleteAudioSummaryByIdRequest, initOverrides?: RequestInit | runtime.InitOverrideFunction): Promise<ApiResponseVoid> {
+        const response = await this.deleteAudioSummaryByIdRaw(requestParameters, initOverrides);
+        return await response.value();
     }
 
     /**
      */
-    async deleteImageSummariesByIdsRaw(requestParameters: DeleteImageSummariesByIdsRequest, initOverrides?: RequestInit | runtime.InitOverrideFunction): Promise<runtime.ApiResponse<void>> {
+    async deleteImageSummariesByIdsRaw(requestParameters: DeleteImageSummariesByIdsRequest, initOverrides?: RequestInit | runtime.InitOverrideFunction): Promise<runtime.ApiResponse<ApiResponseVoid>> {
         if (requestParameters['xUserId'] == null) {
             throw new runtime.RequiredError(
                 'xUserId',
@@ -480,18 +491,19 @@ export class PreprocessControllerApi extends runtime.BaseAPI {
             body: requestParameters['requestBody'],
         }, initOverrides);
 
-        return new runtime.VoidApiResponse(response);
+        return new runtime.JSONApiResponse(response, (jsonValue) => ApiResponseVoidFromJSON(jsonValue));
     }
 
     /**
      */
-    async deleteImageSummariesByIds(requestParameters: DeleteImageSummariesByIdsRequest, initOverrides?: RequestInit | runtime.InitOverrideFunction): Promise<void> {
-        await this.deleteImageSummariesByIdsRaw(requestParameters, initOverrides);
+    async deleteImageSummariesByIds(requestParameters: DeleteImageSummariesByIdsRequest, initOverrides?: RequestInit | runtime.InitOverrideFunction): Promise<ApiResponseVoid> {
+        const response = await this.deleteImageSummariesByIdsRaw(requestParameters, initOverrides);
+        return await response.value();
     }
 
     /**
      */
-    async deleteImageSummaryByIdRaw(requestParameters: DeleteImageSummaryByIdRequest, initOverrides?: RequestInit | runtime.InitOverrideFunction): Promise<runtime.ApiResponse<void>> {
+    async deleteImageSummaryByIdRaw(requestParameters: DeleteImageSummaryByIdRequest, initOverrides?: RequestInit | runtime.InitOverrideFunction): Promise<runtime.ApiResponse<ApiResponseVoid>> {
         if (requestParameters['xUserId'] == null) {
             throw new runtime.RequiredError(
                 'xUserId',
@@ -525,13 +537,14 @@ export class PreprocessControllerApi extends runtime.BaseAPI {
             query: queryParameters,
         }, initOverrides);
 
-        return new runtime.VoidApiResponse(response);
+        return new runtime.JSONApiResponse(response, (jsonValue) => ApiResponseVoidFromJSON(jsonValue));
     }
 
     /**
      */
-    async deleteImageSummaryById(requestParameters: DeleteImageSummaryByIdRequest, initOverrides?: RequestInit | runtime.InitOverrideFunction): Promise<void> {
-        await this.deleteImageSummaryByIdRaw(requestParameters, initOverrides);
+    async deleteImageSummaryById(requestParameters: DeleteImageSummaryByIdRequest, initOverrides?: RequestInit | runtime.InitOverrideFunction): Promise<ApiResponseVoid> {
+        const response = await this.deleteImageSummaryByIdRaw(requestParameters, initOverrides);
+        return await response.value();
     }
 
     /**
@@ -582,7 +595,7 @@ export class PreprocessControllerApi extends runtime.BaseAPI {
 
     /**
      */
-    async getAudioSummariesByUuidRaw(requestParameters: GetAudioSummariesByUuidRequest, initOverrides?: RequestInit | runtime.InitOverrideFunction): Promise<runtime.ApiResponse<PageAudioSummary>> {
+    async getAudioSummariesByUuidRaw(requestParameters: GetAudioSummariesByUuidRequest, initOverrides?: RequestInit | runtime.InitOverrideFunction): Promise<runtime.ApiResponse<ApiResponsePageAudioSummary>> {
         if (requestParameters['xUserId'] == null) {
             throw new runtime.RequiredError(
                 'xUserId',
@@ -627,12 +640,12 @@ export class PreprocessControllerApi extends runtime.BaseAPI {
             query: queryParameters,
         }, initOverrides);
 
-        return new runtime.JSONApiResponse(response, (jsonValue) => PageAudioSummaryFromJSON(jsonValue));
+        return new runtime.JSONApiResponse(response, (jsonValue) => ApiResponsePageAudioSummaryFromJSON(jsonValue));
     }
 
     /**
      */
-    async getAudioSummariesByUuid(requestParameters: GetAudioSummariesByUuidRequest, initOverrides?: RequestInit | runtime.InitOverrideFunction): Promise<PageAudioSummary> {
+    async getAudioSummariesByUuid(requestParameters: GetAudioSummariesByUuidRequest, initOverrides?: RequestInit | runtime.InitOverrideFunction): Promise<ApiResponsePageAudioSummary> {
         const response = await this.getAudioSummariesByUuidRaw(requestParameters, initOverrides);
         return await response.value();
     }
@@ -685,7 +698,7 @@ export class PreprocessControllerApi extends runtime.BaseAPI {
 
     /**
      */
-    async getImageSummariesByUuidRaw(requestParameters: GetImageSummariesByUuidRequest, initOverrides?: RequestInit | runtime.InitOverrideFunction): Promise<runtime.ApiResponse<PageImageSummaryEntity>> {
+    async getImageSummariesByUuidRaw(requestParameters: GetImageSummariesByUuidRequest, initOverrides?: RequestInit | runtime.InitOverrideFunction): Promise<runtime.ApiResponse<ApiResponsePageImageSummaryEntity>> {
         if (requestParameters['xUserId'] == null) {
             throw new runtime.RequiredError(
                 'xUserId',
@@ -730,19 +743,19 @@ export class PreprocessControllerApi extends runtime.BaseAPI {
             query: queryParameters,
         }, initOverrides);
 
-        return new runtime.JSONApiResponse(response, (jsonValue) => PageImageSummaryEntityFromJSON(jsonValue));
+        return new runtime.JSONApiResponse(response, (jsonValue) => ApiResponsePageImageSummaryEntityFromJSON(jsonValue));
     }
 
     /**
      */
-    async getImageSummariesByUuid(requestParameters: GetImageSummariesByUuidRequest, initOverrides?: RequestInit | runtime.InitOverrideFunction): Promise<PageImageSummaryEntity> {
+    async getImageSummariesByUuid(requestParameters: GetImageSummariesByUuidRequest, initOverrides?: RequestInit | runtime.InitOverrideFunction): Promise<ApiResponsePageImageSummaryEntity> {
         const response = await this.getImageSummariesByUuidRaw(requestParameters, initOverrides);
         return await response.value();
     }
 
     /**
      */
-    async getProgressRaw(requestParameters: GetProgressRequest, initOverrides?: RequestInit | runtime.InitOverrideFunction): Promise<runtime.ApiResponse<TaskProgress>> {
+    async getProgressRaw(requestParameters: GetProgressRequest, initOverrides?: RequestInit | runtime.InitOverrideFunction): Promise<runtime.ApiResponse<ApiResponseTaskProgress>> {
         if (requestParameters['xUserId'] == null) {
             throw new runtime.RequiredError(
                 'xUserId',
@@ -776,19 +789,19 @@ export class PreprocessControllerApi extends runtime.BaseAPI {
             query: queryParameters,
         }, initOverrides);
 
-        return new runtime.JSONApiResponse(response, (jsonValue) => TaskProgressFromJSON(jsonValue));
+        return new runtime.JSONApiResponse(response, (jsonValue) => ApiResponseTaskProgressFromJSON(jsonValue));
     }
 
     /**
      */
-    async getProgress(requestParameters: GetProgressRequest, initOverrides?: RequestInit | runtime.InitOverrideFunction): Promise<TaskProgress> {
+    async getProgress(requestParameters: GetProgressRequest, initOverrides?: RequestInit | runtime.InitOverrideFunction): Promise<ApiResponseTaskProgress> {
         const response = await this.getProgressRaw(requestParameters, initOverrides);
         return await response.value();
     }
 
     /**
      */
-    async preprocessRaw(requestParameters: PreprocessRequest, initOverrides?: RequestInit | runtime.InitOverrideFunction): Promise<runtime.ApiResponse<string>> {
+    async preprocessRaw(requestParameters: PreprocessRequest, initOverrides?: RequestInit | runtime.InitOverrideFunction): Promise<runtime.ApiResponse<ApiResponseTaskAckResponse>> {
         if (requestParameters['xUserId'] == null) {
             throw new runtime.RequiredError(
                 'xUserId',
@@ -822,16 +835,12 @@ export class PreprocessControllerApi extends runtime.BaseAPI {
             query: queryParameters,
         }, initOverrides);
 
-        if (this.isJsonMime(response.headers.get('content-type'))) {
-            return new runtime.JSONApiResponse<string>(response);
-        } else {
-            return new runtime.TextApiResponse(response) as any;
-        }
+        return new runtime.JSONApiResponse(response, (jsonValue) => ApiResponseTaskAckResponseFromJSON(jsonValue));
     }
 
     /**
      */
-    async preprocess(requestParameters: PreprocessRequest, initOverrides?: RequestInit | runtime.InitOverrideFunction): Promise<string> {
+    async preprocess(requestParameters: PreprocessRequest, initOverrides?: RequestInit | runtime.InitOverrideFunction): Promise<ApiResponseTaskAckResponse> {
         const response = await this.preprocessRaw(requestParameters, initOverrides);
         return await response.value();
     }

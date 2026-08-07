@@ -26,14 +26,15 @@ export default function useAudioSummaries({ uuidInput, currentUser }) {
         page,
         size
       });
-      setAudioSummaries(data.content || []);
+      const pageData = data?.data;
+      setAudioSummaries(pageData?.content || []);
       setAudioPagination({
-        page: data.number,
-        size: data.size,
-        totalPages: data.totalPages,
-        totalElements: data.totalElements,
-        isFirst: data.first,
-        isLast: data.last
+        page: pageData?.number,
+        size: pageData?.size,
+        totalPages: pageData?.totalPages,
+        totalElements: pageData?.totalElements,
+        isFirst: pageData?.first,
+        isLast: pageData?.last
       });
     } catch (err) {
       setError(err.message);

@@ -31,10 +31,7 @@ export default function useSummaryStatus({ uuidInput, currentUser }) {
       });
       if (!data) return;
 
-      const payload = (data && (data.status || data.result))
-        ? data
-        : (Object.values(data)[0] || {});
-
+      const payload = data.data || {};
       const status = (payload.status || 'INITIAL_STATE').toUpperCase();
       let rawProgress = payload.progress ?? payload.progressPercentage ?? 0;
       const progress = rawProgress > 1 ? rawProgress / 100 : rawProgress;

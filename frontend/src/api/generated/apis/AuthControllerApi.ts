@@ -15,14 +15,17 @@
 
 import * as runtime from '../runtime';
 import type {
+  ApiResponseAuthResponse,
   AuthRequest,
-  AuthResponse,
+  ErrorResponse,
 } from '../models/index';
 import {
+    ApiResponseAuthResponseFromJSON,
+    ApiResponseAuthResponseToJSON,
     AuthRequestFromJSON,
     AuthRequestToJSON,
-    AuthResponseFromJSON,
-    AuthResponseToJSON,
+    ErrorResponseFromJSON,
+    ErrorResponseToJSON,
 } from '../models/index';
 
 export interface LoginRequest {
@@ -40,7 +43,7 @@ export class AuthControllerApi extends runtime.BaseAPI {
 
     /**
      */
-    async loginRaw(requestParameters: LoginRequest, initOverrides?: RequestInit | runtime.InitOverrideFunction): Promise<runtime.ApiResponse<AuthResponse>> {
+    async loginRaw(requestParameters: LoginRequest, initOverrides?: RequestInit | runtime.InitOverrideFunction): Promise<runtime.ApiResponse<ApiResponseAuthResponse>> {
         if (requestParameters['authRequest'] == null) {
             throw new runtime.RequiredError(
                 'authRequest',
@@ -65,19 +68,19 @@ export class AuthControllerApi extends runtime.BaseAPI {
             body: AuthRequestToJSON(requestParameters['authRequest']),
         }, initOverrides);
 
-        return new runtime.JSONApiResponse(response, (jsonValue) => AuthResponseFromJSON(jsonValue));
+        return new runtime.JSONApiResponse(response, (jsonValue) => ApiResponseAuthResponseFromJSON(jsonValue));
     }
 
     /**
      */
-    async login(requestParameters: LoginRequest, initOverrides?: RequestInit | runtime.InitOverrideFunction): Promise<AuthResponse> {
+    async login(requestParameters: LoginRequest, initOverrides?: RequestInit | runtime.InitOverrideFunction): Promise<ApiResponseAuthResponse> {
         const response = await this.loginRaw(requestParameters, initOverrides);
         return await response.value();
     }
 
     /**
      */
-    async registerRaw(requestParameters: RegisterRequest, initOverrides?: RequestInit | runtime.InitOverrideFunction): Promise<runtime.ApiResponse<AuthResponse>> {
+    async registerRaw(requestParameters: RegisterRequest, initOverrides?: RequestInit | runtime.InitOverrideFunction): Promise<runtime.ApiResponse<ApiResponseAuthResponse>> {
         if (requestParameters['authRequest'] == null) {
             throw new runtime.RequiredError(
                 'authRequest',
@@ -102,12 +105,12 @@ export class AuthControllerApi extends runtime.BaseAPI {
             body: AuthRequestToJSON(requestParameters['authRequest']),
         }, initOverrides);
 
-        return new runtime.JSONApiResponse(response, (jsonValue) => AuthResponseFromJSON(jsonValue));
+        return new runtime.JSONApiResponse(response, (jsonValue) => ApiResponseAuthResponseFromJSON(jsonValue));
     }
 
     /**
      */
-    async register(requestParameters: RegisterRequest, initOverrides?: RequestInit | runtime.InitOverrideFunction): Promise<AuthResponse> {
+    async register(requestParameters: RegisterRequest, initOverrides?: RequestInit | runtime.InitOverrideFunction): Promise<ApiResponseAuthResponse> {
         const response = await this.registerRaw(requestParameters, initOverrides);
         return await response.value();
     }

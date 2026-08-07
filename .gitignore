@@ -9,6 +9,7 @@ backend/.idea/
 frontend/node_modules/
 frontend/dist/
 frontend/.vite/
+frontend/src/api/generated/
 
 # OS / IDE
 .DS_Store
