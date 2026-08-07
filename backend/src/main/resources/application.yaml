@@ -57,7 +57,7 @@ custom-ai:
     timeout: 60m
 
 storage:
-  upload-dir: ${HOME}/uploads
+  upload-dir: ./uploads
 
 processing:
   image-max-size-bytes: 5000000

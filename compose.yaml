@@ -34,6 +34,34 @@ services:
     volumes:
       - whisper_models:/root/.cache/huggingface # 挂载模型目录，避免每次重启重复下载
 
+  backend:
+    build:
+      context: ./backend
+      dockerfile: Dockerfile
+    container_name: wechat-backend
+    ports:
+      - "8080:8080"
+    environment:
+      SPRING_DATA_REDIS_HOST: redis
+      SPRING_DATA_REDIS_PORT: 6379
+      SPRING_RABBITMQ_HOST: rabbitmq
+      SPRING_RABBITMQ_PORT: 5672
+      SPRING_RABBITMQ_USERNAME: myuser
+      SPRING_RABBITMQ_PASSWORD: secret
+      SPRING_DATASOURCE_URL: jdbc:postgresql://postgres:5432/wechat
+      SPRING_DATASOURCE_USERNAME: myuser
+      SPRING_DATASOURCE_PASSWORD: secret
+      SPRING_AI_OPENAI_AUDIO_TRANSCRIPTION_BASE_URL: http://whisper-api:8000/v1/
+      STORAGE_UPLOAD_DIR: /app/uploads
+    volumes:
+      - ./uploads:/app/uploads
+    depends_on:
+      - postgres
+      - rabbitmq
+      - redis
+      - whisper-api
+    restart: unless-stopped
+
   frontend:
     build:
       context: ./frontend
@@ -44,6 +72,7 @@ services:
     depends_on:
       - postgres
       - rabbitmq
+      - backend
     restart: unless-stopped
 
 volumes:
