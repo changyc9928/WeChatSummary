@@ -1,5 +1,7 @@
 import React, { useState, useEffect } from 'react';
-import { styles } from '../styles/dashboardStyles';
+import { styles } from '../../styles/dashboardStyles';
+import { getChatPreview } from '../../api/preprocessApi';
+import { toLocalInputValue, fromLocalInputValue, parseToComparable } from '../../utils/time';
 
 export default function StepPreprocess({
   uuidInput,
@@ -11,7 +13,6 @@ export default function StepPreprocess({
   errorPreprocess,
   onNavigateToImages,
   onNavigateToAudios,
-  apiUrl,
   currentUser,
   selectedStartTime,
   setSelectedStartTime,
@@ -38,13 +39,8 @@ export default function StepPreprocess({
       const fetchPreview = async () => {
         setLoadingPreview(true);
         try {
-          const res = await fetch(`${apiUrl}/api/summary/preview/${uuidInput}`, {
-            headers: { 'X-User-Id': currentUser.uuid }
-          });
-          if (res.ok) {
-            const data = await res.json();
-            setPreviewData(data);
-          }
+          const data = await getChatPreview(uuidInput, currentUser.uuid);
+          setPreviewData(data);
         } catch (err) {
           console.error("Failed to load chat preview:", err);
         } finally {
@@ -55,40 +51,7 @@ export default function StepPreprocess({
     } else {
       setPreviewData({ metadata: {}, rows: [] });
     }
-  }, [uuidInput, isCompleted, currentUser, apiUrl]);
-
-  // Convert chat log timestamps like "2026-07-28 13:41:08" to "YYYY-MM-DDTHH:mm:ss" for datetime-local input
-  const toLocalInputValue = (str) => {
-    if (!str) return '';
-    let cleaned = str.trim().replace('T', ' ');
-    const match = cleaned.match(/^(\d{4}-\d{2}-\d{2})[ T](\d{2}):(\d{2}):(\d{2})/);
-    if (match) {
-      const [, date, hour, min, sec] = match;
-      return `${date}T${hour}:${min}:${sec}`;
-    }
-    return '';
-  };
-
-  const fromLocalInputValue = (val) => {
-    if (!val) return '';
-    // val from datetime-local input is typically "YYYY-MM-DDTHH:mm"
-    let formatted = val.replace('T', ' '); // Use a space instead of 'T'
-
-    if (formatted.length === 16) {
-      formatted += ':00'; // Appends seconds if missing -> "YYYY-MM-DD HH:mm:ss"
-    } else if (formatted.length > 19) {
-      formatted = formatted.substring(0, 19);
-    }
-
-    return formatted; // Returns e.g. "2026-07-28 18:33:27"
-  };
-  // Robust parsing to numeric epoch milliseconds for reliable comparison
-  const parseToComparable = (str) => {
-    if (!str) return 0;
-    const formatted = str.includes('T') ? str : str.replace(' ', 'T');
-    const timeValue = new Date(formatted).getTime();
-    return isNaN(timeValue) ? 0 : timeValue;
-  };
+  }, [uuidInput, isCompleted, currentUser]);
 
   const handleRowClick = (row) => {
     const rowComp = parseToComparable(row.timestamp);
@@ -167,7 +130,7 @@ export default function StepPreprocess({
                 <div style={{ ...styles.progressBarFill, width: `${progressVal}%`, backgroundColor: '#d97706' }} />
               </div>
               {preprocessProgress.totalTasks != null && (
-                <div style={{ fontSize: '0.8rem', color: '#6b7280', marginTop: '4px' }}>
+                <div style={{ fontSize: '0.8rem', color: 'var(--text-muted)', marginTop: '4px' }}>
                   Processed {preprocessProgress.completedTasks || 0} of {preprocessProgress.totalTasks} tasks
                   ({preprocessProgress.remainingTasks || 0} remaining)
                 </div>
@@ -193,7 +156,7 @@ export default function StepPreprocess({
                 <div style={{ ...styles.progressBarFill, width: `${progressVal}%`, backgroundColor: '#2563eb' }} />
               </div>
               {preprocessProgress.totalTasks != null && (
-                <div style={{ fontSize: '0.8rem', color: '#6b7280', marginTop: '4px' }}>
+                <div style={{ fontSize: '0.8rem', color: 'var(--text-muted)', marginTop: '4px' }}>
                   Processed {preprocessProgress.completedTasks || 0} of {preprocessProgress.totalTasks} tasks
                   ({preprocessProgress.remainingTasks || 0} remaining)
                 </div>
@@ -216,32 +179,32 @@ export default function StepPreprocess({
               </div>
 
               {/* Chat Log Preview & Calendar Time Window Selection */}
-              <div style={{ border: '1px solid #e2e8f0', borderRadius: '8px', padding: '12px', background: '#f8fafc', marginTop: '8px' }}>
+              <div style={{ border: '1px solid var(--border)', borderRadius: '8px', padding: '12px', background: 'var(--bg-card)', marginTop: '8px' }}>
                 <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '8px' }}>
-                  <h4 style={{ margin: 0, fontSize: '14px', color: '#334155' }}>
+                  <h4 style={{ margin: 0, fontSize: '14px', color: 'var(--text-primary)' }}>
                     Chat Log Preview & Standard Timestamp Window
                   </h4>
-                  <span style={{ fontSize: '11px', color: '#64748b' }}>
+                  <span style={{ fontSize: '11px', color: 'var(--text-muted)' }}>
                     Click table rows to target exact timestamps
                   </span>
                 </div>
 
                 {previewData.metadata && Object.keys(previewData.metadata).length > 0 && (
-                  <div style={{ fontSize: '12px', color: '#64748b', marginBottom: '8px' }}>
+                  <div style={{ fontSize: '12px', color: 'var(--text-muted)', marginBottom: '8px' }}>
                     <strong>Group:</strong> {previewData.metadata['群名称'] || 'N/A'} |
                     <strong> Total Messages:</strong> {previewData.metadata['总消息数'] || previewData.rows.length}
                   </div>
                 )}
 
                 {/* Datetime Pickers Row */}
-                <div style={{ display: 'flex', gap: '15px', alignItems: 'center', marginBottom: '10px', background: '#e2e8f0', padding: '8px 10px', borderRadius: '4px', flexWrap: 'wrap' }}>
+                <div style={{ display: 'flex', gap: '15px', alignItems: 'center', marginBottom: '10px', background: 'var(--bg-subtle)', padding: '8px 10px', borderRadius: '4px', flexWrap: 'wrap' }}>
                   <div style={{ display: 'flex', alignItems: 'center', gap: '6px', fontSize: '12px' }}>
                     <label style={{ fontWeight: '500' }}>Start Time:</label>
                     <input
                       type="datetime-local"
                       value={toLocalInputValue(selectedStartTime)}
                       onChange={(e) => setSelectedStartTime(fromLocalInputValue(e.target.value))}
-                      style={{ padding: '4px 6px', borderRadius: '4px', border: '1px solid #cbd5e1', fontSize: '12px', background: '#fff' }}
+                      style={{ padding: '4px 6px', borderRadius: '4px', border: '1px solid var(--border-strong)', fontSize: '12px', background: 'var(--bg-card)', color: 'var(--text-primary)' }}
                     />
                   </div>
 
@@ -251,7 +214,7 @@ export default function StepPreprocess({
                       type="datetime-local"
                       value={toLocalInputValue(selectedEndTime)}
                       onChange={(e) => setSelectedEndTime(fromLocalInputValue(e.target.value))}
-                      style={{ padding: '4px 6px', borderRadius: '4px', border: '1px solid #cbd5e1', fontSize: '12px', background: '#fff' }}
+                      style={{ padding: '4px 6px', borderRadius: '4px', border: '1px solid var(--border-strong)', fontSize: '12px', background: 'var(--bg-card)', color: 'var(--text-primary)' }}
                     />
                   </div>
 
@@ -267,15 +230,15 @@ export default function StepPreprocess({
                 </div>
 
                 {/* Table View */}
-                <div style={{ maxHeight: '200px', overflowY: 'auto', border: '1px solid #e2e8f0', borderRadius: '4px', background: '#fff' }}>
+                <div style={{ maxHeight: '200px', overflowY: 'auto', border: '1px solid var(--border)', borderRadius: '4px', background: 'var(--bg-card)' }}>
                   {loadingPreview ? (
-                    <div style={{ padding: '15px', textAlign: 'center', fontSize: '12px', color: '#64748b' }}>Loading preview table...</div>
+                    <div style={{ padding: '15px', textAlign: 'center', fontSize: '12px', color: 'var(--text-muted)' }}>Loading preview table...</div>
                   ) : previewData.rows.length === 0 ? (
-                    <div style={{ padding: '15px', textAlign: 'center', fontSize: '12px', color: '#64748b' }}>No preview rows available.</div>
+                    <div style={{ padding: '15px', textAlign: 'center', fontSize: '12px', color: 'var(--text-muted)' }}>No preview rows available.</div>
                   ) : (
                     <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: '12px', textAlign: 'left' }}>
                       <thead>
-                        <tr style={{ background: '#f1f5f9', borderBottom: '1px solid #e2e8f0', position: 'sticky', top: 0, zIndex: 1 }}>
+                        <tr style={{ background: 'var(--bg-subtle)', borderBottom: '1px solid var(--border)', position: 'sticky', top: 0, zIndex: 1 }}>
                           <th style={{ padding: '6px 8px', width: '50px' }}>Line</th>
                           <th style={{ padding: '6px 8px', width: '190px' }}>Timestamp</th>
                           <th style={{ padding: '6px 8px', width: '90px' }}>Sender</th>
@@ -304,15 +267,15 @@ export default function StepPreprocess({
                               key={row.lineId}
                               onClick={() => handleRowClick(row)}
                               style={{
-                                borderBottom: '1px solid #f1f5f9',
+                                borderBottom: '1px solid var(--border)',
                                 cursor: 'pointer',
                                 backgroundColor: rowBg
                               }}
                             >
-                              <td style={{ padding: '4px 8px', color: '#64748b' }}>{row.lineId}</td>
-                              <td style={{ padding: '4px 8px', color: '#475569', fontFamily: 'monospace' }}>{row.timestamp}</td>
-                              <td style={{ padding: '4px 8px', fontWeight: '500', color: '#334155' }}>{row.sender}</td>
-                              <td style={{ padding: '4px 8px', color: '#1e293b', wordBreak: 'break-word' }}>{row.content}</td>
+                              <td style={{ padding: '4px 8px', color: 'var(--text-muted)' }}>{row.lineId}</td>
+                              <td style={{ padding: '4px 8px', color: 'var(--text-secondary)', fontFamily: 'monospace' }}>{row.timestamp}</td>
+                              <td style={{ padding: '4px 8px', fontWeight: '500', color: 'var(--text-secondary)' }}>{row.sender}</td>
+                              <td style={{ padding: '4px 8px', color: 'var(--text-primary)', wordBreak: 'break-word' }}>{row.content}</td>
                             </tr>
                           );
                         })}

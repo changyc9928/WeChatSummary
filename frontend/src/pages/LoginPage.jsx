@@ -1,6 +1,8 @@
 import React, { useState } from 'react';
+import ThemeToggle from '../components/common/ThemeToggle';
+import { login, register } from '../api/authApi';
 
-export default function LoginForm({ onLoginSuccess, apiUrl }) {
+export default function LoginPage({ onLoginSuccess, theme, onToggleTheme }) {
   const [authMode, setAuthMode] = useState('login'); // 'login' or 'register'
   const [username, setUsername] = useState('');
   const [password, setPassword] = useState('');
@@ -17,36 +19,16 @@ export default function LoginForm({ onLoginSuccess, apiUrl }) {
     setAuthLoading(true);
     setAuthError(null);
 
-    const endpoint = authMode === 'login' ? '/api/auth/login' : '/api/auth/register';
+    const credentials = { username, password };
 
     try {
-      const response = await fetch(`${apiUrl}${endpoint}`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ username, password })
-      });
+      const userData = authMode === 'login'
+        ? await login(credentials)
+        : await register(credentials);
 
-      if (!response.ok) {
-        let errorMsg = `${authMode === 'login' ? 'Login' : 'Registration'} failed.`;
-        try {
-          const errData = await response.json();
-          if (errData && errData.message) {
-            errorMsg = errData.message;
-          }
-        } catch (parseError) {
-          const errText = await response.text();
-          if (errText) errorMsg = errText;
-        }
-        
-        setPassword('');
-        throw new Error(errorMsg);
-      }
-
-      const data = await response.json();
-      const userData = { uuid: data.uuid, username };
-      
       onLoginSuccess(userData);
     } catch (err) {
+      setPassword('');
       setAuthError(err.message);
     } finally {
       setAuthLoading(false);
@@ -54,9 +36,12 @@ export default function LoginForm({ onLoginSuccess, apiUrl }) {
   };
 
   return (
-    <div style={{ minHeight: '100vh', display: 'flex', alignItems: 'center', justifyContent: 'center', backgroundColor: '#f9fafb', fontFamily: 'system-ui, sans-serif' }}>
-      <div style={{ background: '#fff', padding: '30px', borderRadius: '12px', boxShadow: '0 4px 12px rgba(0,0,0,0.05)', width: '100%', maxWidth: '400px' }}>
-        <h2 style={{ textAlign: 'center', marginBottom: '20px', color: '#111827' }}>
+    <div style={{ minHeight: '100vh', display: 'flex', alignItems: 'center', justifyContent: 'center', backgroundColor: 'var(--bg)', color: 'var(--text-secondary)', fontFamily: 'system-ui, sans-serif', transition: 'background-color 0.2s ease' }}>
+      <div style={{ position: 'absolute', top: '16px', right: '16px' }}>
+        <ThemeToggle theme={theme} onToggle={onToggleTheme} />
+      </div>
+      <div style={{ background: 'var(--bg-card)', padding: '30px', borderRadius: '12px', boxShadow: '0 4px 12px rgba(0,0,0,0.05)', width: '100%', maxWidth: '400px' }}>
+        <h2 style={{ textAlign: 'center', marginBottom: '20px', color: 'var(--text-primary)' }}>
           {authMode === 'login' ? 'User Login' : 'Register New Account'}
         </h2>
 
@@ -68,24 +53,24 @@ export default function LoginForm({ onLoginSuccess, apiUrl }) {
 
         <form onSubmit={handleAuthSubmit}>
           <div style={{ marginBottom: '15px' }}>
-            <label style={{ display: 'block', marginBottom: '5px', fontWeight: '600', fontSize: '0.9rem', color: '#374151' }}>Username</label>
+            <label style={{ display: 'block', marginBottom: '5px', fontWeight: '600', fontSize: '0.9rem', color: 'var(--text-secondary)' }}>Username</label>
             <input
               type="text"
               value={username}
               onChange={e => setUsername(e.target.value)}
               placeholder="Enter your username"
-              style={{ width: '100%', padding: '10px', boxSizing: 'border-box', border: '1px solid #d1d5db', borderRadius: '8px', fontSize: '0.95rem' }}
+              style={{ width: '100%', padding: '10px', boxSizing: 'border-box', border: '1px solid var(--border-strong)', borderRadius: '8px', fontSize: '0.95rem', backgroundColor: 'var(--bg-card)', color: 'var(--text-primary)' }}
             />
           </div>
 
           <div style={{ marginBottom: '20px' }}>
-            <label style={{ display: 'block', marginBottom: '5px', fontWeight: '600', fontSize: '0.9rem', color: '#374151' }}>Password</label>
+            <label style={{ display: 'block', marginBottom: '5px', fontWeight: '600', fontSize: '0.9rem', color: 'var(--text-secondary)' }}>Password</label>
             <input
               type="password"
               value={password}
               onChange={e => setPassword(e.target.value)}
               placeholder="Enter your password"
-              style={{ width: '100%', padding: '10px', boxSizing: 'border-box', border: '1px solid #d1d5db', borderRadius: '8px', fontSize: '0.95rem' }}
+              style={{ width: '100%', padding: '10px', boxSizing: 'border-box', border: '1px solid var(--border-strong)', borderRadius: '8px', fontSize: '0.95rem', backgroundColor: 'var(--bg-card)', color: 'var(--text-primary)' }}
             />
           </div>
 
@@ -100,23 +85,23 @@ export default function LoginForm({ onLoginSuccess, apiUrl }) {
 
         <div style={{ textAlign: 'center', marginTop: '15px' }}>
           {authMode === 'login' ? (
-            <p style={{ fontSize: '0.85rem', color: '#6b7280' }}>
+            <p style={{ fontSize: '0.85rem', color: 'var(--text-muted)' }}>
               Don't have an account?{' '}
               <button
                 type="button"
                 onClick={() => { setAuthMode('register'); setAuthError(null); setPassword(''); }}
-                style={{ background: 'none', border: 'none', color: '#2563eb', cursor: 'pointer', textDecoration: 'underline', padding: 0, fontWeight: '600' }}
+                style={{ background: 'none', border: 'none', color: 'var(--accent)', cursor: 'pointer', textDecoration: 'underline', padding: 0, fontWeight: '600' }}
               >
                 Register here
               </button>
             </p>
           ) : (
-            <p style={{ fontSize: '0.85rem', color: '#6b7280' }}>
+            <p style={{ fontSize: '0.85rem', color: 'var(--text-muted)' }}>
               Already have an account?{' '}
               <button
                 type="button"
                 onClick={() => { setAuthMode('login'); setAuthError(null); setPassword(''); }}
-                style={{ background: 'none', border: 'none', color: '#2563eb', cursor: 'pointer', textDecoration: 'underline', padding: 0, fontWeight: '600' }}
+                style={{ background: 'none', border: 'none', color: 'var(--accent)', cursor: 'pointer', textDecoration: 'underline', padding: 0, fontWeight: '600' }}
               >
                 Login here
               </button>

@@ -1,5 +1,5 @@
 import React from 'react';
-import { styles } from '../styles/dashboardStyles';
+import { styles } from '../../styles/dashboardStyles';
 
 export default function DatasetSelector({ sessions, uuidInput, setUuidInput, fetchSessions, loadingSessions }) {
   return (

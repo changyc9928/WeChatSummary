@@ -29,7 +29,8 @@ public class ChatSummaryController {
     public ResponseEntity<Map<String, Object>> getChatPreview(
         @RequestHeader("X-User-Id") String userId,
         @PathVariable UUID uuid) {
-        log.info("Request received to fetch chat preview table for user UUID: [{}] and task UUID: [{}]",
+        log.info(
+            "Request received to fetch chat preview table for user UUID: [{}] and task UUID: [{}]",
             userId, uuid);
         Map<String, Object> previewData = chatSummaryService.getChatPreviewData(userId, uuid);
         return ResponseEntity.ok(previewData);
@@ -44,7 +45,8 @@ public class ChatSummaryController {
         LocalDateTime startTime = requestDTO != null ? requestDTO.getStartTime() : null;
         LocalDateTime endTime = requestDTO != null ? requestDTO.getEndTime() : null;
 
-        log.info("Starting chat summary pipeline for user UUID: [{}] and task UUID: [{}] starting time: [{}], end time: [{}]",
+        log.info(
+            "Starting chat summary pipeline for user UUID: [{}] and task UUID: [{}] starting time: [{}], end time: [{}]",
             userId, uuid, startTime, endTime);
 
         chatSummaryService.summarizeChatLogAsync(userId, uuid, startTime, endTime);
@@ -78,7 +80,8 @@ public class ChatSummaryController {
         LocalDateTime startTime = requestDTO != null ? requestDTO.getStartTime() : null;
         LocalDateTime endTime = requestDTO != null ? requestDTO.getEndTime() : null;
 
-        log.info("Request received to clear and restart user UUID: [{}] and task UUID: [{}] starting time: [{}], end time: [{}]",
+        log.info(
+            "Request received to clear and restart user UUID: [{}] and task UUID: [{}] starting time: [{}], end time: [{}]",
             userId, uuid, startTime, endTime);
 
         chatSummaryService.startOverSummary(userId, uuid);

@@ -39,7 +39,8 @@ public class ChatSummaryService {
     private final Map<UUID, Thread> activeThreads = new ConcurrentHashMap<>();
 
     @Async
-    public void summarizeChatLogAsync(String userId, UUID uuid, LocalDateTime startTime, LocalDateTime endTime) {
+    public void summarizeChatLogAsync(String userId, UUID uuid, LocalDateTime startTime,
+        LocalDateTime endTime) {
         if (activeThreads.containsKey(uuid)) {
             log.warn(
                 "Execution request rejected for user UUID: [{}] and task {}: Thread is already running.",
@@ -47,7 +48,8 @@ public class ChatSummaryService {
             return;
         }
 
-        log.info("Starting worker thread for user UUID: [{}] and task UUID: [{}] starting time: [{}], end time: [{}]",
+        log.info(
+            "Starting worker thread for user UUID: [{}] and task UUID: [{}] starting time: [{}], end time: [{}]",
             userId, uuid, startTime, endTime);
         activeThreads.put(uuid, Thread.currentThread());
 
@@ -137,7 +139,8 @@ public class ChatSummaryService {
         }
     }
 
-    private String filterContentTimeWindow(Path targetFilePath, LocalDateTime startTime, LocalDateTime endTime) throws Exception {
+    private String filterContentTimeWindow(Path targetFilePath, LocalDateTime startTime,
+        LocalDateTime endTime) throws Exception {
         List<String> lines = Files.readAllLines(targetFilePath, StandardCharsets.UTF_8);
         List<String> filteredLines = new ArrayList<>();
 
@@ -150,12 +153,14 @@ public class ChatSummaryService {
             .toFormatter();
 
         // Regex to extract timestamps whether they have milliseconds or not (e.g. [2026-07-28 13:41:08] or [2026-07-28 13:41:08.123])
-        Pattern timestampPattern = Pattern.compile("^\\[(\\d{4}-\\d{2}-\\d{2} \\d{2}:\\d{2}:\\d{2}(?:\\.\\d{1,3})?)]");
+        Pattern timestampPattern = Pattern.compile(
+            "^\\[(\\d{4}-\\d{2}-\\d{2} \\d{2}:\\d{2}:\\d{2}(?:\\.\\d{1,3})?)]");
 
         boolean keepLine = (startTime == null);
 
         for (String line : lines) {
-            if (line.startsWith("---") || line.startsWith("群名称") || line.startsWith("总消息数")) {
+            if (line.startsWith("---") || line.startsWith("群名称") || line.startsWith(
+                "总消息数")) {
                 filteredLines.add(line);
                 continue;
             }
@@ -179,7 +184,8 @@ public class ChatSummaryService {
         }
 
         if (filteredLines.isEmpty()) {
-            log.warn("No lines matched the criteria (startTime: {}, endTime: {}). Falling back to full content.",
+            log.warn(
+                "No lines matched the criteria (startTime: {}, endTime: {}). Falling back to full content.",
                 startTime, endTime);
             return String.join("\n", lines);
         }
@@ -255,7 +261,8 @@ public class ChatSummaryService {
             result.put("rows", chatRows);
 
         } catch (Exception e) {
-            log.error("Failed to parse preview chat data for user UUID: [{}] and task UUID: [{}]", userId, uuid, e);
+            log.error("Failed to parse preview chat data for user UUID: [{}] and task UUID: [{}]",
+                userId, uuid, e);
             throw new RuntimeException("Failed to load chat preview: " + e.getMessage());
         }
 

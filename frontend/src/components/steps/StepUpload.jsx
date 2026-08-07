@@ -1,5 +1,5 @@
 import React from 'react';
-import { styles } from '../styles/dashboardStyles';
+import { styles } from '../../styles/dashboardStyles';
 
 export default function StepUpload({ file, setFile, handleUpload, loadingUpload, errorUpload }) {
   return (

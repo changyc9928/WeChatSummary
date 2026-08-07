@@ -1,5 +1,6 @@
 import React from 'react';
-import { styles } from '../styles/dashboardStyles';
+import { styles } from '../../styles/dashboardStyles';
+import { fromLocalInputValue } from '../../utils/time';
 
 export default function StepSummary({
   uuidInput,
@@ -23,28 +24,13 @@ export default function StepSummary({
   const progressFraction = rawProg > 1 ? rawProg / 100 : rawProg;
   const progressPercent = Math.round(progressFraction * 100);
 
-  const formatFromDatetimeLocal = (localStr) => {
-    if (!localStr) return '';
-
-    // Convert 'T' to space to match backend's expected 'YYYY-MM-DD HH:mm:ss' format
-    let formatted = localStr.replace('T', ' ');
-
-    if (formatted.length === 16) {
-      formatted += ':00'; // Appends seconds if missing -> "YYYY-MM-DD HH:mm:ss"
-    } else if (formatted.length > 19) {
-      formatted = formatted.substring(0, 19);
-    }
-
-    return formatted; // Produces clean "2026-07-28 18:29:44"
-  };
-
   const handleStartWithParams = (isRestart = false) => {
     const payload = {};
     if (selectedStartTime) {
-      payload.startTime = formatFromDatetimeLocal(selectedStartTime);
+      payload.startTime = fromLocalInputValue(selectedStartTime);
     }
     if (selectedEndTime) {
-      payload.endTime = formatFromDatetimeLocal(selectedEndTime);
+      payload.endTime = fromLocalInputValue(selectedEndTime);
     }
 
     if (isRestart) {
@@ -111,12 +97,12 @@ export default function StepSummary({
                 maxHeight: '400px',
                 overflowY: 'auto',
                 padding: '12px',
-                background: '#f8fafc',
+                background: 'var(--bg-card)',
                 borderRadius: '6px',
-                border: '1px solid #e2e8f0',
+                border: '1px solid var(--border)',
                 fontSize: '14px',
                 lineHeight: '1.5',
-                color: '#1e293b'
+                color: 'var(--text-secondary)'
               }}>
                 {displayResultText || 'Summary generation completed successfully.'}
               </div>

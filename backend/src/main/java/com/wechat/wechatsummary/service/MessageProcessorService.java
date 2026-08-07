@@ -130,7 +130,7 @@ public class MessageProcessorService {
 
             int processedCount = 0;
             for (WeChatMessageDto msg : messages) {
-                String cleanContent = processMessageContent(uuid, msg);
+                String cleanContent = processMessageContent(userId, uuid, msg);
                 cleanContent = replaceWxidsWithNicknames(cleanContent, userMap);
 
                 String rawName =
@@ -225,7 +225,7 @@ public class MessageProcessorService {
      * Core router assessing WeChat message configurations, mapping metadata payloads, and
      * evaluating cached summaries.
      */
-    private String processMessageContent(String uuid, WeChatMessageDto msg) {
+    private String processMessageContent(String userId, String uuid, WeChatMessageDto msg) {
         String content = msg.getContent();
         if (!StringUtils.hasText(content)) {
             content = "";
@@ -235,13 +235,13 @@ public class MessageProcessorService {
         long localType = msg.getLocalType() != null ? msg.getLocalType() : 0L;
 
         if ("图片消息".equals(type) || localType == 3) {
-            String imageHash = extractPathHash(uuid, msg.getContent(), msg.getRawContent());
-            return "(" + getImageSummary(imageHash) + ")";
+            String imageHash = extractPathHash(userId, uuid, msg.getContent(), msg.getRawContent());
+            return "(图片描述：" + getImageSummary(imageHash) + ")";
         } else if ("动画表情".equals(type) || localType == 47) {
-            String emojiHash = extractPathHash(uuid, msg.getContent(), msg.getRawContent());
+            String emojiHash = extractPathHash(userId, uuid, msg.getContent(), msg.getRawContent());
             return "(动画表情描述: " + getEmojiSummary(emojiHash, msg.getContent()) + ")";
         } else if ("语音消息".equals(type) || localType == 34) {
-            String audioHash = extractPathHash(uuid, msg.getContent(), msg.getRawContent());
+            String audioHash = extractPathHash(userId, uuid, msg.getContent(), msg.getRawContent());
             return "(语音转译: " + getAudioSummary(audioHash) + ")";
         } else if ("视频消息".equals(type) || localType == 43 || "文件".equals(type)
             || localType == 49) {
@@ -271,21 +271,26 @@ public class MessageProcessorService {
     /**
      * Resolves local storage assets to compute an absolute system SHA-256 track token.
      */
-    private String extractPathHash(String uuid, String content, String rawContent) {
+    private String extractPathHash(String userId, String uuid, String content, String rawContent) {
         if (!StringUtils.hasText(content)) {
             return extractHashFromXml(rawContent);
         }
+
         String relativePath = content.trim();
         if (relativePath.contains("]")) {
             relativePath = relativePath.substring(relativePath.indexOf("]") + 1).trim();
         }
+
         String lowerPath = relativePath.toLowerCase();
         if (lowerPath.startsWith("images") || lowerPath.startsWith("emojis")
             || lowerPath.startsWith("voices")) {
-            return sha256(
-                storageConfig.getUploadDir().resolve(uuid).resolve(relativePath).toAbsolutePath()
-                    .toString());
+
+            // Correct path construction: uploadDir / userId / uuid / relativePath
+            Path resolvedPath = storageConfig.getUploadDir().resolve(userId).resolve(uuid)
+                .resolve(relativePath);
+            return sha256(resolvedPath.toAbsolutePath().normalize().toString());
         }
+
         String xmlHash = extractHashFromXml(rawContent);
         return StringUtils.hasText(xmlHash) ? xmlHash : sha256(content.trim());
     }

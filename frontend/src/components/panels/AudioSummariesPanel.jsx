@@ -1,5 +1,5 @@
 import React from 'react';
-import { styles } from '../styles/dashboardStyles';
+import { styles } from '../../styles/dashboardStyles';
 
 export default function AudioSummariesPanel({
   uuidInput,
@@ -34,7 +34,7 @@ export default function AudioSummariesPanel({
     return (
       <div style={{ ...styles.card, gridColumn: '1 / -1', textAlign: 'center', padding: '30px' }}>
         <h3 style={styles.cardTitle}>Audio Transcripts & Summaries</h3>
-        <p style={{ color: '#6b7280', marginTop: '10px' }}>No active dataset selected. Please choose or upload a dataset from the dashboard.</p>
+        <p style={{ color: 'var(--text-muted)', marginTop: '10px' }}>No active dataset selected. Please choose or upload a dataset from the dashboard.</p>
       </div>
     );
   }
@@ -56,9 +56,9 @@ export default function AudioSummariesPanel({
       {errorAudios && <div style={styles.errorText}>⚠️ {errorAudios}</div>}
 
       {loadingAudios ? (
-        <div style={{ textAlign: 'center', padding: '20px', color: '#6b7280' }}>Loading audio elements...</div>
+        <div style={{ textAlign: 'center', padding: '20px', color: 'var(--text-muted)' }}>Loading audio elements...</div>
       ) : safeSummaries.length === 0 ? (
-        <div style={{ color: '#6b7280', fontSize: '0.85rem', padding: '15px 0' }}>No processed audio logs found for this dataset.</div>
+        <div style={{ color: 'var(--text-muted)', fontSize: '0.85rem', padding: '15px 0' }}>No processed audio logs found for this dataset.</div>
       ) : (
         <>
           <div style={styles.tableWrapper}>

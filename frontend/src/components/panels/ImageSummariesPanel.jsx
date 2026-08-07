@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from 'react';
-import { styles } from '../styles/dashboardStyles';
+import { styles } from '../../styles/dashboardStyles';
+import { getImageFile } from '../../api/preprocessApi';
 
 export default function ImageSummariesPanel({
   uuidInput,
@@ -14,7 +15,6 @@ export default function ImageSummariesPanel({
   setActiveModalImage,
   loading,
   errorImages,
-  apiUrl,
   currentUser
 }) {
   const [imageObjectUrls, setImageObjectUrls] = useState({});
@@ -29,10 +29,7 @@ export default function ImageSummariesPanel({
 
       for (const item of imageSummaries) {
         try {
-          // FIXED: Removed invalid placeholder line (const res = us1 => res;)
-          const response = await fetch(`${apiUrl}/api/preprocess/images/${item.id}/file`, {
-            headers: { 'X-User-Id': currentUser.uuid }
-          });
+          const response = await getImageFile(item.id, currentUser.uuid);
           if (response.ok) {
             const blob = await response.blob();
             if (isMounted) {
@@ -53,7 +50,7 @@ export default function ImageSummariesPanel({
       // Cleanup object URLs to prevent memory leaks
       Object.values(objectUrls).forEach(url => URL.revokeObjectURL(url));
     };
-  }, [imageSummaries, apiUrl, currentUser]);
+  }, [imageSummaries, currentUser]);
 
   const toggleSelectAll = (e) => {
     if (e.target.checked) {
@@ -83,9 +80,9 @@ export default function ImageSummariesPanel({
       {errorImages && <div style={styles.errorText}>⚠️ {errorImages}</div>}
 
       {loadingImages ? (
-        <div style={{ textAlign: 'center', padding: '20px', color: '#6b7280' }}>Loading image summaries...</div>
+        <div style={{ textAlign: 'center', padding: '20px', color: 'var(--text-muted)' }}>Loading image summaries...</div>
       ) : imageSummaries.length === 0 ? (
-        <div style={{ color: '#6b7280', fontSize: '0.85rem' }}>No processed images found for this dataset.</div>
+        <div style={{ color: 'var(--text-muted)', fontSize: '0.85rem' }}>No processed images found for this dataset.</div>
       ) : (
         <>
           <div style={styles.tableWrapper}>
@@ -110,7 +107,7 @@ export default function ImageSummariesPanel({
                           {objectUrl ? (
                             <img src={objectUrl} alt="thumbnail" style={styles.thumbnail} />
                           ) : (
-                            <div style={{ fontSize: '0.75rem', color: '#9ca3af', textAlign: 'center' }}>Loading...</div>
+                            <div style={{ fontSize: '0.75rem', color: 'var(--text-muted)', textAlign: 'center' }}>Loading...</div>
                           )}
                           <div style={styles.thumbnailOverlay}>View</div>
                         </div>
