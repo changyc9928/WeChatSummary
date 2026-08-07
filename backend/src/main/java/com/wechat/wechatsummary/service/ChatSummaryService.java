@@ -1,5 +1,6 @@
 package com.wechat.wechatsummary.service;
 
+import com.wechat.wechatsummary.config.SummaryConfig;
 import com.wechat.wechatsummary.dto.ChatPreviewResponse;
 import com.wechat.wechatsummary.dto.ChatPreviewRow;
 import com.wechat.wechatsummary.dto.SummaryProgressResponse;
@@ -34,10 +35,10 @@ import org.springframework.stereotype.Service;
 @Slf4j
 public class ChatSummaryService {
 
-    private static final int MAX_CHUNK_CHARS = 15000;
     private final AiService aiService;
     private final StoragePaths storagePaths;
     private final ChatSummaryTaskRepository taskRepository;
+    private final SummaryConfig summaryConfig;
 
     private final Map<UUID, Thread> activeThreads = new ConcurrentHashMap<>();
 
@@ -313,7 +314,7 @@ Path targetFilePath = locateProcessedFile(storagePaths.outputDir(userId),
                     int totalChunks = splitContent(rawContent).size();
 
                     if (totalChunks > 0) {
-                        progress = Math.min(99.9,
+                        progress = Math.min(summaryConfig.getProgressCap(),
                             ((double) (processedIndex + 1) / totalChunks) * 100);
                     }
                 }
@@ -362,7 +363,7 @@ Path targetFilePath = locateProcessedFile(storagePaths.outputDir(userId),
         int length = content.length();
         int start = 0;
         while (start < length) {
-            int end = Math.min(start + MAX_CHUNK_CHARS, length);
+            int end = Math.min(start + summaryConfig.getChunkSizeChars(), length);
             if (end < length) {
                 int nextNewLine = content.lastIndexOf('\n', end);
                 if (nextNewLine > start) {

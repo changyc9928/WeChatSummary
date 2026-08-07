@@ -15,6 +15,7 @@ import org.springframework.data.redis.connection.RedisConnectionFactory;
 import org.springframework.data.redis.serializer.GenericJackson2JsonRedisSerializer;
 import org.springframework.data.redis.serializer.RedisSerializationContext;
 import org.springframework.data.redis.serializer.StringRedisSerializer;
+import org.springframework.beans.factory.annotation.Value;
 
 /**
  * Configuration class establishing Spring Cache parameters backed by a Redis infrastructure.
@@ -23,6 +24,15 @@ import org.springframework.data.redis.serializer.StringRedisSerializer;
  */
 @Configuration
 public class CacheConfig {
+
+    @Value("${cache.ttl-default:1d}")
+    private Duration ttlDefault;
+
+    @Value("${cache.ttl-audio:7d}")
+    private Duration ttlAudio;
+
+    @Value("${cache.ttl-image:3d}")
+    private Duration ttlImage;
 
     /**
      * Standardizes the Redis CacheManager configuration layer. Sets up JSON serialization
@@ -51,7 +61,7 @@ public class CacheConfig {
 
         // 1. Establish the clean base default configuration mapping (Swapping messy JDK binary for explicit JSON layouts)
         RedisCacheConfiguration baseConfiguration = RedisCacheConfiguration.defaultCacheConfig()
-            .entryTtl(Duration.ofDays(1)) // Global fallback baseline threshold safety net of 1 day
+            .entryTtl(ttlDefault)
             .serializeKeysWith(
                 RedisSerializationContext.SerializationPair.fromSerializer(
                     new StringRedisSerializer())
@@ -65,10 +75,10 @@ public class CacheConfig {
         Map<String, RedisCacheConfiguration> fineGrainedOverrides = new HashMap<>();
 
         // Audio transcribes receive high retention footprints due to compute expense rules
-        fineGrainedOverrides.put("audio_summary", baseConfiguration.entryTtl(Duration.ofDays(7)));
+        fineGrainedOverrides.put("audio_summary", baseConfiguration.entryTtl(ttlAudio));
 
-        // Multi-modal image analysis visual tracking captures are allocated a steady 3-day buffer window
-        fineGrainedOverrides.put("image_summary", baseConfiguration.entryTtl(Duration.ofDays(3)));
+        // Multi-modal image analysis visual tracking captures are allocated a steady buffer window
+        fineGrainedOverrides.put("image_summary", baseConfiguration.entryTtl(ttlImage));
 
         // 3. Complete structural instantiation linking custom namespaces straight onto the connection pipeline factory
         return RedisCacheManager.builder(connectionFactory)

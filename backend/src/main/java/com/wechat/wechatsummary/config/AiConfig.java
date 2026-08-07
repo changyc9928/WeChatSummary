@@ -28,14 +28,15 @@ public class AiConfig {
         @Value("${spring.ai.openai.base-url}") String baseUrl,
         @Value("${spring.ai.openai.api-key}") String apiKey,
         @Value("${spring.ai.openai.chat.options.model}") String model,
-        @Value("${spring.ai.openai.chat.temperature}") Double temperature) {
+        @Value("${spring.ai.openai.chat.temperature}") Double temperature,
+        @Value("${spring.ai.openai.chat.timeout}") Duration timeout) {
 
         OpenAiChatOptions options = OpenAiChatOptions.builder()
             .model(model)
             .baseUrl(baseUrl)
             .apiKey(apiKey)
             .temperature(temperature)
-            .timeout(Duration.ofMinutes(60))
+            .timeout(timeout)
             .build();
 
         return OpenAiChatModel.builder()
@@ -98,13 +99,14 @@ public class AiConfig {
     public OpenAiChatModel multimodalChatModel(
         @Value("${custom-ai.multimodal.base-url}") String baseUrl,
         @Value("${custom-ai.multimodal.api-key}") String apiKey,
-        @Value("${custom-ai.multimodal.model}") String model) {
+        @Value("${custom-ai.multimodal.model}") String model,
+        @Value("${custom-ai.multimodal.timeout}") Duration timeout) {
 
         OpenAiChatOptions options = OpenAiChatOptions.builder()
             .model(model)
             .baseUrl(baseUrl)
             .apiKey(apiKey)
-            .timeout(Duration.ofMinutes(60))
+            .timeout(timeout)
             .build();
 
         return OpenAiChatModel.builder()

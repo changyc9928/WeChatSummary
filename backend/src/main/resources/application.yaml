@@ -54,6 +54,31 @@ custom-ai:
     base-url: https://integrate.api.nvidia.com/v1
     api-key: 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
     model: meta/llama-3.2-90b-vision-instruct
+    timeout: 60m
 
 storage:
   upload-dir: ${HOME}/uploads
+
+processing:
+  image-max-size-bytes: 5000000
+  log-progress-every: 500
+
+summary:
+  chunk-size-chars: 15000
+  progress-cap: 99.9
+
+task:
+  redis-ttl: 1d
+
+http:
+  cache-max-age: 1h
+
+rabbit:
+  concurrent-consumers: 3
+  max-concurrent-consumers: 10
+  prefetch-count: 5
+
+cache:
+  ttl-default: 1d
+  ttl-audio: 7d
+  ttl-image: 3d

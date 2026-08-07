@@ -1,5 +1,6 @@
 package com.wechat.wechatsummary.service;
 
+import com.wechat.wechatsummary.config.TaskConfig;
 import com.wechat.wechatsummary.dto.TaskProgress;
 import com.wechat.wechatsummary.dto.TaskStatus;
 import java.nio.file.Files;
@@ -34,6 +35,7 @@ public class TaskCoordinatorService {
     private final StringRedisTemplate redisTemplate;
     private final MessageProcessorService messageProcessorService;
     private final StoragePaths storagePaths;
+    private final TaskConfig taskConfig;
 
     public void initTaskContext(String userId, String uuid, int totalTasks, String inputJsonPath,
         String outputFilePath) {
@@ -48,11 +50,12 @@ public class TaskCoordinatorService {
         }
 
         // Store userId in Redis mapping for this uuid so completion can fetch it if needed, or pass it directly
-        redisTemplate.opsForValue().set(USER_KEY_PREFIX + uuid, userId, 1, TimeUnit.DAYS);
+        long redisTtl = taskConfig.getRedisTtl().toDays();
+        redisTemplate.opsForValue().set(USER_KEY_PREFIX + uuid, userId, redisTtl, TimeUnit.DAYS);
         redisTemplate.opsForValue()
-            .set(COUNTER_PREFIX + uuid, String.valueOf(totalTasks), 1, TimeUnit.DAYS);
+            .set(COUNTER_PREFIX + uuid, String.valueOf(totalTasks), redisTtl, TimeUnit.DAYS);
         redisTemplate.opsForValue()
-            .set(TOTAL_PREFIX + uuid, String.valueOf(totalTasks), 1, TimeUnit.DAYS);
+            .set(TOTAL_PREFIX + uuid, String.valueOf(totalTasks), redisTtl, TimeUnit.DAYS);
     }
 
     /**
@@ -84,7 +87,8 @@ public class TaskCoordinatorService {
         Set<Thread> threads = activeThreadsMap.remove(uuid);
 
         // Store abort flag in Redis to represent PAUSED status
-        redisTemplate.opsForValue().set(ABORTED_PREFIX + uuid, "true", 1, TimeUnit.DAYS);
+        redisTemplate.opsForValue().set(ABORTED_PREFIX + uuid, "true", taskConfig.getRedisTtl()
+            .toDays(), TimeUnit.DAYS);
 
         // Delete active counter keys in Redis
         redisTemplate.delete(COUNTER_PREFIX + uuid);

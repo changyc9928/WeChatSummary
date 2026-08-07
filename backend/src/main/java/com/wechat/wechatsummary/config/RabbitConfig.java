@@ -6,6 +6,7 @@ import org.springframework.amqp.core.Queue;
 import org.springframework.amqp.core.TopicExchange;
 import org.springframework.amqp.rabbit.config.SimpleRabbitListenerContainerFactory;
 import org.springframework.amqp.rabbit.connection.ConnectionFactory;
+import org.springframework.beans.factory.annotation.Value;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 
@@ -42,6 +43,15 @@ public class RabbitConfig {
      */
     public static final String AUDIO_ROUTING_KEY = "media.audio";
 
+    @Value("${rabbit.concurrent-consumers:3}")
+    private int concurrentConsumers;
+
+    @Value("${rabbit.max-concurrent-consumers:10}")
+    private int maxConcurrentConsumers;
+
+    @Value("${rabbit.prefetch-count:5}")
+    private int prefetchCount;
+
     /**
      * Configures the listener container factory responsible for initializing asynchronous consumer
      * thread pools. Manages scaling behaviors, baseline workers, and prefetch limits to optimize
@@ -58,11 +68,9 @@ public class RabbitConfig {
         factory.setConnectionFactory(connectionFactory);
 
         // Concurrent Worker Allocation Topology Configuration
-        factory.setConcurrentConsumers(3);   // Baseline concurrent consumer worker threads
-        factory.setMaxConcurrentConsumers(
-            10); // Dynamic expansion scaling ceiling under heavy loads
-        factory.setPrefetchCount(
-            5);          // Unacknowledged message threshold window limit allocated per consumer
+        factory.setConcurrentConsumers(concurrentConsumers);
+        factory.setMaxConcurrentConsumers(maxConcurrentConsumers);
+        factory.setPrefetchCount(prefetchCount);
 
         return factory;
     }

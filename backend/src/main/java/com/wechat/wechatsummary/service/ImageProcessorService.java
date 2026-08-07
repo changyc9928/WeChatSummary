@@ -1,5 +1,6 @@
 package com.wechat.wechatsummary.service;
 
+import com.wechat.wechatsummary.config.ProcessingConfig;
 import com.wechat.wechatsummary.entity.ImageSummaryEntity;
 import com.wechat.wechatsummary.util.HashUtils;
 import com.wechat.wechatsummary.util.PageUtils;
@@ -31,6 +32,7 @@ public class ImageProcessorService {
     private final WeChatSummaryCacheService cacheService;
     private final MediaFileResourceLoader fileResourceLoader;
     private final StoragePaths storagePaths;
+    private final ProcessingConfig processingConfig;
 
     public void processImage(String filePath) {
         log.info("Initiating image processing pipeline execution for target file: [{}]", filePath);
@@ -55,10 +57,10 @@ public class ImageProcessorService {
 
             byte[] imageBytes = Files.readAllBytes(path);
 
-            if (imageBytes.length > 5_000_000) {
+            if (imageBytes.length > processingConfig.getImageMaxSizeBytes()) {
                 log.warn(
-                    "Image analysis aborted. Payload size ({} bytes) exceeds the allowed 5MB structural limit for file: {}",
-                    imageBytes.length, filePath);
+                    "Image analysis aborted. Payload size ({} bytes) exceeds the allowed {} byte structural limit for file: {}",
+                    imageBytes.length, processingConfig.getImageMaxSizeBytes(), filePath);
                 return;
             }
 

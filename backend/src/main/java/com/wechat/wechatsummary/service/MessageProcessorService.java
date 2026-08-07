@@ -3,6 +3,7 @@ package com.wechat.wechatsummary.service;
 import com.fasterxml.jackson.core.type.TypeReference;
 import com.fasterxml.jackson.databind.DeserializationFeature;
 import com.fasterxml.jackson.databind.ObjectMapper;
+import com.wechat.wechatsummary.config.ProcessingConfig;
 import com.wechat.wechatsummary.dto.WeChatMessageDto;
 import com.wechat.wechatsummary.util.HashUtils;
 import java.io.IOException;
@@ -48,9 +49,26 @@ public class MessageProcessorService {
 
     private static final Pattern WXID_PATTERN = Pattern.compile("wxid_[a-zA-Z0-9]{10,25}");
 
+    // WeChat message type protocol codes (localType)
+    private static final long LOCAL_TYPE_IMAGE = 3;
+    private static final long LOCAL_TYPE_AUDIO = 34;
+    private static final long LOCAL_TYPE_VIDEO = 43;
+    private static final long LOCAL_TYPE_EMOJI = 47;
+    private static final long LOCAL_TYPE_FILE = 49;
+    private static final long LOCAL_TYPE_REFER_MESSAGE = 244813135921L;
+
+    // Referenced media type codes embedded in <refermsg> XML payloads
+    private static final String REFER_TYPE_IMAGE = "3";
+    private static final String REFER_TYPE_AUDIO = "34";
+    private static final String REFER_TYPE_EMOJI = "47";
+
+    // Number of trailing characters of a wxid kept in the anonymous fallback display name
+    private static final int WXID_FALLBACK_TAIL_LENGTH = 4;
+
     private final WeChatSummaryCacheService cacheService;
     private final ObjectMapper objectMapper;
     private final StoragePaths storagePaths;
+    private final ProcessingConfig processingConfig;
 
     /**
      * Parses the underlying raw chat JSON archive, structures content models, injects resolved
@@ -146,7 +164,8 @@ public class MessageProcessorService {
                     .append(cleanContent).append("\n");
 
                 processedCount++;
-                if (processedCount % 500 == 0 && log.isDebugEnabled()) {
+                if (processedCount % processingConfig.getLogProgressEvery() == 0
+                    && log.isDebugEnabled()) {
                     log.debug(
                         "Task UUID: {} iteratively normalized {} messages out of {} total logs.",
                         uuid, processedCount, messages.size());
@@ -181,7 +200,8 @@ public class MessageProcessorService {
                         : wxid;
                 String cleanName = cleanNickname(rawName);
                 if (!StringUtils.hasText(cleanName)) {
-                    cleanName = "微信用户_" + wxid.substring(Math.max(0, wxid.length() - 4));
+                    cleanName = "微信用户_" + wxid.substring(Math.max(0,
+                        wxid.length() - WXID_FALLBACK_TAIL_LENGTH));
                 }
                 userMap.put(wxid, cleanName);
             }
@@ -232,19 +252,19 @@ public class MessageProcessorService {
         String type = msg.getType();
         long localType = msg.getLocalType() != null ? msg.getLocalType() : 0L;
 
-        if ("图片消息".equals(type) || localType == 3) {
+        if ("图片消息".equals(type) || localType == LOCAL_TYPE_IMAGE) {
             String imageHash = extractPathHash(userId, uuid, msg.getContent(), msg.getRawContent());
             return "(图片描述：" + getImageSummary(imageHash) + ")";
-        } else if ("动画表情".equals(type) || localType == 47) {
+        } else if ("动画表情".equals(type) || localType == LOCAL_TYPE_EMOJI) {
             String emojiHash = extractPathHash(userId, uuid, msg.getContent(), msg.getRawContent());
             return "(动画表情描述: " + getEmojiSummary(emojiHash, msg.getContent()) + ")";
-        } else if ("语音消息".equals(type) || localType == 34) {
+        } else if ("语音消息".equals(type) || localType == LOCAL_TYPE_AUDIO) {
             String audioHash = extractPathHash(userId, uuid, msg.getContent(), msg.getRawContent());
             return "(语音转译: " + getAudioSummary(audioHash) + ")";
-        } else if ("视频消息".equals(type) || localType == 43 || "文件".equals(type)
-            || localType == 49) {
+        } else if ("视频消息".equals(type) || localType == LOCAL_TYPE_VIDEO || "文件".equals(type)
+            || localType == LOCAL_TYPE_FILE) {
             return "[" + type + "消息，暂未处理]";
-        } else if ("引用消息".equals(type) || localType == 244813135921L) {
+        } else if ("引用消息".equals(type) || localType == LOCAL_TYPE_REFER_MESSAGE) {
             String raw = msg.getRawContent();
             if (raw != null && raw.contains("<refermsg>")) {
                 Matcher typeMatcher = REFER_TYPE_PATTERN.matcher(raw);
@@ -252,12 +272,12 @@ public class MessageProcessorService {
                     String referType = typeMatcher.group(1);
                     String mediaHash = extractHashFromXml(raw);
 
-                    if ("3".equals(referType)) {
+                    if (REFER_TYPE_IMAGE.equals(referType)) {
                         return content + " (引用了图片: " + getImageSummary(mediaHash) + ")";
-                    } else if ("47".equals(referType)) {
+                    } else if (REFER_TYPE_EMOJI.equals(referType)) {
                         return content + " (引用了动画表情: " + getEmojiSummary(mediaHash, raw)
                             + ")";
-                    } else if ("34".equals(referType)) {
+                    } else if (REFER_TYPE_AUDIO.equals(referType)) {
                         return content + " (引用了语音: " + getAudioSummary(mediaHash) + ")";
                     }
                 }

@@ -1,5 +1,6 @@
 package com.wechat.wechatsummary.controller;
 
+import com.wechat.wechatsummary.config.HttpConfig;
 import com.wechat.wechatsummary.dto.ApiResponse;
 import com.wechat.wechatsummary.dto.TaskAckResponse;
 import com.wechat.wechatsummary.dto.TaskProgress;
@@ -48,6 +49,7 @@ public class PreprocessController {
     private final TaskCoordinatorService taskCoordinatorService;
     private final ImageProcessorService imageProcessorService;
     private final AudioProcessorService audioProcessorService;
+    private final HttpConfig httpConfig;
 
     @PostMapping("/{uuid}")
     public ApiResponse<TaskAckResponse> preprocess(
@@ -167,7 +169,7 @@ public class PreprocessController {
         return imageProcessorService.getImageFileById(id)
             .map(fileRes -> ResponseEntity.ok()
                 .contentType(MediaType.parseMediaType(fileRes.contentType()))
-                .header(HttpHeaders.CACHE_CONTROL, "max-age=3600")
+                .header(HttpHeaders.CACHE_CONTROL, "max-age=" + httpConfig.getCacheMaxAge().toSeconds())
                 .body(fileRes.resource()))
             .orElseGet(() -> ResponseEntity.notFound().build());
     }
@@ -273,7 +275,7 @@ public class PreprocessController {
         return audioProcessorService.getAudioFileById(id)
             .map(fileObj -> ResponseEntity.ok()
                 .contentType(MediaType.parseMediaType(fileObj.contentType()))
-                .header(HttpHeaders.CACHE_CONTROL, "max-age=3600")
+                .header(HttpHeaders.CACHE_CONTROL, "max-age=" + httpConfig.getCacheMaxAge().toSeconds())
                 .body(fileObj.resource()))
             .orElseGet(() -> ResponseEntity.notFound().build());
     }
