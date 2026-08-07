@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { styles } from '../../styles/dashboardStyles';
-import { getImageFile } from '../../api/preprocessApi';
+import { apiClient } from '../../api/client';
 
 export default function ImageSummariesPanel({
   uuidInput,
@@ -29,13 +29,13 @@ export default function ImageSummariesPanel({
 
       for (const item of imageSummaries) {
         try {
-          const response = await getImageFile(item.id, currentUser.uuid);
-          if (response.ok) {
-            const blob = await response.blob();
-            if (isMounted) {
-              objectUrls[item.id] = URL.createObjectURL(blob);
-              setImageObjectUrls({ ...objectUrls });
-            }
+          const blob = await apiClient.preprocess.getImageFileById({
+            xUserId: currentUser.uuid,
+            id: item.id
+          });
+          if (isMounted) {
+            objectUrls[item.id] = URL.createObjectURL(blob);
+            setImageObjectUrls({ ...objectUrls });
           }
         } catch (err) {
           console.error(`Failed to load image for id ${item.id}`, err);

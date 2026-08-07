@@ -1,5 +1,6 @@
 # Backend (Java / Maven)
 backend/target/
+target/
 backend/.mvn/
 backend/.idea/
 *.class

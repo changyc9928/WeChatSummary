@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { styles } from '../../styles/dashboardStyles';
-import { getChatPreview } from '../../api/preprocessApi';
+import { apiClient } from '../../api/client';
 import { toLocalInputValue, fromLocalInputValue, parseToComparable } from '../../utils/time';
 
 export default function StepPreprocess({
@@ -39,7 +39,10 @@ export default function StepPreprocess({
       const fetchPreview = async () => {
         setLoadingPreview(true);
         try {
-          const data = await getChatPreview(uuidInput, currentUser.uuid);
+          const data = await apiClient.chatSummary.getChatPreview({
+            xUserId: currentUser.uuid,
+            uuid: uuidInput
+          });
           setPreviewData(data);
         } catch (err) {
           console.error("Failed to load chat preview:", err);

@@ -1,22 +1,136 @@
-openapi: 3.0.1
+openapi: 3.1.0
 info:
   title: OpenAPI definition
   version: v0
 servers:
-  - url: http://localhost:8080
-    description: Generated server url
+- url: http://localhost:8080
+  description: Generated server url
 paths:
+  /api/summary/{uuid}:
+    post:
+      tags:
+      - chat-summary-controller
+      operationId: startSummary
+      parameters:
+      - name: X-User-Id
+        in: header
+        required: true
+        schema:
+          type: string
+      - name: uuid
+        in: path
+        required: true
+        schema:
+          type: string
+          format: uuid
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/SummaryRequestDTO"
+      responses:
+        "200":
+          description: OK
+          content:
+            '*/*':
+              schema:
+                type: object
+  /api/summary/restart/{uuid}:
+    post:
+      tags:
+      - chat-summary-controller
+      operationId: restartSummary
+      parameters:
+      - name: X-User-Id
+        in: header
+        required: true
+        schema:
+          type: string
+      - name: uuid
+        in: path
+        required: true
+        schema:
+          type: string
+          format: uuid
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/SummaryRequestDTO"
+      responses:
+        "200":
+          description: OK
+          content:
+            '*/*':
+              schema:
+                type: object
+                additionalProperties:
+                  type: string
+  /api/summary/pause/{uuid}:
+    post:
+      tags:
+      - chat-summary-controller
+      operationId: pauseSummary
+      parameters:
+      - name: X-User-Id
+        in: header
+        required: true
+        schema:
+          type: string
+      - name: uuid
+        in: path
+        required: true
+        schema:
+          type: string
+          format: uuid
+      responses:
+        "200":
+          description: OK
+          content:
+            '*/*':
+              schema:
+                type: object
+                additionalProperties:
+                  type: string
   /api/preprocess/{uuid}:
     post:
       tags:
-        - preprocess-controller
+      - preprocess-controller
       operationId: preprocess
       parameters:
-        - name: uuid
-          in: path
-          required: true
-          schema:
-            type: string
+      - name: X-User-Id
+        in: header
+        required: true
+        schema:
+          type: string
+      - name: uuid
+        in: path
+        required: true
+        schema:
+          type: string
+      responses:
+        "200":
+          description: OK
+          content:
+            '*/*':
+              schema:
+                type: string
+  /api/preprocess/{uuid}/abort:
+    post:
+      tags:
+      - preprocess-controller
+      operationId: abortTask
+      parameters:
+      - name: X-User-Id
+        in: header
+        required: true
+        schema:
+          type: string
+      - name: uuid
+        in: path
+        required: true
+        schema:
+          type: string
       responses:
         "200":
           description: OK
@@ -27,19 +141,25 @@ paths:
   /api/files/upload:
     post:
       tags:
-        - upload-controller
+      - upload-controller
       operationId: upload
+      parameters:
+      - name: X-User-Id
+        in: header
+        required: true
+        schema:
+          type: string
       requestBody:
+        description: ZIP archive to ingest
         content:
-          application/json:
+          multipart/form-data:
             schema:
-              required:
-                - file
               type: object
               properties:
                 file:
                   type: string
                   format: binary
+        required: true
       responses:
         "200":
           description: OK
@@ -47,18 +167,59 @@ paths:
             '*/*':
               schema:
                 type: string
-  /api/analysis/{uuid}:
+  /api/auth/register:
     post:
       tags:
-        - chat-analysis-controller
-      operationId: startAnalysis
+      - auth-controller
+      operationId: register
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/AuthRequest"
+        required: true
+      responses:
+        "200":
+          description: OK
+          content:
+            '*/*':
+              schema:
+                $ref: "#/components/schemas/AuthResponse"
+  /api/auth/login:
+    post:
+      tags:
+      - auth-controller
+      operationId: login
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/AuthRequest"
+        required: true
+      responses:
+        "200":
+          description: OK
+          content:
+            '*/*':
+              schema:
+                $ref: "#/components/schemas/AuthResponse"
+  /api/summary/status-pool/{uuid}:
+    get:
+      tags:
+      - chat-summary-controller
+      operationId: getStatusAndProgress
       parameters:
-        - name: uuid
-          in: path
-          required: true
-          schema:
-            type: string
-            format: uuid
+      - name: X-User-Id
+        in: header
+        required: true
+        schema:
+          type: string
+      - name: uuid
+        in: path
+        required: true
+        schema:
+          type: string
+          format: uuid
       responses:
         "200":
           description: OK
@@ -66,18 +227,24 @@ paths:
             '*/*':
               schema:
                 type: object
-  /api/analysis/restart/{uuid}:
-    post:
+                additionalProperties: {}
+  /api/summary/preview/{uuid}:
+    get:
       tags:
-        - chat-analysis-controller
-      operationId: restartAnalysis
+      - chat-summary-controller
+      operationId: getChatPreview
       parameters:
-        - name: uuid
-          in: path
-          required: true
-          schema:
-            type: string
-            format: uuid
+      - name: X-User-Id
+        in: header
+        required: true
+        schema:
+          type: string
+      - name: uuid
+        in: path
+        required: true
+        schema:
+          type: string
+          format: uuid
       responses:
         "200":
           description: OK
@@ -85,40 +252,23 @@ paths:
             '*/*':
               schema:
                 type: object
-                additionalProperties:
-                  type: string
-  /api/analysis/pause/{uuid}:
-    post:
-      tags:
-        - chat-analysis-controller
-      operationId: pauseAnalysis
-      parameters:
-        - name: uuid
-          in: path
-          required: true
-          schema:
-            type: string
-            format: uuid
-      responses:
-        "200":
-          description: OK
-          content:
-            '*/*':
-              schema:
-                type: object
-                additionalProperties:
-                  type: string
+                additionalProperties: {}
   /api/preprocess/{uuid}/progress:
     get:
       tags:
-        - preprocess-controller
+      - preprocess-controller
       operationId: getProgress
       parameters:
-        - name: uuid
-          in: path
-          required: true
-          schema:
-            type: string
+      - name: X-User-Id
+        in: header
+        required: true
+        schema:
+          type: string
+      - name: uuid
+        in: path
+        required: true
+        schema:
+          type: string
       responses:
         "200":
           description: OK
@@ -126,52 +276,340 @@ paths:
             '*/*':
               schema:
                 $ref: "#/components/schemas/TaskProgress"
-  /api/preprocess/{uuid}/finished:
+  /api/preprocess/images/{id}/file:
     get:
       tags:
-        - preprocess-controller
-      operationId: isFinished
+      - preprocess-controller
+      operationId: getImageFileById
       parameters:
-        - name: uuid
-          in: path
-          required: true
-          schema:
-            type: string
+      - name: X-User-Id
+        in: header
+        required: true
+        schema:
+          type: string
+      - name: id
+        in: path
+        required: true
+        schema:
+          type: string
       responses:
         "200":
           description: OK
           content:
             '*/*':
               schema:
-                type: boolean
-  /api/analysis/status-pool/{uuid}:
+                type: string
+                format: binary
+  /api/preprocess/images/summaries:
     get:
       tags:
-        - chat-analysis-controller
-      operationId: getStatusAndProgress
+      - preprocess-controller
+      operationId: getImageSummariesByUuid
       parameters:
-        - name: uuid
-          in: path
-          required: true
-          schema:
-            type: string
-            format: uuid
+      - name: X-User-Id
+        in: header
+        required: true
+        schema:
+          type: string
+      - name: uuid
+        in: query
+        required: true
+        schema:
+          type: string
+      - name: page
+        in: query
+        required: false
+        schema:
+          type: integer
+          format: int32
+          default: 0
+      - name: size
+        in: query
+        required: false
+        schema:
+          type: integer
+          format: int32
+          default: 20
       responses:
         "200":
           description: OK
           content:
             '*/*':
               schema:
-                type: object
-                additionalProperties:
-                  type: object
+                $ref: "#/components/schemas/PageImageSummaryEntity"
+    delete:
+      tags:
+      - preprocess-controller
+      operationId: deleteImageSummariesByIds
+      parameters:
+      - name: X-User-Id
+        in: header
+        required: true
+        schema:
+          type: string
+      requestBody:
+        content:
+          application/json:
+            schema:
+              type: array
+              items:
+                type: string
+        required: true
+      responses:
+        "200":
+          description: OK
+  /api/preprocess/audios/{id}/file:
+    get:
+      tags:
+      - preprocess-controller
+      operationId: getAudioFileById
+      parameters:
+      - name: X-User-Id
+        in: header
+        required: true
+        schema:
+          type: string
+      - name: id
+        in: path
+        required: true
+        schema:
+          type: string
+      responses:
+        "200":
+          description: OK
+          content:
+            '*/*':
+              schema:
+                type: string
+                format: binary
+  /api/preprocess/audios/summaries:
+    get:
+      tags:
+      - preprocess-controller
+      operationId: getAudioSummariesByUuid
+      parameters:
+      - name: X-User-Id
+        in: header
+        required: true
+        schema:
+          type: string
+      - name: uuid
+        in: query
+        required: true
+        schema:
+          type: string
+      - name: page
+        in: query
+        required: false
+        schema:
+          type: integer
+          format: int32
+          default: 0
+      - name: size
+        in: query
+        required: false
+        schema:
+          type: integer
+          format: int32
+          default: 20
+      responses:
+        "200":
+          description: OK
+          content:
+            '*/*':
+              schema:
+                $ref: "#/components/schemas/PageAudioSummary"
+    delete:
+      tags:
+      - preprocess-controller
+      operationId: deleteAudioSummariesByIds
+      parameters:
+      - name: X-User-Id
+        in: header
+        required: true
+        schema:
+          type: string
+      requestBody:
+        content:
+          application/json:
+            schema:
+              type: array
+              items:
+                type: string
+        required: true
+      responses:
+        "200":
+          description: OK
+  /api/files/sessions:
+    get:
+      tags:
+      - upload-controller
+      operationId: getAvailableSessions
+      parameters:
+      - name: X-User-Id
+        in: header
+        required: true
+        schema:
+          type: string
+      responses:
+        "200":
+          description: OK
+          content:
+            '*/*':
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/SessionResponseDTO"
+  /api/preprocess/images/summaries/{id}:
+    delete:
+      tags:
+      - preprocess-controller
+      operationId: deleteImageSummaryById
+      parameters:
+      - name: X-User-Id
+        in: header
+        required: true
+        schema:
+          type: string
+      - name: id
+        in: path
+        required: true
+        schema:
+          type: string
+      responses:
+        "200":
+          description: OK
+  /api/preprocess/images/summaries/all:
+    delete:
+      tags:
+      - preprocess-controller
+      operationId: deleteAllImageSummariesByUuid
+      parameters:
+      - name: X-User-Id
+        in: header
+        required: true
+        schema:
+          type: string
+      - name: uuid
+        in: query
+        required: true
+        schema:
+          type: string
+      responses:
+        "200":
+          description: OK
+  /api/preprocess/audios/summaries/{id}:
+    delete:
+      tags:
+      - preprocess-controller
+      operationId: deleteAudioSummaryById
+      parameters:
+      - name: X-User-Id
+        in: header
+        required: true
+        schema:
+          type: string
+      - name: id
+        in: path
+        required: true
+        schema:
+          type: string
+      responses:
+        "200":
+          description: OK
+  /api/preprocess/audios/summaries/{id}/text:
+    delete:
+      tags:
+      - preprocess-controller
+      operationId: clearAudioSummaryTextById
+      parameters:
+      - name: X-User-Id
+        in: header
+        required: true
+        schema:
+          type: string
+      - name: id
+        in: path
+        required: true
+        schema:
+          type: string
+      responses:
+        "200":
+          description: OK
+  /api/preprocess/audios/summaries/text:
+    delete:
+      tags:
+      - preprocess-controller
+      operationId: clearAudioSummaryTextsByIds
+      parameters:
+      - name: X-User-Id
+        in: header
+        required: true
+        schema:
+          type: string
+      requestBody:
+        content:
+          application/json:
+            schema:
+              type: array
+              items:
+                type: string
+        required: true
+      responses:
+        "200":
+          description: OK
+  /api/preprocess/audios/summaries/all:
+    delete:
+      tags:
+      - preprocess-controller
+      operationId: deleteAllAudioSummariesByUuid
+      parameters:
+      - name: X-User-Id
+        in: header
+        required: true
+        schema:
+          type: string
+      - name: uuid
+        in: query
+        required: true
+        schema:
+          type: string
+      responses:
+        "200":
+          description: OK
 components:
   schemas:
+    SummaryRequestDTO:
+      type: object
+      properties:
+        startTime:
+          type: string
+          format: date-time
+        endTime:
+          type: string
+          format: date-time
+    AuthRequest:
+      type: object
+      properties:
+        username:
+          type: string
+        password:
+          type: string
+    AuthResponse:
+      type: object
+      properties:
+        uuid:
+          type: string
     TaskProgress:
       type: object
       properties:
         status:
           type: string
+          enum:
+          - IDLING
+          - RUNNING
+          - PAUSED
+          - COMPLETED
         totalTasks:
           type: integer
           format: int32
@@ -184,3 +622,133 @@ components:
         progressPercentage:
           type: number
           format: double
+    ImageSummaryEntity:
+      type: object
+      properties:
+        id:
+          type: string
+        imageHash:
+          type: string
+        filePath:
+          type: string
+        summary:
+          type: string
+        createdAt:
+          type: string
+          format: date-time
+    PageImageSummaryEntity:
+      type: object
+      properties:
+        totalPages:
+          type: integer
+          format: int32
+        totalElements:
+          type: integer
+          format: int64
+        size:
+          type: integer
+          format: int32
+        content:
+          type: array
+          items:
+            $ref: "#/components/schemas/ImageSummaryEntity"
+        number:
+          type: integer
+          format: int32
+        sort:
+          $ref: "#/components/schemas/SortObject"
+        pageable:
+          $ref: "#/components/schemas/PageableObject"
+        numberOfElements:
+          type: integer
+          format: int32
+        first:
+          type: boolean
+        last:
+          type: boolean
+        empty:
+          type: boolean
+    PageableObject:
+      type: object
+      properties:
+        paged:
+          type: boolean
+        pageNumber:
+          type: integer
+          format: int32
+        pageSize:
+          type: integer
+          format: int32
+        unpaged:
+          type: boolean
+        offset:
+          type: integer
+          format: int64
+        sort:
+          $ref: "#/components/schemas/SortObject"
+    SortObject:
+      type: object
+      properties:
+        sorted:
+          type: boolean
+        empty:
+          type: boolean
+        unsorted:
+          type: boolean
+    AudioSummary:
+      type: object
+      properties:
+        id:
+          type: string
+        fileHash:
+          type: string
+        filePath:
+          type: string
+        transcript:
+          type: string
+        summary:
+          type: string
+        createdAt:
+          type: string
+          format: date-time
+    PageAudioSummary:
+      type: object
+      properties:
+        totalPages:
+          type: integer
+          format: int32
+        totalElements:
+          type: integer
+          format: int64
+        size:
+          type: integer
+          format: int32
+        content:
+          type: array
+          items:
+            $ref: "#/components/schemas/AudioSummary"
+        number:
+          type: integer
+          format: int32
+        sort:
+          $ref: "#/components/schemas/SortObject"
+        pageable:
+          $ref: "#/components/schemas/PageableObject"
+        numberOfElements:
+          type: integer
+          format: int32
+        first:
+          type: boolean
+        last:
+          type: boolean
+        empty:
+          type: boolean
+    SessionResponseDTO:
+      type: object
+      properties:
+        uuid:
+          type: string
+        jsonFilename:
+          type: string
+        uploadedAt:
+          type: string

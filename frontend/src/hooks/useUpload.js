@@ -1,5 +1,5 @@
 import { useCallback, useState } from 'react';
-import * as uploadApi from '../api/uploadApi';
+import { apiClient } from '../api/client';
 
 export default function useUpload({ currentUser, onUploaded }) {
   const [loading, setLoading] = useState(false);
@@ -13,7 +13,10 @@ export default function useUpload({ currentUser, onUploaded }) {
     setLoading(true);
     setError(null);
     try {
-      const assignedUuid = await uploadApi.uploadFile(file, currentUser.uuid);
+      const assignedUuid = await apiClient.upload.upload({
+        xUserId: currentUser.uuid,
+        file
+      });
       if (assignedUuid) onUploaded?.(assignedUuid.trim());
     } catch (err) {
       setError(err.message);

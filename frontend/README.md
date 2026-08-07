@@ -1,8 +1,36 @@
-# React + Vite
+# api-dashboard (React + Vite)
 
-This template provides a minimal setup to get React working in Vite with HMR and some ESLint rules.
+Frontend for WeChatSummary. All backend API calls are auto-generated from the
+backend's OpenAPI spec (`backend/openapi.yaml`) using
+[openapi-generator](https://openapi-generator.tech) with the `typescript-fetch`
+template. The generated client lives in `src/api/generated/` and is wired up
+through the configured singleton in `src/api/client.js` (sets the API base URL
+and enriches error messages from the response body).
 
-Currently, two official plugins are available:
+## API codegen workflow
 
-- [@vitejs/plugin-react](https://github.com/vitejs/vite-plugin-react/blob/main/packages/plugin-react/README.md) uses [Babel](https://babeljs.io/) for Fast Refresh
-- [@vitejs/plugin-react-swc](https://github.com/vitejs/vite-plugin-react-swc) uses [SWC](https://swc.rs/) for Fast Refresh
+When the backend endpoints change:
+
+1. Make sure the backend is running, then refresh the spec:
+
+   ```bash
+   ../backend/scripts/generate-openapi.sh
+   ```
+
+2. Regenerate the frontend client:
+
+   ```bash
+   npm run generate:api
+   ```
+
+3. Commit both `backend/openapi.yaml` and the regenerated `src/api/generated/`.
+
+`npm run generate:api` reads `../backend/openapi.yaml` and regenerates
+`src/api/generated/` with the pinned generator version from `openapitools.json`.
+
+## Dev
+
+```bash
+npm install
+npm run dev
+```

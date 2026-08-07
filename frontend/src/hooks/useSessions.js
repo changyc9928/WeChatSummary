@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useState } from 'react';
-import * as sessionApi from '../api/sessionApi';
+import { apiClient } from '../api/client';
 
 export default function useSessions(currentUser) {
   const [sessions, setSessions] = useState([]);
@@ -10,7 +10,9 @@ export default function useSessions(currentUser) {
     if (!currentUser) return;
     setLoadingSessions(true);
     try {
-      const data = await sessionApi.getSessions(currentUser.uuid);
+      const data = await apiClient.upload.getAvailableSessions({
+        xUserId: currentUser.uuid
+      });
       setSessions(data);
       setError(null);
     } catch (err) {

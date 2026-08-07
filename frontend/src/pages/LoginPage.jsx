@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
 import ThemeToggle from '../components/common/ThemeToggle';
-import { login, register } from '../api/authApi';
+import { apiClient } from '../api/client';
 
 export default function LoginPage({ onLoginSuccess, theme, onToggleTheme }) {
   const [authMode, setAuthMode] = useState('login'); // 'login' or 'register'
@@ -22,11 +22,11 @@ export default function LoginPage({ onLoginSuccess, theme, onToggleTheme }) {
     const credentials = { username, password };
 
     try {
-      const userData = authMode === 'login'
-        ? await login(credentials)
-        : await register(credentials);
+      const data = authMode === 'login'
+        ? await apiClient.auth.login({ authRequest: credentials })
+        : await apiClient.auth.register({ authRequest: credentials });
 
-      onLoginSuccess(userData);
+      onLoginSuccess({ uuid: data.uuid, username });
     } catch (err) {
       setPassword('');
       setAuthError(err.message);

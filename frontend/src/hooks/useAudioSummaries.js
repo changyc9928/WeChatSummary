@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useState } from 'react';
-import * as preprocessApi from '../api/preprocessApi';
+import { apiClient } from '../api/client';
 import { INITIAL_PAGINATION } from './useImageSummaries';
 
 export default function useAudioSummaries({ uuidInput, currentUser }) {
@@ -20,7 +20,12 @@ export default function useAudioSummaries({ uuidInput, currentUser }) {
     }
     setLoadingAudios(true);
     try {
-      const data = await preprocessApi.getAudioSummaries(sessionUuid, page, size, currentUser.uuid);
+      const data = await apiClient.preprocess.getAudioSummariesByUuid({
+        xUserId: currentUser.uuid,
+        uuid: sessionUuid,
+        page,
+        size
+      });
       setAudioSummaries(data.content || []);
       setAudioPagination({
         page: data.number,
@@ -51,7 +56,10 @@ export default function useAudioSummaries({ uuidInput, currentUser }) {
     if (!currentUser) return;
     setDeleting(true);
     try {
-      await preprocessApi.deleteAudioSummary(id, currentUser.uuid);
+      await apiClient.preprocess.deleteAudioSummaryById({
+        xUserId: currentUser.uuid,
+        id
+      });
       setSelectedAudioIds(prev => prev.filter(item => item !== id));
       await fetchAudioSummaries(uuidInput, audioPagination.page, audioPagination.size);
     } catch (err) {
@@ -65,7 +73,10 @@ export default function useAudioSummaries({ uuidInput, currentUser }) {
     if (!currentUser) return;
     setClearingText(true);
     try {
-      await preprocessApi.clearAudioText(id, currentUser.uuid);
+      await apiClient.preprocess.clearAudioSummaryTextById({
+        xUserId: currentUser.uuid,
+        id
+      });
       await fetchAudioSummaries(uuidInput, audioPagination.page, audioPagination.size);
     } catch (err) {
       setError(err.message);
@@ -78,7 +89,10 @@ export default function useAudioSummaries({ uuidInput, currentUser }) {
     if (!currentUser || ids.length === 0) return;
     setBatchDeleting(true);
     try {
-      await preprocessApi.batchDeleteAudioSummaries(ids, currentUser.uuid);
+      await apiClient.preprocess.deleteAudioSummariesByIds({
+        xUserId: currentUser.uuid,
+        requestBody: ids
+      });
       setSelectedAudioIds([]);
       await fetchAudioSummaries(uuidInput, 0, audioPagination.size);
     } catch (err) {
@@ -92,7 +106,10 @@ export default function useAudioSummaries({ uuidInput, currentUser }) {
     if (!currentUser || ids.length === 0) return;
     setBatchClearingText(true);
     try {
-      await preprocessApi.batchClearAudioTexts(ids, currentUser.uuid);
+      await apiClient.preprocess.clearAudioSummaryTextsByIds({
+        xUserId: currentUser.uuid,
+        requestBody: ids
+      });
       setSelectedAudioIds([]);
       await fetchAudioSummaries(uuidInput, 0, audioPagination.size);
     } catch (err) {

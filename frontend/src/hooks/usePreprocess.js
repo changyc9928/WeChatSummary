@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
-import * as preprocessApi from '../api/preprocessApi';
+import { apiClient } from '../api/client';
 
 export default function usePreprocess({ uuidInput, currentUser, onCompleted }) {
   const [isFinished, setIsFinished] = useState(false);
@@ -23,7 +23,10 @@ export default function usePreprocess({ uuidInput, currentUser, onCompleted }) {
 
   const checkProgress = useCallback(async (uuid) => {
     try {
-      const data = await preprocessApi.getPreprocessProgress(uuid, currentUser?.uuid);
+      const data = await apiClient.preprocess.getProgress({
+        xUserId: currentUser?.uuid,
+        uuid
+      });
       if (data) {
         setProgress(data);
         return data;
@@ -59,7 +62,7 @@ export default function usePreprocess({ uuidInput, currentUser, onCompleted }) {
     setError(null);
     setLoading(true);
     try {
-      await preprocessApi.startPreprocess(uuidInput, currentUser.uuid);
+      await apiClient.preprocess.preprocess({ xUserId: currentUser.uuid, uuid: uuidInput });
       startPolling(uuidInput);
     } catch (err) {
       setError(err.message);
@@ -72,7 +75,7 @@ export default function usePreprocess({ uuidInput, currentUser, onCompleted }) {
     if (!uuidInput) return;
     setAborting(true);
     try {
-      await preprocessApi.abortPreprocess(uuidInput, currentUser?.uuid);
+      await apiClient.preprocess.abortTask({ xUserId: currentUser?.uuid, uuid: uuidInput });
       stopPolling();
       await checkProgress(uuidInput);
     } catch (err) {

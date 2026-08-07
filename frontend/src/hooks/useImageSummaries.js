@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useState } from 'react';
-import * as preprocessApi from '../api/preprocessApi';
+import { apiClient } from '../api/client';
 
 export const INITIAL_PAGINATION = {
   page: 0,
@@ -26,7 +26,12 @@ export default function useImageSummaries({ uuidInput, currentUser }) {
     }
     setLoadingImages(true);
     try {
-      const data = await preprocessApi.getImageSummaries(sessionUuid, page, size, currentUser.uuid);
+      const data = await apiClient.preprocess.getImageSummariesByUuid({
+        xUserId: currentUser.uuid,
+        uuid: sessionUuid,
+        page,
+        size
+      });
       setImageSummaries(data.content || []);
       setImagePagination({
         page: data.number,
@@ -57,7 +62,10 @@ export default function useImageSummaries({ uuidInput, currentUser }) {
     if (!currentUser) return;
     setDeleting(true);
     try {
-      await preprocessApi.deleteImageSummary(id, currentUser.uuid);
+      await apiClient.preprocess.deleteImageSummaryById({
+        xUserId: currentUser.uuid,
+        id
+      });
       setSelectedImageIds(prev => prev.filter(item => item !== id));
       await fetchImageSummaries(uuidInput, imagePagination.page, imagePagination.size);
     } catch (err) {
@@ -71,7 +79,10 @@ export default function useImageSummaries({ uuidInput, currentUser }) {
     if (!currentUser || ids.length === 0) return;
     setBatchDeleting(true);
     try {
-      await preprocessApi.batchDeleteImageSummaries(ids, currentUser.uuid);
+      await apiClient.preprocess.deleteImageSummariesByIds({
+        xUserId: currentUser.uuid,
+        requestBody: ids
+      });
       setSelectedImageIds([]);
       await fetchImageSummaries(uuidInput, 0, imagePagination.size);
     } catch (err) {

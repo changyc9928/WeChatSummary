@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
-import * as summaryApi from '../api/summaryApi';
+import { apiClient } from '../api/client';
 
 const INITIAL_STATE = { status: 'INITIAL_STATE', progress: 0.0, result: null, errorMessage: null };
 
@@ -25,7 +25,10 @@ export default function useSummaryStatus({ uuidInput, currentUser }) {
 
   const fetchStatus = useCallback(async (uuid) => {
     try {
-      const data = await summaryApi.getSummaryStatus(uuid, currentUser?.uuid);
+      const data = await apiClient.chatSummary.getStatusAndProgress({
+        xUserId: currentUser?.uuid,
+        uuid
+      });
       if (!data) return;
 
       const payload = (data && (data.status || data.result))
@@ -61,7 +64,11 @@ export default function useSummaryStatus({ uuidInput, currentUser }) {
     setLoading(true);
     setError(null);
     try {
-      await summaryApi.startSummary(uuidInput, payload, currentUser?.uuid);
+      await apiClient.chatSummary.startSummary({
+        xUserId: currentUser?.uuid,
+        uuid: uuidInput,
+        summaryRequestDTO: payload
+      });
       fetchStatus(uuidInput);
     } catch (err) {
       setError(err.message);
@@ -74,7 +81,11 @@ export default function useSummaryStatus({ uuidInput, currentUser }) {
     if (!uuidInput) return;
     setRestarting(true);
     try {
-      await summaryApi.restartSummary(uuidInput, payload, currentUser?.uuid);
+      await apiClient.chatSummary.restartSummary({
+        xUserId: currentUser?.uuid,
+        uuid: uuidInput,
+        summaryRequestDTO: payload
+      });
       fetchStatus(uuidInput);
     } catch (err) {
       console.error(err);
@@ -87,7 +98,10 @@ export default function useSummaryStatus({ uuidInput, currentUser }) {
     if (!uuidInput) return;
     setPausing(true);
     try {
-      await summaryApi.pauseSummary(uuidInput, currentUser?.uuid);
+      await apiClient.chatSummary.pauseSummary({
+        xUserId: currentUser?.uuid,
+        uuid: uuidInput
+      });
       fetchStatus(uuidInput);
     } catch (err) {
       console.error(err);
