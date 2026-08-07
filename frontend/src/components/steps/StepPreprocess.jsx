@@ -10,6 +10,7 @@ export default function StepPreprocess({
   preprocessProgress,
   handleStartPreprocess,
   handleAbortPreprocess,
+  handleReprocessPreprocess,
   loading,
   errorPreprocess,
   onNavigateToImages,
@@ -34,6 +35,7 @@ export default function StepPreprocess({
   // Chat Preview States specific to Step 2
   const [previewData, setPreviewData] = useState({ metadata: {}, rows: [] });
   const [loadingPreview, setLoadingPreview] = useState(false);
+  const [previewVersion, setPreviewVersion] = useState(0);
 
   // Fetch chat preview data once preprocessing is finished
   useEffect(() => {
@@ -56,7 +58,12 @@ export default function StepPreprocess({
     } else {
       setPreviewData({ metadata: {}, rows: [] });
     }
-  }, [uuidInput, isCompleted, currentUser]);
+  }, [uuidInput, isCompleted, currentUser, previewVersion]);
+
+  const handleReprocessClick = async () => {
+    await handleReprocessPreprocess();
+    setPreviewVersion(v => v + 1);
+  };
 
   const handleRowClick = (row) => {
     const rowComp = parseToComparable(row.timestamp);
@@ -180,6 +187,14 @@ export default function StepPreprocess({
               <div style={{ fontSize: '0.85rem', color: '#059669', fontWeight: '600' }}>
                 {t('preprocess.finished')}
               </div>
+
+              <button
+                onClick={handleReprocessClick}
+                disabled={loading.reprocess}
+                style={{ ...styles.button, width: '100%' }}
+              >
+                {loading.reprocess ? t('preprocess.reprocessing') : t('preprocess.reprocess')}
+              </button>
 
               {/* Chat Log Preview & Calendar Time Window Selection */}
               <div style={{ border: '1px solid var(--border)', borderRadius: '8px', padding: '12px', background: 'var(--bg-card)', marginTop: '8px' }}>

@@ -79,6 +79,7 @@ export default function DashboardPage({
           preprocessProgress={preprocess.progress}
           handleStartPreprocess={preprocess.onStart}
           handleAbortPreprocess={preprocess.onAbort}
+          handleReprocessPreprocess={preprocess.onReprocess}
           loading={loading}
           errorPreprocess={preprocessError}
           onNavigateToImages={onNavigateToImages}

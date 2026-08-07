@@ -54,6 +54,7 @@ export default function App() {
     upload: upload.loading,
     preprocess: preprocess.loading,
     abortPreprocess: preprocess.aborting,
+    reprocess: preprocess.reprocessing,
     start: summary.loading,
     pauseSummary: summary.pausing,
     restartSummary: summary.restarting
@@ -135,7 +136,8 @@ export default function App() {
         isFinished: preprocess.isFinished,
         progress: preprocess.progress,
         onStart: preprocess.startPreprocess,
-        onAbort: preprocess.abortPreprocess
+        onAbort: preprocess.abortPreprocess,
+        onReprocess: preprocess.reprocess
       }}
       preprocessError={preprocess.error}
       timeWindow={timeWindow}

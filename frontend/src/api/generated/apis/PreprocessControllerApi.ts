@@ -116,6 +116,11 @@ export interface PreprocessRequest {
     uuid: string;
 }
 
+export interface ReprocessRequest {
+    xUserId: string;
+    uuid: string;
+}
+
 /**
  * 
  */
@@ -796,6 +801,52 @@ export class PreprocessControllerApi extends runtime.BaseAPI {
      */
     async getProgress(requestParameters: GetProgressRequest, initOverrides?: RequestInit | runtime.InitOverrideFunction): Promise<ApiResponseTaskProgress> {
         const response = await this.getProgressRaw(requestParameters, initOverrides);
+        return await response.value();
+    }
+
+    /**
+     */
+    async reprocessRaw(requestParameters: ReprocessRequest, initOverrides?: RequestInit | runtime.InitOverrideFunction): Promise<runtime.ApiResponse<ApiResponseTaskAckResponse>> {
+        if (requestParameters['xUserId'] == null) {
+            throw new runtime.RequiredError(
+                'xUserId',
+                'Required parameter "xUserId" was null or undefined when calling reprocess().'
+            );
+        }
+
+        if (requestParameters['uuid'] == null) {
+            throw new runtime.RequiredError(
+                'uuid',
+                'Required parameter "uuid" was null or undefined when calling reprocess().'
+            );
+        }
+
+        const queryParameters: any = {};
+
+        const headerParameters: runtime.HTTPHeaders = {};
+
+        if (requestParameters['xUserId'] != null) {
+            headerParameters['X-User-Id'] = String(requestParameters['xUserId']);
+        }
+
+
+        let urlPath = `/api/preprocess/{uuid}/reprocess`;
+        urlPath = urlPath.replace(`{${"uuid"}}`, encodeURIComponent(String(requestParameters['uuid'])));
+
+        const response = await this.request({
+            path: urlPath,
+            method: 'POST',
+            headers: headerParameters,
+            query: queryParameters,
+        }, initOverrides);
+
+        return new runtime.JSONApiResponse(response, (jsonValue) => ApiResponseTaskAckResponseFromJSON(jsonValue));
+    }
+
+    /**
+     */
+    async reprocess(requestParameters: ReprocessRequest, initOverrides?: RequestInit | runtime.InitOverrideFunction): Promise<ApiResponseTaskAckResponse> {
+        const response = await this.reprocessRaw(requestParameters, initOverrides);
         return await response.value();
     }
 

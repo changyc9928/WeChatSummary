@@ -11,6 +11,7 @@ import com.wechat.wechatsummary.exception.BusinessException;
 import com.wechat.wechatsummary.service.AudioProcessorService;
 import com.wechat.wechatsummary.service.ImageProcessorService;
 import com.wechat.wechatsummary.service.MediaProducerService;
+import com.wechat.wechatsummary.service.MessageProcessorService;
 import com.wechat.wechatsummary.service.TaskCoordinatorService;
 import java.io.IOException;
 import java.util.List;
@@ -47,6 +48,7 @@ public class PreprocessController {
 
     private final MediaProducerService producerService;
     private final TaskCoordinatorService taskCoordinatorService;
+    private final MessageProcessorService messageProcessorService;
     private final ImageProcessorService imageProcessorService;
     private final AudioProcessorService audioProcessorService;
     private final HttpConfig httpConfig;
@@ -74,6 +76,22 @@ public class PreprocessController {
             userId, uuid);
         return ApiResponse.success("Preprocessing started",
             new TaskAckResponse(uuid, null, "Preprocessing started"));
+    }
+
+    /**
+     * Re-runs the raw JSON to markdown compilation pipeline for a session that already has a
+     * {@code {uuid}_processed.md} file, regenerating it from the latest media summaries.
+     */
+    @PostMapping("/{uuid}/reprocess")
+    public ApiResponse<TaskAckResponse> reprocess(
+        @RequestHeader("X-User-Id") String userId,
+        @PathVariable String uuid) {
+        log.info(
+            "REST endpoint invoked to REPROCESS (regenerate markdown) for user UUID: [{}] and session UUID: [{}]",
+            userId, uuid);
+        messageProcessorService.processJsonAndSave(userId, uuid);
+        return ApiResponse.success("Re-processing finished",
+            new TaskAckResponse(uuid, null, "Re-processing finished"));
     }
 
     @PostMapping("/{uuid}/abort")

@@ -6,6 +6,7 @@ export default function usePreprocess({ uuidInput, currentUser, onCompleted }) {
   const [progress, setProgress] = useState(null);
   const [loading, setLoading] = useState(false);
   const [aborting, setAborting] = useState(false);
+  const [reprocessing, setReprocessing] = useState(false);
   const [error, setError] = useState(null);
 
   const pollRef = useRef(null);
@@ -85,6 +86,21 @@ export default function usePreprocess({ uuidInput, currentUser, onCompleted }) {
     }
   }, [uuidInput, currentUser, stopPolling, checkProgress]);
 
+  const reprocess = useCallback(async () => {
+    if (!uuidInput || !currentUser) return;
+    setError(null);
+    setReprocessing(true);
+    try {
+      await apiClient.preprocess.reprocess({ xUserId: currentUser.uuid, uuid: uuidInput });
+      setIsFinished(true);
+      await checkProgress(uuidInput);
+    } catch (err) {
+      setError(err.message);
+    } finally {
+      setReprocessing(false);
+    }
+  }, [uuidInput, currentUser, checkProgress]);
+
   useEffect(() => {
     if (uuidInput && currentUser) {
       setProgress(null);
@@ -118,9 +134,11 @@ export default function usePreprocess({ uuidInput, currentUser, onCompleted }) {
     progress,
     loading,
     aborting,
+    reprocessing,
     error,
     startPreprocess,
     abortPreprocess,
+    reprocess,
     checkProgress
   };
 }

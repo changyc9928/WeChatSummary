@@ -89,6 +89,8 @@ export const translations = {
     'preprocess.clearSelection': 'Clear Selection',
     'preprocess.loadingPreview': 'Loading preview table...',
     'preprocess.noPreview': 'No preview rows available.',
+    'preprocess.reprocess': 'Re-preprocess (regenerate markdown)',
+    'preprocess.reprocessing': 'Re-processing...',
 
     'summary.title': 'Step 3: AI Summary',
     'summary.selectDatasetFirst': 'Select a dataset first.',
@@ -219,6 +221,8 @@ export const translations = {
     'preprocess.clearSelection': '清除选择',
     'preprocess.loadingPreview': '正在加载预览表...',
     'preprocess.noPreview': '暂无预览数据。',
+    'preprocess.reprocess': '重新预处理（重新生成 Markdown）',
+    'preprocess.reprocessing': '重新处理中...',
 
     'summary.title': '第 3 步：AI 摘要',
     'summary.selectDatasetFirst': '请先选择数据集。',
