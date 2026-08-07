@@ -1,13 +1,15 @@
 import { useCallback, useState } from 'react';
 import { apiClient } from '../api/client';
+import useLanguage from './useLanguage';
 
 export default function useUpload({ currentUser, onUploaded }) {
+  const { t } = useLanguage();
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState(null);
 
   const handleUpload = useCallback(async (e, file) => {
     e.preventDefault();
-    if (!file) return alert('Please select a file first!');
+    if (!file) return alert(t('upload.noFile'));
     if (!currentUser) return;
 
     setLoading(true);
@@ -24,7 +26,7 @@ export default function useUpload({ currentUser, onUploaded }) {
     } finally {
       setLoading(false);
     }
-  }, [currentUser, onUploaded]);
+  }, [currentUser, onUploaded, t]);
 
   return { loading, error, handleUpload };
 }

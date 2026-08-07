@@ -2,6 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { styles } from '../../styles/dashboardStyles';
 import { apiClient } from '../../api/client';
 import { toLocalInputValue, fromLocalInputValue, parseToComparable } from '../../utils/time';
+import useLanguage from '../../hooks/useLanguage';
 
 export default function StepPreprocess({
   uuidInput,
@@ -19,6 +20,7 @@ export default function StepPreprocess({
   selectedEndTime,
   setSelectedEndTime
 }) {
+  const { t } = useLanguage();
   const status = preprocessProgress ? preprocessProgress.status : 'IDLING';
   const isRunning = status === 'RUNNING';
   const isPaused = status === 'PAUSED';
@@ -86,27 +88,27 @@ export default function StepPreprocess({
   };
 
   const getBadgeText = () => {
-    if (isCompleted) return 'Completed';
-    if (isRunning) return 'Processing';
-    if (isPaused) return 'Paused';
-    return 'Pending';
+    if (isCompleted) return t('status.completed');
+    if (isRunning) return t('status.processing');
+    if (isPaused) return t('status.paused');
+    return t('status.pending');
   };
 
   return (
     <div style={styles.card}>
       <div style={styles.cardHeader}>
-        <h3 style={styles.cardTitle}>Step 2: Clean & Preprocess</h3>
+        <h3 style={styles.cardTitle}>{t('preprocess.title')}</h3>
         <span style={{ ...styles.lockBadge, ...getBadgeStyle() }}>{getBadgeText()}</span>
       </div>
 
       {!uuidInput ? (
-        <div style={styles.dbErrorBox}>Select or upload a dataset first.</div>
+        <div style={styles.dbErrorBox}>{t('preprocess.selectDatasetFirst')}</div>
       ) : (
         <div style={styles.actionButtonGroup}>
           {/* Universal Access to Audio and Image Tables */}
           <div style={{ display: 'flex', gap: '8px', flexWrap: 'wrap', marginBottom: '12px' }}>
-            <button onClick={onNavigateToImages} style={styles.button}>📁 View Image Summaries</button>
-            <button onClick={onNavigateToAudios} style={styles.button}>🎙️ View Audio Summaries</button>
+            <button onClick={onNavigateToImages} style={styles.button}>{t('preprocess.viewImages')}</button>
+            <button onClick={onNavigateToAudios} style={styles.button}>{t('preprocess.viewAudios')}</button>
           </div>
 
           {/* State: IDLING / Pending */}
@@ -117,7 +119,7 @@ export default function StepPreprocess({
                 disabled={loading.preprocess}
                 style={styles.buttonSuccess}
               >
-                {loading.preprocess ? 'Starting...' : 'Start Preprocessing'}
+                {loading.preprocess ? t('preprocess.starting') : t('preprocess.start')}
               </button>
             </div>
           )}
@@ -126,7 +128,7 @@ export default function StepPreprocess({
           {isPaused && (
             <div style={styles.progressSection}>
               <div style={styles.progressLabelRow}>
-                <span>Status: <strong>Paused</strong></span>
+                <span>{t('common.status')} <strong>{t('status.paused')}</strong></span>
                 <span>{progressVal}%</span>
               </div>
               <div style={styles.progressBarBg}>
@@ -134,8 +136,7 @@ export default function StepPreprocess({
               </div>
               {preprocessProgress.totalTasks != null && (
                 <div style={{ fontSize: '0.8rem', color: 'var(--text-muted)', marginTop: '4px' }}>
-                  Processed {preprocessProgress.completedTasks || 0} of {preprocessProgress.totalTasks} tasks
-                  ({preprocessProgress.remainingTasks || 0} remaining)
+                  {t('preprocess.tasksProcessed', { done: preprocessProgress.completedTasks || 0, total: preprocessProgress.totalTasks, remaining: preprocessProgress.remainingTasks || 0 })}
                 </div>
               )}
               <button
@@ -143,7 +144,7 @@ export default function StepPreprocess({
                 disabled={loading.preprocess}
                 style={{ ...styles.buttonSuccess, width: '100%', marginTop: '10px' }}
               >
-                {loading.preprocess ? 'Resuming...' : 'Resume Preprocessing'}
+                {loading.preprocess ? t('preprocess.resuming') : t('preprocess.resume')}
               </button>
             </div>
           )}
@@ -152,7 +153,7 @@ export default function StepPreprocess({
           {isRunning && (
             <div style={styles.progressSection}>
               <div style={styles.progressLabelRow}>
-                <span>Status: <strong>Running</strong></span>
+                <span>{t('common.status')} <strong>{t('status.running')}</strong></span>
                 <span>{progressVal}%</span>
               </div>
               <div style={styles.progressBarBg}>
@@ -160,8 +161,7 @@ export default function StepPreprocess({
               </div>
               {preprocessProgress.totalTasks != null && (
                 <div style={{ fontSize: '0.8rem', color: 'var(--text-muted)', marginTop: '4px' }}>
-                  Processed {preprocessProgress.completedTasks || 0} of {preprocessProgress.totalTasks} tasks
-                  ({preprocessProgress.remainingTasks || 0} remaining)
+                  {t('preprocess.tasksProcessed', { done: preprocessProgress.completedTasks || 0, total: preprocessProgress.totalTasks, remaining: preprocessProgress.remainingTasks || 0 })}
                 </div>
               )}
               <button
@@ -169,7 +169,7 @@ export default function StepPreprocess({
                 disabled={loading.abortPreprocess}
                 style={{ ...styles.button, width: '100%', marginTop: '10px', backgroundColor: '#d97706', color: '#fff' }}
               >
-                {loading.abortPreprocess ? 'Pausing...' : 'Pause'}
+                {loading.abortPreprocess ? t('preprocess.pausing') : t('preprocess.pause')}
               </button>
             </div>
           )}
@@ -178,31 +178,31 @@ export default function StepPreprocess({
           {isCompleted && (
             <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
               <div style={{ fontSize: '0.85rem', color: '#059669', fontWeight: '600' }}>
-                ✓ Preprocessing task finished successfully.
+                {t('preprocess.finished')}
               </div>
 
               {/* Chat Log Preview & Calendar Time Window Selection */}
               <div style={{ border: '1px solid var(--border)', borderRadius: '8px', padding: '12px', background: 'var(--bg-card)', marginTop: '8px' }}>
                 <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '8px' }}>
                   <h4 style={{ margin: 0, fontSize: '14px', color: 'var(--text-primary)' }}>
-                    Chat Log Preview & Standard Timestamp Window
+                    {t('preprocess.previewTitle')}
                   </h4>
                   <span style={{ fontSize: '11px', color: 'var(--text-muted)' }}>
-                    Click table rows to target exact timestamps
+                    {t('preprocess.previewHint')}
                   </span>
                 </div>
 
                 {previewData.metadata && Object.keys(previewData.metadata).length > 0 && (
                   <div style={{ fontSize: '12px', color: 'var(--text-muted)', marginBottom: '8px' }}>
-                    <strong>Group:</strong> {previewData.metadata['群名称'] || 'N/A'} |
-                    <strong> Total Messages:</strong> {previewData.metadata['总消息数'] || previewData.rows.length}
+                    <strong>{t('preprocess.group')}</strong> {previewData.metadata['群名称'] || 'N/A'} |
+                    <strong> {t('preprocess.totalMessages')}</strong> {previewData.metadata['总消息数'] || previewData.rows.length}
                   </div>
                 )}
 
                 {/* Datetime Pickers Row */}
                 <div style={{ display: 'flex', gap: '15px', alignItems: 'center', marginBottom: '10px', background: 'var(--bg-subtle)', padding: '8px 10px', borderRadius: '4px', flexWrap: 'wrap' }}>
                   <div style={{ display: 'flex', alignItems: 'center', gap: '6px', fontSize: '12px' }}>
-                    <label style={{ fontWeight: '500' }}>Start Time:</label>
+                    <label style={{ fontWeight: '500' }}>{t('preprocess.startTime')}</label>
                     <input
                       type="datetime-local"
                       value={toLocalInputValue(selectedStartTime)}
@@ -212,7 +212,7 @@ export default function StepPreprocess({
                   </div>
 
                   <div style={{ display: 'flex', alignItems: 'center', gap: '6px', fontSize: '12px' }}>
-                    <label style={{ fontWeight: '500' }}>End Time:</label>
+                    <label style={{ fontWeight: '500' }}>{t('preprocess.endTime')}</label>
                     <input
                       type="datetime-local"
                       value={toLocalInputValue(selectedEndTime)}
@@ -227,7 +227,7 @@ export default function StepPreprocess({
                       onClick={() => { setSelectedStartTime(''); setSelectedEndTime(''); }}
                       style={{ marginLeft: 'auto', background: 'transparent', border: 'none', color: '#dc2626', cursor: 'pointer', fontSize: '11px', fontWeight: 'bold' }}
                     >
-                      Clear Selection
+                      {t('preprocess.clearSelection')}
                     </button>
                   )}
                 </div>
@@ -235,17 +235,17 @@ export default function StepPreprocess({
                 {/* Table View */}
                 <div style={{ maxHeight: '200px', overflowY: 'auto', border: '1px solid var(--border)', borderRadius: '4px', background: 'var(--bg-card)' }}>
                   {loadingPreview ? (
-                    <div style={{ padding: '15px', textAlign: 'center', fontSize: '12px', color: 'var(--text-muted)' }}>Loading preview table...</div>
+                    <div style={{ padding: '15px', textAlign: 'center', fontSize: '12px', color: 'var(--text-muted)' }}>{t('preprocess.loadingPreview')}</div>
                   ) : previewData.rows.length === 0 ? (
-                    <div style={{ padding: '15px', textAlign: 'center', fontSize: '12px', color: 'var(--text-muted)' }}>No preview rows available.</div>
+                    <div style={{ padding: '15px', textAlign: 'center', fontSize: '12px', color: 'var(--text-muted)' }}>{t('preprocess.noPreview')}</div>
                   ) : (
                     <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: '12px', textAlign: 'left' }}>
                       <thead>
                         <tr style={{ background: 'var(--bg-subtle)', borderBottom: '1px solid var(--border)', position: 'sticky', top: 0, zIndex: 1 }}>
-                          <th style={{ padding: '6px 8px', width: '50px' }}>Line</th>
-                          <th style={{ padding: '6px 8px', width: '190px' }}>Timestamp</th>
-                          <th style={{ padding: '6px 8px', width: '90px' }}>Sender</th>
-                          <th style={{ padding: '6px 8px' }}>Content</th>
+                          <th style={{ padding: '6px 8px', width: '50px' }}>{t('table.line')}</th>
+                          <th style={{ padding: '6px 8px', width: '190px' }}>{t('table.timestamp')}</th>
+                          <th style={{ padding: '6px 8px', width: '90px' }}>{t('table.sender')}</th>
+                          <th style={{ padding: '6px 8px' }}>{t('table.content')}</th>
                         </tr>
                       </thead>
                       <tbody>

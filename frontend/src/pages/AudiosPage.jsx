@@ -1,7 +1,9 @@
 import React from 'react';
 import { styles } from '../styles/dashboardStyles';
 import ThemeToggle from '../components/common/ThemeToggle';
+import LanguageToggle from '../components/common/LanguageToggle';
 import AudioSummariesPanel from '../components/panels/AudioSummariesPanel';
+import useLanguage from '../hooks/useLanguage';
 
 export default function AudiosPage({
   theme,
@@ -11,6 +13,7 @@ export default function AudiosPage({
   audios,
   onRefreshProgress
 }) {
+  const { t } = useLanguage();
   const handleDeleteAudio = async (id) => {
     await audios.deleteAudio(id);
     if (uuidInput) await onRefreshProgress(uuidInput);
@@ -43,10 +46,11 @@ export default function AudiosPage({
   return (
     <div style={styles.container}>
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '15px' }}>
-        <h2 style={styles.title}>Audio Transcripts & Summaries</h2>
+        <h2 style={styles.title}>{t('audios.title')}</h2>
         <div style={{ display: 'flex', gap: '8px' }}>
+          <LanguageToggle />
           <ThemeToggle theme={theme} onToggle={onToggleTheme} />
-          <button onClick={onBack} style={styles.buttonSecondary}>← Back to Dashboard</button>
+          <button onClick={onBack} style={styles.buttonSecondary}>{t('common.back')}</button>
         </div>
       </div>
       <AudioSummariesPanel

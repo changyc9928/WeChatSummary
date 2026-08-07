@@ -1,13 +1,13 @@
-import React from 'react';
 import useLanguage from '../../hooks/useLanguage';
 
-export default function ThemeToggle({ theme, onToggle, style }) {
-  const { t } = useLanguage();
-  const isDark = theme === 'dark';
+// eslint-disable-next-line react/prop-types
+export default function LanguageToggle({ style }) {
+  const { lang, toggleLang, t } = useLanguage();
+  const isZh = lang === 'zh';
   return (
     <button
       type="button"
-      onClick={onToggle}
+      onClick={toggleLang}
       style={{
         backgroundColor: 'transparent',
         border: '1px solid var(--border-strong)',
@@ -19,9 +19,9 @@ export default function ThemeToggle({ theme, onToggle, style }) {
         cursor: 'pointer',
         ...style
       }}
-      title={isDark ? t('theme.toLight') : t('theme.toDark')}
+      title={isZh ? t('lang.toggleTitleToEn') : t('lang.toggleTitleToZh')}
     >
-      {isDark ? t('theme.light') : t('theme.dark')}
+      {isZh ? 'EN' : '中文'}
     </button>
   );
 }

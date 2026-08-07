@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { styles } from '../../styles/dashboardStyles';
 import { apiClient } from '../../api/client';
+import useLanguage from '../../hooks/useLanguage';
 
 export default function ImageSummariesPanel({
   uuidInput,
@@ -17,6 +18,7 @@ export default function ImageSummariesPanel({
   errorImages,
   currentUser
 }) {
+  const { t } = useLanguage();
   const [imageObjectUrls, setImageObjectUrls] = useState({});
 
   // Fetch image bytes with X-User-Id header and create local Object URLs
@@ -69,10 +71,10 @@ export default function ImageSummariesPanel({
   return (
     <div style={{ ...styles.card, gridColumn: '1 / -1' }}>
       <div style={styles.cardHeader}>
-        <h3 style={styles.cardTitle}>Image Summaries & Records</h3>
+        <h3 style={styles.cardTitle}>{t('images.panelTitle')}</h3>
         {selectedImageIds.length > 0 && (
           <button onClick={handleBatchDeleteImages} disabled={loading.batchDeleteImages} style={styles.buttonDangerSmall}>
-            {loading.batchDeleteImages ? 'Deleting...' : `Delete Selected (${selectedImageIds.length})`}
+            {loading.batchDeleteImages ? t('images.deleting') : t('images.deleteSelected', { count: selectedImageIds.length })}
           </button>
         )}
       </div>
@@ -80,9 +82,9 @@ export default function ImageSummariesPanel({
       {errorImages && <div style={styles.errorText}>⚠️ {errorImages}</div>}
 
       {loadingImages ? (
-        <div style={{ textAlign: 'center', padding: '20px', color: 'var(--text-muted)' }}>Loading image summaries...</div>
+        <div style={{ textAlign: 'center', padding: '20px', color: 'var(--text-muted)' }}>{t('images.loading')}</div>
       ) : imageSummaries.length === 0 ? (
-        <div style={{ color: 'var(--text-muted)', fontSize: '0.85rem' }}>No processed images found for this dataset.</div>
+        <div style={{ color: 'var(--text-muted)', fontSize: '0.85rem' }}>{t('images.none')}</div>
       ) : (
         <>
           <div style={styles.tableWrapper}>
@@ -90,9 +92,9 @@ export default function ImageSummariesPanel({
               <thead>
                 <tr style={styles.tr}>
                   <th style={styles.th}><input type="checkbox" onChange={toggleSelectAll} checked={selectedImageIds.length === imageSummaries.length && imageSummaries.length > 0} /></th>
-                  <th style={styles.th}>Thumbnail</th>
-                  <th style={styles.th}>AI Description / Summary</th>
-                  <th style={styles.th}>Actions</th>
+                  <th style={styles.th}>{t('images.thumbnail')}</th>
+                  <th style={styles.th}>{t('images.aiSummary')}</th>
+                  <th style={styles.th}>{t('common.actions')}</th>
                 </tr>
               </thead>
               <tbody>
@@ -107,16 +109,16 @@ export default function ImageSummariesPanel({
                           {objectUrl ? (
                             <img src={objectUrl} alt="thumbnail" style={styles.thumbnail} />
                           ) : (
-                            <div style={{ fontSize: '0.75rem', color: 'var(--text-muted)', textAlign: 'center' }}>Loading...</div>
+                            <div style={{ fontSize: '0.75rem', color: 'var(--text-muted)', textAlign: 'center' }}>{t('common.loading')}</div>
                           )}
-                          <div style={styles.thumbnailOverlay}>View</div>
+                          <div style={styles.thumbnailOverlay}>{t('images.view')}</div>
                         </div>
                       </td>
                       <td style={styles.td}>
-                        <div style={styles.summaryText}>{item.summary || <span style={styles.emptySummaryBadge}>No summary generated</span>}</div>
+                        <div style={styles.summaryText}>{item.summary || <span style={styles.emptySummaryBadge}>{t('common.noSummary')}</span>}</div>
                       </td>
                       <td style={styles.td}>
-                        <button onClick={() => handleDeleteImage(item.id)} disabled={loading.deleteImage} style={styles.buttonDangerSmall}>Delete</button>
+                        <button onClick={() => handleDeleteImage(item.id)} disabled={loading.deleteImage} style={styles.buttonDangerSmall}>{t('common.delete')}</button>
                       </td>
                     </tr>
                   );
@@ -126,10 +128,10 @@ export default function ImageSummariesPanel({
           </div>
 
           <div style={styles.paginationContainer}>
-            <span style={styles.paginationInfo}>Page {imagePagination.page + 1} of {imagePagination.totalPages || 1} ({imagePagination.totalElements} total items)</span>
+            <span style={styles.paginationInfo}>{t('pagination.pageInfo', { page: imagePagination.page + 1, totalPages: imagePagination.totalPages || 1, total: imagePagination.totalElements })}</span>
             <div style={styles.paginationControls}>
-              <button disabled={imagePagination.isFirst} onClick={() => fetchImageSummaries(uuidInput, imagePagination.page - 1, imagePagination.size)} style={imagePagination.isFirst ? styles.pageButtonDisabled : styles.pageButton}>Previous</button>
-              <button disabled={imagePagination.isLast} onClick={() => fetchImageSummaries(uuidInput, imagePagination.page + 1, imagePagination.size)} style={imagePagination.isLast ? styles.pageButtonDisabled : styles.pageButton}>Next</button>
+              <button disabled={imagePagination.isFirst} onClick={() => fetchImageSummaries(uuidInput, imagePagination.page - 1, imagePagination.size)} style={imagePagination.isFirst ? styles.pageButtonDisabled : styles.pageButton}>{t('pagination.previous')}</button>
+              <button disabled={imagePagination.isLast} onClick={() => fetchImageSummaries(uuidInput, imagePagination.page + 1, imagePagination.size)} style={imagePagination.isLast ? styles.pageButtonDisabled : styles.pageButton}>{t('pagination.next')}</button>
             </div>
           </div>
         </>

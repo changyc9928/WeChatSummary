@@ -5,7 +5,9 @@ import StepUpload from '../components/steps/StepUpload';
 import StepPreprocess from '../components/steps/StepPreprocess';
 import StepSummary from '../components/steps/StepSummary';
 import ThemeToggle from '../components/common/ThemeToggle';
+import LanguageToggle from '../components/common/LanguageToggle';
 import ImageLightboxModal from '../components/common/ImageLightboxModal';
+import useLanguage from '../hooks/useLanguage';
 
 export default function DashboardPage({
   theme,
@@ -30,19 +32,22 @@ export default function DashboardPage({
   activeModalImage,
   setActiveModalImage
 }) {
+  const { t } = useLanguage();
+
   return (
     <div style={styles.container}>
       <header style={styles.header}>
         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '10px' }}>
           <div>
-            <h1 style={{ ...styles.title, margin: 0, textAlign: 'left' }}>Data Summary Dashboard</h1>
+            <h1 style={{ ...styles.title, margin: 0, textAlign: 'left' }}>{t('dashboard.title')}</h1>
             <p style={{ ...styles.subtitle, textAlign: 'left', margin: '4px 0 0 0' }}>
-              Logged in as: <strong>{currentUser.username}</strong>
+              {t('dashboard.loggedInAs')} <strong>{currentUser.username}</strong>
             </p>
           </div>
           <div style={{ display: 'flex', gap: '8px', alignItems: 'center' }}>
+            <LanguageToggle />
             <ThemeToggle theme={theme} onToggle={onToggleTheme} />
-            <button onClick={onLogout} style={styles.buttonDangerSmall}>Logout</button>
+            <button onClick={onLogout} style={styles.buttonDangerSmall}>{t('dashboard.logout')}</button>
           </div>
         </div>
       </header>

@@ -1,7 +1,9 @@
 import React, { useEffect } from 'react';
 import { styles } from '../../styles/dashboardStyles';
+import useLanguage from '../../hooks/useLanguage';
 
 export default function ImageLightboxModal({ activeModalImage, setActiveModalImage }) {
+  const { t } = useLanguage();
   useEffect(() => {
     if (!activeModalImage) return;
     const handleKeyDown = (e) => {
@@ -22,7 +24,7 @@ export default function ImageLightboxModal({ activeModalImage, setActiveModalIma
         </div>
         <div style={styles.modalFooter}>
           <span style={{ fontSize: '0.85rem', color: 'var(--text-secondary)', lineHeight: '1.4' }}>
-            <strong>Summary:</strong> {activeModalImage.summary || 'No summary available.'}
+            <strong>{t('modal.summary')}</strong> {activeModalImage.summary || t('modal.noSummary')}
           </span>
         </div>
       </div>

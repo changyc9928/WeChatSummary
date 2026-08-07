@@ -1,8 +1,10 @@
 import React from 'react';
 import { styles } from '../styles/dashboardStyles';
 import ThemeToggle from '../components/common/ThemeToggle';
+import LanguageToggle from '../components/common/LanguageToggle';
 import ImageSummariesPanel from '../components/panels/ImageSummariesPanel';
 import ImageLightboxModal from '../components/common/ImageLightboxModal';
+import useLanguage from '../hooks/useLanguage';
 
 export default function ImagesPage({
   theme,
@@ -15,6 +17,7 @@ export default function ImagesPage({
   activeModalImage,
   setActiveModalImage
 }) {
+  const { t } = useLanguage();
   const handleDeleteImage = async (id) => {
     await images.deleteImage(id);
     if (uuidInput) await onRefreshProgress(uuidInput);
@@ -34,10 +37,11 @@ export default function ImagesPage({
   return (
     <div style={styles.container}>
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '15px' }}>
-        <h2 style={styles.title}>Image Summaries & Records</h2>
+        <h2 style={styles.title}>{t('images.title')}</h2>
         <div style={{ display: 'flex', gap: '8px' }}>
+          <LanguageToggle />
           <ThemeToggle theme={theme} onToggle={onToggleTheme} />
-          <button onClick={onBack} style={styles.buttonSecondary}>← Back to Dashboard</button>
+          <button onClick={onBack} style={styles.buttonSecondary}>{t('common.back')}</button>
         </div>
       </div>
       <ImageSummariesPanel

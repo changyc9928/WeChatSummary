@@ -1,6 +1,7 @@
 import React from 'react';
 import { styles } from '../../styles/dashboardStyles';
 import { fromLocalInputValue } from '../../utils/time';
+import useLanguage from '../../hooks/useLanguage';
 
 export default function StepSummary({
   uuidInput,
@@ -13,12 +14,26 @@ export default function StepSummary({
   selectedStartTime,
   selectedEndTime
 }) {
+  const { t } = useLanguage();
   const currentStatus = (summaryState?.status || 'INITIAL_STATE').toUpperCase();
 
   const isRunning = currentStatus === 'RUNNING';
   const isPaused = currentStatus === 'PAUSED';
   const isIdling = currentStatus === 'IDLING';
   const isFinished = currentStatus === 'SUCCESS' || currentStatus === 'COMPLETED';
+
+  const statusLabel = (() => {
+    const map = {
+      INITIAL_STATE: t('status.initial'),
+      IDLING: t('status.idle'),
+      RUNNING: t('status.running'),
+      PAUSED: t('status.paused'),
+      SUCCESS: t('status.success'),
+      COMPLETED: t('status.completed'),
+      FAILED: t('status.failed')
+    };
+    return map[currentStatus] || currentStatus;
+  })();
 
   const rawProg = summaryState?.progress || 0;
   const progressFraction = rawProg > 1 ? rawProg / 100 : rawProg;
@@ -48,48 +63,48 @@ export default function StepSummary({
   return (
     <div style={styles.card}>
       <div style={styles.cardHeader}>
-        <h3 style={styles.cardTitle}>Step 3: AI Summary</h3>
-        <span style={styles.lockBadge}>{currentStatus}</span>
+        <h3 style={styles.cardTitle}>{t('summary.title')}</h3>
+        <span style={styles.lockBadge}>{statusLabel}</span>
       </div>
 
       {!uuidInput ? (
-        <div style={styles.dbErrorBox}>Select a dataset first.</div>
+        <div style={styles.dbErrorBox}>{t('summary.selectDatasetFirst')}</div>
       ) : !isPreprocessFinished ? (
-        <div style={styles.dbErrorBox}>Complete Step 2 preprocessing first.</div>
+        <div style={styles.dbErrorBox}>{t('summary.completeStep2')}</div>
       ) : (
         <div style={styles.actionButtonGroup}>
 
           {(currentStatus === 'INITIAL_STATE' || isIdling) && (
             <button type="button" onClick={() => handleStartWithParams(false)} disabled={loading.start} style={styles.button}>
-              {loading.start ? 'Starting Engine...' : 'Run Summary Engine'}
+              {loading.start ? t('summary.starting') : t('summary.run')}
             </button>
           )}
 
           {isRunning && (
             <div style={styles.progressSection}>
               <div style={styles.progressLabelRow}>
-                <span>Generating summary items...</span>
+                <span>{t('summary.generating')}</span>
                 <span>{progressPercent}%</span>
               </div>
               <div style={styles.progressBarBg}>
                 <div style={{ ...styles.progressBarFill, width: `${progressPercent}%`, backgroundColor: '#d97706' }} />
               </div>
               <button type="button" onClick={handlePauseSummary} disabled={loading.pauseSummary} style={styles.buttonWarningSmall}>
-                {loading.pauseSummary ? 'Pausing...' : 'Pause Summary'}
+                {loading.pauseSummary ? t('summary.pausing') : t('summary.pause')}
               </button>
             </div>
           )}
 
           {isPaused && (
             <div style={styles.actionButtonRow}>
-              <button type="button" onClick={() => handleStartWithParams(false)} disabled={loading.start} style={styles.button}>Resume</button>
-              <button type="button" onClick={() => handleStartWithParams(true)} disabled={loading.restartSummary} style={styles.buttonWarningSmall}>Restart</button>
+              <button type="button" onClick={() => handleStartWithParams(false)} disabled={loading.start} style={styles.button}>{t('summary.resume')}</button>
+              <button type="button" onClick={() => handleStartWithParams(true)} disabled={loading.restartSummary} style={styles.buttonWarningSmall}>{t('summary.restart')}</button>
             </div>
           )}
 
           {(isFinished || displayResultText) && (
             <div style={styles.summaryContainer}>
-              <div style={styles.summaryLabel}>Final Generated Summary:</div>
+              <div style={styles.summaryLabel}>{t('summary.finalLabel')}</div>
               <div style={{
                 ...styles.cleanSummaryOutput,
                 whiteSpace: 'pre-wrap',
@@ -104,10 +119,10 @@ export default function StepSummary({
                 lineHeight: '1.5',
                 color: 'var(--text-secondary)'
               }}>
-                {displayResultText || 'Summary generation completed successfully.'}
+                {displayResultText || t('summary.done')}
               </div>
               <button type="button" onClick={() => handleStartWithParams(true)} style={{ ...styles.buttonWarningSmall, marginTop: '12px' }}>
-                Re-run Summary with Filters
+                {t('summary.rerun')}
               </button>
             </div>
           )}
