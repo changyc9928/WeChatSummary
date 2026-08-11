@@ -4,9 +4,11 @@ import com.wechat.wechatsummary.entity.AudioSummary;
 import com.wechat.wechatsummary.entity.ChatSummaryStatus;
 import com.wechat.wechatsummary.entity.ChatSummaryTask;
 import com.wechat.wechatsummary.entity.ImageSummaryEntity;
+import com.wechat.wechatsummary.entity.VideoSummary;
 import com.wechat.wechatsummary.repository.AudioSummaryRepository;
 import com.wechat.wechatsummary.repository.ChatSummaryTaskRepository;
 import com.wechat.wechatsummary.repository.ImageSummaryRepository;
+import com.wechat.wechatsummary.repository.VideoSummaryRepository;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
@@ -32,6 +34,7 @@ public class WeChatSummaryCacheService {
 
     private final ImageSummaryRepository imageSummaryRepository;
     private final AudioSummaryRepository audioSummaryRepository;
+    private final VideoSummaryRepository videoSummaryRepository;
     private final ChatSummaryTaskRepository taskRepository;
     private final StringRedisTemplate redisTemplate;
     private final CacheManager cacheManager;
@@ -53,8 +56,8 @@ public class WeChatSummaryCacheService {
     @Cacheable(cacheNames = "image_summary", key = "#hash", sync = true)
     public Optional<String> getImageSummary(String hash) {
         log.info(
-            "Cache miss for image_summary signature target [{}]. Querying relational persistence layers...",
-            hash);
+                "Cache miss for image_summary signature target [{}]. Querying relational persistence layers...",
+                hash);
         return imageSummaryRepository.findByImageHash(hash).map(ImageSummaryEntity::getSummary);
     }
 
@@ -64,15 +67,16 @@ public class WeChatSummaryCacheService {
     @Cacheable(cacheNames = "image_summary_list", key = "#uuid", sync = true)
     public List<ImageSummaryEntity> getImageSummariesByUuid(String uuid) {
         log.info(
-            "Cache miss for image_summary_list for UUID: [{}]. Querying relational persistence layer...",
-            uuid);
+                "Cache miss for image_summary_list for UUID: [{}]. Querying relational persistence layer...",
+                uuid);
         return imageSummaryRepository.findByFilePathContainingUuid(uuid);
     }
 
     /**
-     * Persists an image summary entity to DB and invalidates image summary list caches.
+     * Persists an image summary entity to DB and invalidates image summary list
+     * caches.
      */
-    @CacheEvict(cacheNames = "image_summary_list", allEntries = true)
+    @CacheEvict(cacheNames = "image_summary_list", key = "#entity.filePath")
     public ImageSummaryEntity saveImageSummary(ImageSummaryEntity entity) {
         log.info("Persisting image summary record for hash: [{}]", entity.getImageHash());
         ImageSummaryEntity saved = imageSummaryRepository.save(entity);
@@ -81,7 +85,8 @@ public class WeChatSummaryCacheService {
     }
 
     /**
-     * Deletes a single image summary record by ID (hash) and evicts relevant caches.
+     * Deletes a single image summary record by ID (hash) and evicts relevant
+     * caches.
      */
     @CacheEvict(cacheNames = "image_summary_list", allEntries = true)
     public void deleteImageSummaryById(String id) {
@@ -90,14 +95,15 @@ public class WeChatSummaryCacheService {
             imageSummaryRepository.deleteById(id);
             evictImageSummary(id);
             log.info("Successfully deleted image summary record and evicted caches for ID: [{}]",
-                id);
+                    id);
         } else {
             log.warn("Deletion skipped. No record found for ID: [{}]", id);
         }
     }
 
     /**
-     * Batch deletes image summary records by IDs (hashes) and evicts relevant caches.
+     * Batch deletes image summary records by IDs (hashes) and evicts relevant
+     * caches.
      */
     @CacheEvict(cacheNames = "image_summary_list", allEntries = true)
     public void deleteImageSummariesByIds(List<String> ids) {
@@ -127,10 +133,10 @@ public class WeChatSummaryCacheService {
     @CacheEvict(cacheNames = "image_summary", key = "#hash")
     public void evictImageSummary(String hash) {
         log.info("Evicting and invalidating image cache address segment mapping for key hash: [{}]",
-            hash);
+                hash);
     }
 
-// =========================================================================
+    // =========================================================================
     // 2. AUDIO MEDIA SUMMARY CACHE (Spring Cache Driven)
     // =========================================================================
 
@@ -144,8 +150,8 @@ public class WeChatSummaryCacheService {
     @Cacheable(cacheNames = "audio_summary", key = "#hash", sync = true)
     public Optional<String> getAudioSummary(String hash) {
         log.info(
-            "Cache miss for audio_summary signature target [{}]. Falling back to underlying persistence tables...",
-            hash);
+                "Cache miss for audio_summary signature target [{}]. Falling back to underlying persistence tables...",
+                hash);
         return audioSummaryRepository.findByFileHash(hash).map(AudioSummary::getSummary);
     }
 
@@ -155,13 +161,14 @@ public class WeChatSummaryCacheService {
     @Cacheable(cacheNames = "audio_summary_list", key = "#uuid", sync = true)
     public List<AudioSummary> getAudioSummariesByUuid(String uuid) {
         log.info(
-            "Cache miss for audio_summary_list for UUID: [{}]. Querying relational persistence layer...",
-            uuid);
+                "Cache miss for audio_summary_list for UUID: [{}]. Querying relational persistence layer...",
+                uuid);
         return audioSummaryRepository.findByFilePathContainingUuid(uuid);
     }
 
     /**
-     * Persists an audio summary entity to DB and invalidates audio summary list caches.
+     * Persists an audio summary entity to DB and invalidates audio summary list
+     * caches.
      */
     @CacheEvict(cacheNames = "audio_summary_list", allEntries = true)
     public AudioSummary saveAudioSummary(AudioSummary entity) {
@@ -172,7 +179,8 @@ public class WeChatSummaryCacheService {
     }
 
     /**
-     * Deletes a single audio summary record by ID (hash) and evicts relevant caches.
+     * Deletes a single audio summary record by ID (hash) and evicts relevant
+     * caches.
      */
     @CacheEvict(cacheNames = "audio_summary_list", allEntries = true)
     public void deleteAudioSummaryById(String id) {
@@ -181,14 +189,15 @@ public class WeChatSummaryCacheService {
             audioSummaryRepository.deleteById(id);
             evictAudioSummary(id);
             log.info("Successfully deleted audio summary record and evicted caches for ID: [{}]",
-                id);
+                    id);
         } else {
             log.warn("Deletion skipped. No record found for ID: [{}]", id);
         }
     }
 
     /**
-     * Batch deletes audio summary records by IDs (hashes) and evicts relevant caches.
+     * Batch deletes audio summary records by IDs (hashes) and evicts relevant
+     * caches.
      */
     @CacheEvict(cacheNames = "audio_summary_list", allEntries = true)
     public void deleteAudioSummariesByIds(List<String> ids) {
@@ -208,7 +217,8 @@ public class WeChatSummaryCacheService {
     }
 
     /**
-     * Clears ONLY the summary text for a single audio record by ID, keeping the transcript intact.
+     * Clears ONLY the summary text for a single audio record by ID, keeping the
+     * transcript intact.
      */
     @CacheEvict(cacheNames = "audio_summary_list", allEntries = true)
     public void clearAudioSummaryTextById(String id) {
@@ -253,8 +263,139 @@ public class WeChatSummaryCacheService {
     @CacheEvict(cacheNames = "audio_summary", key = "#hash")
     public void evictAudioSummary(String hash) {
         log.info(
-            "Evicting and invalidating audio data context cache mapping segment for key hash: [{}]",
-            hash);
+                "Evicting and invalidating audio data context cache mapping segment for key hash: [{}]",
+                hash);
+    }
+
+    // =========================================================================
+    // 2.5 VIDEO MEDIA SUMMARY CACHE (Spring Cache Driven)
+    // =========================================================================
+
+    /**
+     * Checks if a video summary record exists by file hash.
+     */
+    public Optional<VideoSummary> findVideoSummaryByHash(String hash) {
+        return videoSummaryRepository.findByFileHash(hash);
+    }
+
+    @Cacheable(cacheNames = "video_summary", key = "#hash", sync = true)
+    public Optional<String> getVideoSummary(String hash) {
+        log.info(
+                "Cache miss for video_summary signature target [{}]. Querying relational persistence layer...",
+                hash);
+        return videoSummaryRepository.findByFileHash(hash).map(VideoSummary::getSummary);
+    }
+
+    /**
+     * Caches video summary entity records scoped by target session/chat UUID.
+     */
+    @Cacheable(cacheNames = "video_summary_list", key = "#uuid", sync = true)
+    public List<VideoSummary> getVideoSummariesByUuid(String uuid) {
+        log.info(
+                "Cache miss for video_summary_list for UUID: [{}]. Querying relational persistence layer...",
+                uuid);
+        return videoSummaryRepository.findByFilePathContainingUuid(uuid);
+    }
+
+    /**
+     * Persists a video summary entity to DB and invalidates video summary list
+     * caches.
+     */
+    @CacheEvict(cacheNames = "video_summary_list", allEntries = true)
+    public VideoSummary saveVideoSummary(VideoSummary entity) {
+        log.info("Persisting video summary record for hash: [{}]", entity.getFileHash());
+        VideoSummary saved = videoSummaryRepository.save(entity);
+        evictVideoSummary(entity.getFileHash());
+        return saved;
+    }
+
+    /**
+     * Deletes a single video summary record by ID (hash) and evicts relevant
+     * caches.
+     */
+    @CacheEvict(cacheNames = "video_summary_list", allEntries = true)
+    public void deleteVideoSummaryById(String id) {
+        log.info("Request to delete video summary record for ID: [{}]", id);
+        if (videoSummaryRepository.existsById(id)) {
+            videoSummaryRepository.deleteById(id);
+            evictVideoSummary(id);
+            log.info("Successfully deleted video summary record and evicted caches for ID: [{}]", id);
+        } else {
+            log.warn("Deletion skipped. No record found for ID: [{}]", id);
+        }
+    }
+
+    /**
+     * Batch deletes video summary records by IDs (hashes) and evicts relevant
+     * caches.
+     */
+    @CacheEvict(cacheNames = "video_summary_list", allEntries = true)
+    public void deleteVideoSummariesByIds(List<String> ids) {
+        if (ids == null || ids.isEmpty()) {
+            log.warn("Batch deletion aborted. Provided ID list is empty or null.");
+            return;
+        }
+
+        log.info("Request to batch delete [{}] video summary records.", ids.size());
+        for (String id : ids) {
+            if (videoSummaryRepository.existsById(id)) {
+                videoSummaryRepository.deleteById(id);
+                evictVideoSummary(id);
+            }
+        }
+        log.info("Completed batch deletion and cache eviction for provided IDs.");
+    }
+
+    /**
+     * Clears ONLY the summary text for a single video record by ID.
+     */
+    @CacheEvict(cacheNames = "video_summary_list", allEntries = true)
+    public void clearVideoSummaryTextById(String id) {
+        log.info("Request to clear video summary text for ID: [{}]", id);
+        videoSummaryRepository.findById(id).ifPresent(entity -> {
+            entity.setSummary(null);
+            entity.setTranscript(null);
+            videoSummaryRepository.save(entity);
+            evictVideoSummary(id);
+            log.info("Successfully cleared video summary text and evicted cache for ID: [{}]", id);
+        });
+    }
+
+    /**
+     * Batch clears ONLY the summary text for provided video record IDs.
+     */
+    @CacheEvict(cacheNames = "video_summary_list", allEntries = true)
+    public void clearVideoSummaryTextsByIds(List<String> ids) {
+        if (ids == null || ids.isEmpty()) {
+            log.warn("Batch summary text clearing aborted. Provided ID list is empty or null.");
+            return;
+        }
+
+        log.info("Request to batch clear [{}] video summary texts.", ids.size());
+        for (String id : ids) {
+            videoSummaryRepository.findById(id).ifPresent(entity -> {
+                entity.setSummary(null);
+                entity.setTranscript(null);
+                videoSummaryRepository.save(entity);
+                evictVideoSummary(id);
+            });
+        }
+        log.info("Completed batch clearing of video summary texts.");
+    }
+
+    @CachePut(cacheNames = "video_summary", key = "#hash")
+    public Optional<String> putVideoSummary(String hash, String summary) {
+        if (log.isDebugEnabled()) {
+            log.debug("Explicitly updating video cache entry mapping for hash key: {}", hash);
+        }
+        return Optional.ofNullable(summary);
+    }
+
+    @CacheEvict(cacheNames = "video_summary", key = "#hash")
+    public void evictVideoSummary(String hash) {
+        log.info(
+                "Evicting and invalidating video data context cache mapping segment for key hash: [{}]",
+                hash);
     }
 
     // =========================================================================
@@ -264,8 +405,8 @@ public class WeChatSummaryCacheService {
     @Cacheable(cacheNames = "chat_analysis", key = "#uuid.toString()", sync = true)
     public Optional<ChatSummaryTask> getCachedTask(UUID uuid) {
         log.info(
-            "Cache miss for rolling chat task sequence. Extracting profile from DB for UUID: {}",
-            uuid);
+                "Cache miss for rolling chat task sequence. Extracting profile from DB for UUID: {}",
+                uuid);
         return taskRepository.findById(uuid);
     }
 
@@ -311,8 +452,8 @@ public class WeChatSummaryCacheService {
             metrics.put("totalChunks", Integer.parseInt((String) entries.get("totalChunks")));
         } catch (NumberFormatException e) {
             log.error(
-                "Failed to accurately transform numerical progress metrics from cache keys for execution pipeline: {}",
-                uuid, e);
+                    "Failed to accurately transform numerical progress metrics from cache keys for execution pipeline: {}",
+                    uuid, e);
             return null;
         }
         return metrics;
@@ -330,7 +471,7 @@ public class WeChatSummaryCacheService {
 
     public void clearProgress(UUID uuid) {
         log.info("Clearing real-time progress indicators out of Redis memory mappings for UUID: {}",
-            uuid);
+                uuid);
         redisTemplate.delete(STATUS_KEY_PREFIX + uuid.toString());
         redisTemplate.delete(PROGRESS_KEY_PREFIX + uuid);
     }

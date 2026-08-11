@@ -3,7 +3,7 @@ info:
   title: OpenAPI definition
   version: v0
 servers:
-- url: http://localhost:8080
+- url: http://localhost:8081
   description: Generated server url
 paths:
   /api/summary/{uuid}:
@@ -32,21 +32,9 @@ paths:
         "200":
           description: OK
           content:
-            application/json:
+            '*/*':
               schema:
                 $ref: "#/components/schemas/ApiResponseTaskAckResponse"
-        "400":
-          description: Bad Request
-          content:
-            application/json:
-              schema:
-                $ref: "#/components/schemas/ErrorResponse"
-        "500":
-          description: Internal Server Error
-          content:
-            application/json:
-              schema:
-                $ref: "#/components/schemas/ErrorResponse"
   /api/summary/restart/{uuid}:
     post:
       tags:
@@ -73,15 +61,9 @@ paths:
         "200":
           description: OK
           content:
-            application/json:
+            '*/*':
               schema:
                 $ref: "#/components/schemas/ApiResponseTaskAckResponse"
-        "500":
-          description: Internal Server Error
-          content:
-            application/json:
-              schema:
-                $ref: "#/components/schemas/ErrorResponse"
   /api/summary/pause/{uuid}:
     post:
       tags:
@@ -103,7 +85,7 @@ paths:
         "200":
           description: OK
           content:
-            application/json:
+            '*/*':
               schema:
                 $ref: "#/components/schemas/ApiResponseTaskAckResponse"
   /api/preprocess/{uuid}:
@@ -126,15 +108,9 @@ paths:
         "200":
           description: OK
           content:
-            application/json:
+            '*/*':
               schema:
                 $ref: "#/components/schemas/ApiResponseTaskAckResponse"
-        "500":
-          description: Internal Server Error
-          content:
-            application/json:
-              schema:
-                $ref: "#/components/schemas/ErrorResponse"
   /api/preprocess/{uuid}/reprocess:
     post:
       tags:
@@ -155,15 +131,9 @@ paths:
         "200":
           description: OK
           content:
-            application/json:
+            '*/*':
               schema:
                 $ref: "#/components/schemas/ApiResponseTaskAckResponse"
-        "500":
-          description: Internal Server Error
-          content:
-            application/json:
-              schema:
-                $ref: "#/components/schemas/ErrorResponse"
   /api/preprocess/{uuid}/abort:
     post:
       tags:
@@ -184,15 +154,9 @@ paths:
         "200":
           description: OK
           content:
-            application/json:
+            '*/*':
               schema:
                 $ref: "#/components/schemas/ApiResponseTaskAckResponse"
-        "400":
-          description: Bad Request
-          content:
-            application/json:
-              schema:
-                $ref: "#/components/schemas/ErrorResponse"
   /api/files/upload:
     post:
       tags:
@@ -219,21 +183,9 @@ paths:
         "200":
           description: OK
           content:
-            application/json:
+            '*/*':
               schema:
                 $ref: "#/components/schemas/ApiResponseUploadSessionResponse"
-        "400":
-          description: Bad Request
-          content:
-            application/json:
-              schema:
-                $ref: "#/components/schemas/ErrorResponse"
-        "500":
-          description: Internal Server Error
-          content:
-            application/json:
-              schema:
-                $ref: "#/components/schemas/ErrorResponse"
   /api/auth/register:
     post:
       tags:
@@ -249,15 +201,9 @@ paths:
         "200":
           description: OK
           content:
-            application/json:
+            '*/*':
               schema:
                 $ref: "#/components/schemas/ApiResponseAuthResponse"
-        "409":
-          description: Conflict
-          content:
-            application/json:
-              schema:
-                $ref: "#/components/schemas/ErrorResponse"
   /api/auth/login:
     post:
       tags:
@@ -273,15 +219,9 @@ paths:
         "200":
           description: OK
           content:
-            application/json:
+            '*/*':
               schema:
                 $ref: "#/components/schemas/ApiResponseAuthResponse"
-        "401":
-          description: Unauthorized
-          content:
-            application/json:
-              schema:
-                $ref: "#/components/schemas/ErrorResponse"
   /api/summary/status-pool/{uuid}:
     get:
       tags:
@@ -303,15 +243,9 @@ paths:
         "200":
           description: OK
           content:
-            application/json:
+            '*/*':
               schema:
                 $ref: "#/components/schemas/ApiResponseSummaryProgressResponse"
-        "404":
-          description: Not Found
-          content:
-            application/json:
-              schema:
-                $ref: "#/components/schemas/ErrorResponse"
   /api/summary/preview/{uuid}:
     get:
       tags:
@@ -333,15 +267,9 @@ paths:
         "200":
           description: OK
           content:
-            application/json:
+            '*/*':
               schema:
                 $ref: "#/components/schemas/ApiResponseChatPreviewResponse"
-        "404":
-          description: Not Found
-          content:
-            application/json:
-              schema:
-                $ref: "#/components/schemas/ErrorResponse"
   /api/preprocess/{uuid}/progress:
     get:
       tags:
@@ -362,9 +290,95 @@ paths:
         "200":
           description: OK
           content:
-            application/json:
+            '*/*':
               schema:
                 $ref: "#/components/schemas/ApiResponseTaskProgress"
+  /api/preprocess/videos/{id}/file:
+    get:
+      tags:
+      - preprocess-controller
+      operationId: getVideoFileById
+      parameters:
+      - name: X-User-Id
+        in: header
+        required: true
+        schema:
+          type: string
+      - name: id
+        in: path
+        required: true
+        schema:
+          type: string
+      responses:
+        "200":
+          description: OK
+          content:
+            '*/*':
+              schema:
+                type: string
+                format: binary
+  /api/preprocess/videos/summaries:
+    get:
+      tags:
+      - preprocess-controller
+      operationId: getVideoSummariesByUuid
+      parameters:
+      - name: X-User-Id
+        in: header
+        required: true
+        schema:
+          type: string
+      - name: uuid
+        in: query
+        required: true
+        schema:
+          type: string
+      - name: page
+        in: query
+        required: false
+        schema:
+          type: integer
+          format: int32
+          default: 0
+      - name: size
+        in: query
+        required: false
+        schema:
+          type: integer
+          format: int32
+          default: 20
+      responses:
+        "200":
+          description: OK
+          content:
+            '*/*':
+              schema:
+                $ref: "#/components/schemas/ApiResponsePageVideoSummary"
+    delete:
+      tags:
+      - preprocess-controller
+      operationId: deleteVideoSummariesByIds
+      parameters:
+      - name: X-User-Id
+        in: header
+        required: true
+        schema:
+          type: string
+      requestBody:
+        content:
+          application/json:
+            schema:
+              type: array
+              items:
+                type: string
+        required: true
+      responses:
+        "200":
+          description: OK
+          content:
+            '*/*':
+              schema:
+                $ref: "#/components/schemas/ApiResponseVoid"
   /api/preprocess/images/{id}/file:
     get:
       tags:
@@ -385,12 +399,10 @@ paths:
         "200":
           description: OK
           content:
-            application/json:
+            '*/*':
               schema:
                 type: string
                 format: binary
-        "404":
-          description: Not Found
   /api/preprocess/images/summaries:
     get:
       tags:
@@ -425,7 +437,7 @@ paths:
         "200":
           description: OK
           content:
-            application/json:
+            '*/*':
               schema:
                 $ref: "#/components/schemas/ApiResponsePageImageSummaryEntity"
     delete:
@@ -450,7 +462,7 @@ paths:
         "200":
           description: OK
           content:
-            application/json:
+            '*/*':
               schema:
                 $ref: "#/components/schemas/ApiResponseVoid"
   /api/preprocess/audios/{id}/file:
@@ -473,12 +485,10 @@ paths:
         "200":
           description: OK
           content:
-            application/json:
+            '*/*':
               schema:
                 type: string
                 format: binary
-        "404":
-          description: Not Found
   /api/preprocess/audios/summaries:
     get:
       tags:
@@ -513,7 +523,7 @@ paths:
         "200":
           description: OK
           content:
-            application/json:
+            '*/*':
               schema:
                 $ref: "#/components/schemas/ApiResponsePageAudioSummary"
     delete:
@@ -538,7 +548,7 @@ paths:
         "200":
           description: OK
           content:
-            application/json:
+            '*/*':
               schema:
                 $ref: "#/components/schemas/ApiResponseVoid"
   /api/files/sessions:
@@ -556,9 +566,104 @@ paths:
         "200":
           description: OK
           content:
-            application/json:
+            '*/*':
               schema:
                 $ref: "#/components/schemas/ApiResponseListSessionResponseDTO"
+  /api/preprocess/videos/summaries/{id}:
+    delete:
+      tags:
+      - preprocess-controller
+      operationId: deleteVideoSummaryById
+      parameters:
+      - name: X-User-Id
+        in: header
+        required: true
+        schema:
+          type: string
+      - name: id
+        in: path
+        required: true
+        schema:
+          type: string
+      responses:
+        "200":
+          description: OK
+          content:
+            '*/*':
+              schema:
+                $ref: "#/components/schemas/ApiResponseVoid"
+  /api/preprocess/videos/summaries/{id}/text:
+    delete:
+      tags:
+      - preprocess-controller
+      operationId: clearVideoSummaryTextById
+      parameters:
+      - name: X-User-Id
+        in: header
+        required: true
+        schema:
+          type: string
+      - name: id
+        in: path
+        required: true
+        schema:
+          type: string
+      responses:
+        "200":
+          description: OK
+          content:
+            '*/*':
+              schema:
+                $ref: "#/components/schemas/ApiResponseVoid"
+  /api/preprocess/videos/summaries/text:
+    delete:
+      tags:
+      - preprocess-controller
+      operationId: clearVideoSummaryTextsByIds
+      parameters:
+      - name: X-User-Id
+        in: header
+        required: true
+        schema:
+          type: string
+      requestBody:
+        content:
+          application/json:
+            schema:
+              type: array
+              items:
+                type: string
+        required: true
+      responses:
+        "200":
+          description: OK
+          content:
+            '*/*':
+              schema:
+                $ref: "#/components/schemas/ApiResponseVoid"
+  /api/preprocess/videos/summaries/all:
+    delete:
+      tags:
+      - preprocess-controller
+      operationId: deleteAllVideoSummariesByUuid
+      parameters:
+      - name: X-User-Id
+        in: header
+        required: true
+        schema:
+          type: string
+      - name: uuid
+        in: query
+        required: true
+        schema:
+          type: string
+      responses:
+        "200":
+          description: OK
+          content:
+            '*/*':
+              schema:
+                $ref: "#/components/schemas/ApiResponseVoid"
   /api/preprocess/images/summaries/{id}:
     delete:
       tags:
@@ -579,7 +684,7 @@ paths:
         "200":
           description: OK
           content:
-            application/json:
+            '*/*':
               schema:
                 $ref: "#/components/schemas/ApiResponseVoid"
   /api/preprocess/images/summaries/all:
@@ -602,7 +707,7 @@ paths:
         "200":
           description: OK
           content:
-            application/json:
+            '*/*':
               schema:
                 $ref: "#/components/schemas/ApiResponseVoid"
   /api/preprocess/audios/summaries/{id}:
@@ -625,7 +730,7 @@ paths:
         "200":
           description: OK
           content:
-            application/json:
+            '*/*':
               schema:
                 $ref: "#/components/schemas/ApiResponseVoid"
   /api/preprocess/audios/summaries/{id}/text:
@@ -648,7 +753,7 @@ paths:
         "200":
           description: OK
           content:
-            application/json:
+            '*/*':
               schema:
                 $ref: "#/components/schemas/ApiResponseVoid"
   /api/preprocess/audios/summaries/text:
@@ -674,7 +779,7 @@ paths:
         "200":
           description: OK
           content:
-            application/json:
+            '*/*':
               schema:
                 $ref: "#/components/schemas/ApiResponseVoid"
   /api/preprocess/audios/summaries/all:
@@ -697,84 +802,20 @@ paths:
         "200":
           description: OK
           content:
-            application/json:
+            '*/*':
               schema:
                 $ref: "#/components/schemas/ApiResponseVoid"
 components:
   schemas:
-    ErrorResponse:
-      type: object
-      description: Unified error body. The code mirrors the HTTP status.
-      properties:
-        code:
-          type: integer
-          format: int32
-        message:
-          type: string
-        data:
-          nullable: true
-    ApiResponseAuthResponse:
+    SummaryRequestDTO:
       type: object
       properties:
-        code:
-          type: integer
-          format: int32
-        message:
+        startTime:
           type: string
-        data:
-          $ref: "#/components/schemas/AuthResponse"
-    ApiResponseChatPreviewResponse:
-      type: object
-      properties:
-        code:
-          type: integer
-          format: int32
-        message:
+          format: date-time
+        endTime:
           type: string
-        data:
-          $ref: "#/components/schemas/ChatPreviewResponse"
-    ApiResponseListSessionResponseDTO:
-      type: object
-      properties:
-        code:
-          type: integer
-          format: int32
-        message:
-          type: string
-        data:
-          type: array
-          items:
-            $ref: "#/components/schemas/SessionResponseDTO"
-    ApiResponsePageAudioSummary:
-      type: object
-      properties:
-        code:
-          type: integer
-          format: int32
-        message:
-          type: string
-        data:
-          $ref: "#/components/schemas/PageAudioSummary"
-    ApiResponsePageImageSummaryEntity:
-      type: object
-      properties:
-        code:
-          type: integer
-          format: int32
-        message:
-          type: string
-        data:
-          $ref: "#/components/schemas/PageImageSummaryEntity"
-    ApiResponseSummaryProgressResponse:
-      type: object
-      properties:
-        code:
-          type: integer
-          format: int32
-        message:
-          type: string
-        data:
-          $ref: "#/components/schemas/SummaryProgressResponse"
+          format: date-time
     ApiResponseTaskAckResponse:
       type: object
       properties:
@@ -785,16 +826,21 @@ components:
           type: string
         data:
           $ref: "#/components/schemas/TaskAckResponse"
-    ApiResponseTaskProgress:
+    TaskAckResponse:
       type: object
       properties:
-        code:
-          type: integer
-          format: int32
+        taskId:
+          type: string
+        status:
+          type: string
+          enum:
+          - INITIAL_STATE
+          - RUNNING
+          - PAUSED
+          - SUCCESS
+          - FAILED
         message:
           type: string
-        data:
-          $ref: "#/components/schemas/TaskProgress"
     ApiResponseUploadSessionResponse:
       type: object
       properties:
@@ -805,7 +851,19 @@ components:
           type: string
         data:
           $ref: "#/components/schemas/UploadSessionResponse"
-    ApiResponseVoid:
+    UploadSessionResponse:
+      type: object
+      properties:
+        sessionId:
+          type: string
+    AuthRequest:
+      type: object
+      properties:
+        username:
+          type: string
+        password:
+          type: string
+    ApiResponseAuthResponse:
       type: object
       properties:
         code:
@@ -814,28 +872,53 @@ components:
         message:
           type: string
         data:
-          nullable: true
-    SummaryRequestDTO:
-      type: object
-      properties:
-        startTime:
-          type: string
-          format: date-time
-        endTime:
-          type: string
-          format: date-time
-    AuthRequest:
-      type: object
-      properties:
-        username:
-          type: string
-        password:
-          type: string
+          $ref: "#/components/schemas/AuthResponse"
     AuthResponse:
       type: object
       properties:
         uuid:
           type: string
+    ApiResponseSummaryProgressResponse:
+      type: object
+      properties:
+        code:
+          type: integer
+          format: int32
+        message:
+          type: string
+        data:
+          $ref: "#/components/schemas/SummaryProgressResponse"
+    SummaryProgressResponse:
+      type: object
+      properties:
+        taskId:
+          type: string
+          format: uuid
+        status:
+          type: string
+          enum:
+          - INITIAL_STATE
+          - RUNNING
+          - PAUSED
+          - SUCCESS
+          - FAILED
+        progress:
+          type: number
+          format: double
+        result:
+          type: string
+        errorMessage:
+          type: string
+    ApiResponseChatPreviewResponse:
+      type: object
+      properties:
+        code:
+          type: integer
+          format: int32
+        message:
+          type: string
+        data:
+          $ref: "#/components/schemas/ChatPreviewResponse"
     ChatPreviewResponse:
       type: object
       properties:
@@ -858,48 +941,16 @@ components:
           type: string
         content:
           type: string
-    SummaryProgressResponse:
+    ApiResponseTaskProgress:
       type: object
       properties:
-        taskId:
-          type: string
-          format: uuid
-        status:
-          type: string
-          enum:
-          - INITIAL_STATE
-          - RUNNING
-          - PAUSED
-          - SUCCESS
-          - FAILED
-        progress:
-          type: number
-          format: double
-        result:
-          type: string
-        errorMessage:
-          type: string
-    TaskAckResponse:
-      type: object
-      properties:
-        taskId:
-          type: string
-        status:
-          type: string
-          nullable: true
-          enum:
-          - INITIAL_STATE
-          - RUNNING
-          - PAUSED
-          - SUCCESS
-          - FAILED
+        code:
+          type: integer
+          format: int32
         message:
           type: string
-    UploadSessionResponse:
-      type: object
-      properties:
-        sessionId:
-          type: string
+        data:
+          $ref: "#/components/schemas/TaskProgress"
     TaskProgress:
       type: object
       properties:
@@ -922,6 +973,101 @@ components:
         progressPercentage:
           type: number
           format: double
+    ApiResponsePageVideoSummary:
+      type: object
+      properties:
+        code:
+          type: integer
+          format: int32
+        message:
+          type: string
+        data:
+          $ref: "#/components/schemas/PageVideoSummary"
+    PageVideoSummary:
+      type: object
+      properties:
+        totalPages:
+          type: integer
+          format: int32
+        totalElements:
+          type: integer
+          format: int64
+        size:
+          type: integer
+          format: int32
+        content:
+          type: array
+          items:
+            $ref: "#/components/schemas/VideoSummary"
+        number:
+          type: integer
+          format: int32
+        sort:
+          $ref: "#/components/schemas/SortObject"
+        pageable:
+          $ref: "#/components/schemas/PageableObject"
+        numberOfElements:
+          type: integer
+          format: int32
+        first:
+          type: boolean
+        last:
+          type: boolean
+        empty:
+          type: boolean
+    PageableObject:
+      type: object
+      properties:
+        paged:
+          type: boolean
+        pageNumber:
+          type: integer
+          format: int32
+        pageSize:
+          type: integer
+          format: int32
+        unpaged:
+          type: boolean
+        sort:
+          $ref: "#/components/schemas/SortObject"
+        offset:
+          type: integer
+          format: int64
+    SortObject:
+      type: object
+      properties:
+        sorted:
+          type: boolean
+        unsorted:
+          type: boolean
+        empty:
+          type: boolean
+    VideoSummary:
+      type: object
+      properties:
+        id:
+          type: string
+        fileHash:
+          type: string
+        filePath:
+          type: string
+        transcript:
+          type: string
+        summary:
+          type: string
+        createdAt:
+          type: string
+          format: date-time
+    ApiResponsePageImageSummaryEntity:
+      type: object
+      properties:
+        code:
+          type: integer
+          format: int32
+        message:
+          type: string
+        data:
+          $ref: "#/components/schemas/PageImageSummaryEntity"
     ImageSummaryEntity:
       type: object
       properties:
@@ -968,33 +1114,16 @@ components:
           type: boolean
         empty:
           type: boolean
-    PageableObject:
+    ApiResponsePageAudioSummary:
       type: object
       properties:
-        paged:
-          type: boolean
-        pageNumber:
+        code:
           type: integer
           format: int32
-        pageSize:
-          type: integer
-          format: int32
-        unpaged:
-          type: boolean
-        offset:
-          type: integer
-          format: int64
-        sort:
-          $ref: "#/components/schemas/SortObject"
-    SortObject:
-      type: object
-      properties:
-        sorted:
-          type: boolean
-        empty:
-          type: boolean
-        unsorted:
-          type: boolean
+        message:
+          type: string
+        data:
+          $ref: "#/components/schemas/PageAudioSummary"
     AudioSummary:
       type: object
       properties:
@@ -1043,6 +1172,18 @@ components:
           type: boolean
         empty:
           type: boolean
+    ApiResponseListSessionResponseDTO:
+      type: object
+      properties:
+        code:
+          type: integer
+          format: int32
+        message:
+          type: string
+        data:
+          type: array
+          items:
+            $ref: "#/components/schemas/SessionResponseDTO"
     SessionResponseDTO:
       type: object
       properties:
@@ -1052,3 +1193,12 @@ components:
           type: string
         uploadedAt:
           type: string
+    ApiResponseVoid:
+      type: object
+      properties:
+        code:
+          type: integer
+          format: int32
+        message:
+          type: string
+        data: {}

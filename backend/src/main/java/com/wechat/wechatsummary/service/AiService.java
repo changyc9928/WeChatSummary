@@ -31,6 +31,7 @@ public class AiService {
 
     private final ChatClient chatClient;
     private final @Qualifier("multimodalChatClient") ChatClient multimodalChatClient;
+    private final @Qualifier("videoChatClient") ChatClient videoChatClient;
     private final OpenAiAudioTranscriptionModel transcriptionModel;
 
     /**
@@ -287,6 +288,65 @@ public class AiService {
         String outputText = response.getResult().getOutput().getText();
         log.info("Successfully extracted information and summarized target image: {}", filePath);
         return outputText;
+    }
+
+    /**
+     * Transcribes an extracted video frame using the dedicated video vision AI model.
+     *
+     * @param frameBytes raw JPEG bytes of the video frame
+     * @param frameIndex index of the frame in sequence
+     * @return transcription/description text of the frame
+     */
+    @Retryable(
+        retryFor = Exception.class,
+        maxAttempts = 3,
+        backoff = @Backoff(delay = 2000, multiplier = 2.0, maxDelay = 10000)
+    )
+    public String transcribeVideoFrame(byte[] frameBytes, int frameIndex) {
+        log.info("Transcribing video frame index {}", frameIndex);
+        String base64Encoded = Base64.getEncoder().encodeToString(frameBytes);
+        String dataUri = "data:image/jpeg;base64," + base64Encoded;
+
+        UserMessage userMessage = UserMessage.builder()
+            .text("This is frame #" + frameIndex + " extracted from a video. Describe key visual elements, characters, scenes, and extract any visible text accurately.")
+            .media(new Media(MimeType.valueOf("image/jpeg"), URI.create(dataUri)))
+            .build();
+
+        Prompt prompt = new Prompt(userMessage);
+        ChatResponse response = videoChatClient.prompt(prompt).call().chatResponse();
+
+        if (response == null || response.getResult() == null || response.getResult().getOutput() == null) {
+            throw new RuntimeException("Video AI returned empty response for frame #" + frameIndex);
+        }
+        return response.getResult().getOutput().getText();
+    }
+
+    /**
+     * Combines multiple frame transcriptions into a coherent video summary.
+     *
+     * @param frameTranscriptions list of frame transcriptions/descriptions
+     * @return unified video summary text
+     */
+    @Retryable(
+        retryFor = Exception.class,
+        maxAttempts = 3,
+        backoff = @Backoff(delay = 2000, multiplier = 2.0, maxDelay = 10000)
+    )
+    public String summarizeVideoTranscriptions(java.util.List<String> frameTranscriptions) {
+        log.info("Summarizing {} frame transcriptions into unified video summary", frameTranscriptions.size());
+        StringBuilder sb = new StringBuilder();
+        for (int i = 0; i < frameTranscriptions.size(); i++) {
+            sb.append("Frame ").append(i + 1).append(": ").append(frameTranscriptions.get(i)).append("\n\n");
+        }
+
+        String systemPrompt = "你是一个专业的视频内容分析AI。我将提供从一个视频中随机/等间隔抽取的若干关键帧的视觉描述与文字转写。请将这些帧的信息进行综合归纳，生成一份连贯、准确、结构清晰的视频总结。";
+        String userPrompt = "以下是抽取帧的描述内容：\n\n" + sb.toString() + "\n请结合以上所有帧的内容，总结这个视频的主要内容、场景变化与核心信息，直接输出总结文本即可：";
+
+        return chatClient.prompt()
+            .system(systemPrompt)
+            .user(userPrompt)
+            .call()
+            .content();
     }
 
 //    /**

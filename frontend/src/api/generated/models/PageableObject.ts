@@ -53,16 +53,16 @@ export interface PageableObject {
     unpaged?: boolean;
     /**
      * 
-     * @type {number}
-     * @memberof PageableObject
-     */
-    offset?: number;
-    /**
-     * 
      * @type {SortObject}
      * @memberof PageableObject
      */
     sort?: SortObject;
+    /**
+     * 
+     * @type {number}
+     * @memberof PageableObject
+     */
+    offset?: number;
 }
 
 /**
@@ -86,8 +86,8 @@ export function PageableObjectFromJSONTyped(json: any, ignoreDiscriminator: bool
         'pageNumber': json['pageNumber'] == null ? undefined : json['pageNumber'],
         'pageSize': json['pageSize'] == null ? undefined : json['pageSize'],
         'unpaged': json['unpaged'] == null ? undefined : json['unpaged'],
-        'offset': json['offset'] == null ? undefined : json['offset'],
         'sort': json['sort'] == null ? undefined : SortObjectFromJSON(json['sort']),
+        'offset': json['offset'] == null ? undefined : json['offset'],
     };
 }
 
@@ -106,8 +106,8 @@ export function PageableObjectToJSONTyped(value?: PageableObject | null, ignoreD
         'pageNumber': value['pageNumber'],
         'pageSize': value['pageSize'],
         'unpaged': value['unpaged'],
-        'offset': value['offset'],
         'sort': SortObjectToJSON(value['sort']),
+        'offset': value['offset'],
     };
 }
 

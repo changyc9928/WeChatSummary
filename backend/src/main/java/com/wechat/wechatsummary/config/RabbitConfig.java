@@ -34,6 +34,11 @@ public class RabbitConfig {
     public static final String AUDIO_QUEUE = "audio.queue";
 
     /**
+     * Dedicated AMQP queue identifier for video frame extraction and processing operations.
+     */
+    public static final String VIDEO_QUEUE = "video.queue";
+
+    /**
      * Binding routing key utilized to target the image processing infrastructure.
      */
     public static final String IMAGE_ROUTING_KEY = "media.image";
@@ -42,6 +47,11 @@ public class RabbitConfig {
      * Binding routing key utilized to target the whisper audio transcription infrastructure.
      */
     public static final String AUDIO_ROUTING_KEY = "media.audio";
+
+    /**
+     * Binding routing key utilized to target the video processing infrastructure.
+     */
+    public static final String VIDEO_ROUTING_KEY = "media.video";
 
     @Value("${rabbit.concurrent-consumers:3}")
     private int concurrentConsumers;
@@ -137,5 +147,32 @@ public class RabbitConfig {
             .bind(audioQueue)
             .to(mediaExchange)
             .with(AUDIO_ROUTING_KEY);
+    }
+
+    // --- Video Queue & Bindings Infrastructure ---
+
+    /**
+     * Provisions a durable queue dedicated to handling video file processing transactions.
+     *
+     * @return a durable video Queue instance
+     */
+    @Bean
+    public Queue videoQueue() {
+        return new Queue(VIDEO_QUEUE, true);
+    }
+
+    /**
+     * Binds the video queue to the media topic exchange using the designated video routing key.
+     *
+     * @param videoQueue    the configured video queue bean
+     * @param mediaExchange the centralized media topic exchange bean
+     * @return a configured Binding instance
+     */
+    @Bean
+    public Binding videoBinding(Queue videoQueue, TopicExchange mediaExchange) {
+        return BindingBuilder
+            .bind(videoQueue)
+            .to(mediaExchange)
+            .with(VIDEO_ROUTING_KEY);
     }
 }

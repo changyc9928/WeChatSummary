@@ -1,0 +1,25 @@
+{
+  "$schema": "https://opencode.ai/config.json",
+  "provider": {
+    "llmreverseproxy": {
+      "name": "LLM Reverse Proxy",
+      "npm": "@ai-sdk/openai-compatible",
+      "options": {
+        "baseURL": "http://127.0.0.1:18443/v1"
+      },
+      "models": {
+        "gemini-web": {
+          "name": "Gemini Web",
+          "limit": {
+            "context": 30000,
+            "output": 8192
+          }
+        },
+        "gpt-web": {
+          "name": "GPT Web"
+        }
+      }
+    }
+  },
+  "model": "llmreverseproxy/gemini-web"
+}

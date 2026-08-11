@@ -55,6 +55,12 @@ custom-ai:
     api-key: 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
     model: meta/llama-3.2-90b-vision-instruct
     timeout: 60m
+  video:
+    base-url: https://integrate.api.nvidia.com/v1
+    api-key: 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
+    model: meta/llama-3.2-90b-vision-instruct
+    timeout: 60m
+    frame-count: 5
 
 storage:
   upload-dir: ./uploads

@@ -12,7 +12,9 @@ import com.wechat.wechatsummary.service.AudioProcessorService;
 import com.wechat.wechatsummary.service.ImageProcessorService;
 import com.wechat.wechatsummary.service.MediaProducerService;
 import com.wechat.wechatsummary.service.MessageProcessorService;
+import com.wechat.wechatsummary.entity.VideoSummary;
 import com.wechat.wechatsummary.service.TaskCoordinatorService;
+import com.wechat.wechatsummary.service.VideoProcessorService;
 import java.io.IOException;
 import java.util.List;
 import lombok.RequiredArgsConstructor;
@@ -51,6 +53,7 @@ public class PreprocessController {
     private final MessageProcessorService messageProcessorService;
     private final ImageProcessorService imageProcessorService;
     private final AudioProcessorService audioProcessorService;
+    private final VideoProcessorService videoProcessorService;
     private final HttpConfig httpConfig;
 
     @PostMapping("/{uuid}")
@@ -291,6 +294,97 @@ public class PreprocessController {
             userId);
 
         return audioProcessorService.getAudioFileById(id)
+            .map(fileObj -> ResponseEntity.ok()
+                .contentType(MediaType.parseMediaType(fileObj.contentType()))
+                .header(HttpHeaders.CACHE_CONTROL, "max-age=" + httpConfig.getCacheMaxAge().toSeconds())
+                .body(fileObj.resource()))
+            .orElseGet(() -> ResponseEntity.notFound().build());
+    }
+
+    // =========================================================================
+    // VIDEO SUMMARY MANAGEMENT ENDPOINTS
+    // =========================================================================
+
+    @GetMapping("/videos/summaries")
+    public ApiResponse<Page<VideoSummary>> getVideoSummariesByUuid(
+        @RequestHeader("X-User-Id") String userId,
+        @RequestParam("uuid") String uuid,
+        @RequestParam(defaultValue = "0") int page,
+        @RequestParam(defaultValue = "20") int size) {
+
+        log.info(
+            "REST endpoint invoked to retrieve video summary records for user UUID: [{}] and session UUID: [{}] (page: {}, size: {})",
+            userId, uuid, page, size);
+
+        Pageable pageable = PageRequest.of(page, size);
+        Page<VideoSummary> summaries = videoProcessorService.getVideoSummariesByUuid(uuid, pageable);
+
+        return ApiResponse.success(summaries);
+    }
+
+    @DeleteMapping("/videos/summaries/{id}/text")
+    public ApiResponse<Void> clearVideoSummaryTextById(
+        @RequestHeader("X-User-Id") String userId,
+        @PathVariable String id) {
+        log.info(
+            "REST endpoint invoked to clear video summary text for ID: [{}] and user UUID: [{}]",
+            id, userId);
+        videoProcessorService.clearVideoSummaryTextById(id);
+        return ApiResponse.success("Video summary text cleared", null);
+    }
+
+    @DeleteMapping("/videos/summaries/text")
+    public ApiResponse<Void> clearVideoSummaryTextsByIds(
+        @RequestHeader("X-User-Id") String userId,
+        @RequestBody List<String> ids) {
+        log.info(
+            "REST endpoint invoked to batch clear [{}] video summary texts for user UUID: [{}]",
+            ids != null ? ids.size() : 0, userId);
+        videoProcessorService.clearVideoSummaryTextsByIds(ids);
+        return ApiResponse.success("Video summary texts cleared", null);
+    }
+
+    @DeleteMapping("/videos/summaries/{id}")
+    public ApiResponse<Void> deleteVideoSummaryById(
+        @RequestHeader("X-User-Id") String userId,
+        @PathVariable String id) {
+        log.info(
+            "REST endpoint invoked to delete full video record with ID: [{}] for user UUID: [{}]",
+            id, userId);
+        videoProcessorService.deleteVideoSummaryById(id);
+        return ApiResponse.success("Video summary deleted", null);
+    }
+
+    @DeleteMapping("/videos/summaries")
+    public ApiResponse<Void> deleteVideoSummariesByIds(
+        @RequestHeader("X-User-Id") String userId,
+        @RequestBody List<String> ids) {
+        log.info(
+            "REST endpoint invoked to batch delete [{}] full video records for user UUID: [{}]",
+            ids != null ? ids.size() : 0, userId);
+        videoProcessorService.deleteVideoSummariesByIds(ids);
+        return ApiResponse.success("Video summaries deleted", null);
+    }
+
+    @DeleteMapping("/videos/summaries/all")
+    public ApiResponse<Void> deleteAllVideoSummariesByUuid(
+        @RequestHeader("X-User-Id") String userId,
+        @RequestParam("uuid") String uuid) {
+        log.info(
+            "REST endpoint invoked to delete ALL full video records for user UUID: [{}] and session UUID: [{}]",
+            userId, uuid);
+        videoProcessorService.deleteAllVideoSummariesByUuid(uuid);
+        return ApiResponse.success("All video summaries deleted", null);
+    }
+
+    @GetMapping("/videos/{id}/file")
+    public ResponseEntity<Resource> getVideoFileById(
+        @RequestHeader("X-User-Id") String userId,
+        @PathVariable String id) {
+        log.info("REST endpoint invoked to fetch video file for ID: [{}] and user UUID: [{}]", id,
+            userId);
+
+        return videoProcessorService.getVideoFileById(id)
             .map(fileObj -> ResponseEntity.ok()
                 .contentType(MediaType.parseMediaType(fileObj.contentType()))
                 .header(HttpHeaders.CACHE_CONTROL, "max-age=" + httpConfig.getCacheMaxAge().toSeconds())

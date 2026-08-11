@@ -72,6 +72,7 @@ export const translations = {
     'preprocess.selectDatasetFirst': 'Select or upload a dataset first.',
     'preprocess.viewImages': '📁 View Image Summaries',
     'preprocess.viewAudios': '🎙️ View Audio Summaries',
+    'preprocess.viewVideos': '🎬 View Video Summaries',
     'preprocess.starting': 'Starting...',
     'preprocess.start': 'Start Preprocessing',
     'preprocess.tasksProcessed': 'Processed {done} of {total} tasks ({remaining} remaining)',
@@ -131,6 +132,18 @@ export const translations = {
     'audios.aiSummary': 'AI Audio Summary',
     'audios.noTranscript': 'No transcript text',
     'audios.clearText': 'Clear Text',
+
+    'videos.title': 'Video Transcripts & Summaries',
+    'videos.panelTitle': 'Video Transcripts & Summaries',
+    'videos.noDataset': 'No active dataset selected. Please choose or upload a dataset from the dashboard.',
+    'videos.clearTextCount': 'Clear Text ({count})',
+    'videos.deleteCount': 'Delete ({count})',
+    'videos.loading': 'Loading video elements...',
+    'videos.none': 'No processed video logs found for this dataset.',
+    'videos.transcript': 'Transcript Text',
+    'videos.aiSummary': 'AI Video Summary',
+    'videos.noTranscript': 'No transcript text',
+    'videos.clearText': 'Clear Text',
 
     'modal.summary': 'Summary:',
     'modal.noSummary': 'No summary available.'
@@ -204,6 +217,7 @@ export const translations = {
     'preprocess.selectDatasetFirst': '请先选择或上传数据集。',
     'preprocess.viewImages': '📁 查看图片摘要',
     'preprocess.viewAudios': '🎙️ 查看语音摘要',
+    'preprocess.viewVideos': '🎬 查看视频摘要',
     'preprocess.starting': '启动中...',
     'preprocess.start': '开始预处理',
     'preprocess.tasksProcessed': '已处理 {total} 个任务中的 {done} 个（剩余 {remaining} 个）',
@@ -263,6 +277,18 @@ export const translations = {
     'audios.aiSummary': 'AI 语音摘要',
     'audios.noTranscript': '暂无转录文本',
     'audios.clearText': '清除文本',
+
+    'videos.title': '视频转录与摘要',
+    'videos.panelTitle': '视频转录与摘要',
+    'videos.noDataset': '未选择数据集，请从主面板选择或上传数据集。',
+    'videos.clearTextCount': '清除文本（{count}）',
+    'videos.deleteCount': '删除（{count}）',
+    'videos.loading': '正在加载视频记录...',
+    'videos.none': '此数据集暂未处理到视频记录。',
+    'videos.transcript': '转录文本',
+    'videos.aiSummary': 'AI 视频摘要',
+    'videos.noTranscript': '暂无转录文本',
+    'videos.clearText': '清除文本',
 
     'modal.summary': '摘要：',
     'modal.noSummary': '暂无摘要。'

@@ -17,24 +17,24 @@ import * as runtime from '../runtime';
 import type {
   ApiResponsePageAudioSummary,
   ApiResponsePageImageSummaryEntity,
+  ApiResponsePageVideoSummary,
   ApiResponseTaskAckResponse,
   ApiResponseTaskProgress,
   ApiResponseVoid,
-  ErrorResponse,
 } from '../models/index';
 import {
     ApiResponsePageAudioSummaryFromJSON,
     ApiResponsePageAudioSummaryToJSON,
     ApiResponsePageImageSummaryEntityFromJSON,
     ApiResponsePageImageSummaryEntityToJSON,
+    ApiResponsePageVideoSummaryFromJSON,
+    ApiResponsePageVideoSummaryToJSON,
     ApiResponseTaskAckResponseFromJSON,
     ApiResponseTaskAckResponseToJSON,
     ApiResponseTaskProgressFromJSON,
     ApiResponseTaskProgressToJSON,
     ApiResponseVoidFromJSON,
     ApiResponseVoidToJSON,
-    ErrorResponseFromJSON,
-    ErrorResponseToJSON,
 } from '../models/index';
 
 export interface AbortTaskRequest {
@@ -52,12 +52,27 @@ export interface ClearAudioSummaryTextsByIdsRequest {
     requestBody: Array<string>;
 }
 
+export interface ClearVideoSummaryTextByIdRequest {
+    xUserId: string;
+    id: string;
+}
+
+export interface ClearVideoSummaryTextsByIdsRequest {
+    xUserId: string;
+    requestBody: Array<string>;
+}
+
 export interface DeleteAllAudioSummariesByUuidRequest {
     xUserId: string;
     uuid: string;
 }
 
 export interface DeleteAllImageSummariesByUuidRequest {
+    xUserId: string;
+    uuid: string;
+}
+
+export interface DeleteAllVideoSummariesByUuidRequest {
     xUserId: string;
     uuid: string;
 }
@@ -78,6 +93,16 @@ export interface DeleteImageSummariesByIdsRequest {
 }
 
 export interface DeleteImageSummaryByIdRequest {
+    xUserId: string;
+    id: string;
+}
+
+export interface DeleteVideoSummariesByIdsRequest {
+    xUserId: string;
+    requestBody: Array<string>;
+}
+
+export interface DeleteVideoSummaryByIdRequest {
     xUserId: string;
     id: string;
 }
@@ -109,6 +134,18 @@ export interface GetImageSummariesByUuidRequest {
 export interface GetProgressRequest {
     xUserId: string;
     uuid: string;
+}
+
+export interface GetVideoFileByIdRequest {
+    xUserId: string;
+    id: string;
+}
+
+export interface GetVideoSummariesByUuidRequest {
+    xUserId: string;
+    uuid: string;
+    page?: number;
+    size?: number;
 }
 
 export interface PreprocessRequest {
@@ -268,6 +305,100 @@ export class PreprocessControllerApi extends runtime.BaseAPI {
 
     /**
      */
+    async clearVideoSummaryTextByIdRaw(requestParameters: ClearVideoSummaryTextByIdRequest, initOverrides?: RequestInit | runtime.InitOverrideFunction): Promise<runtime.ApiResponse<ApiResponseVoid>> {
+        if (requestParameters['xUserId'] == null) {
+            throw new runtime.RequiredError(
+                'xUserId',
+                'Required parameter "xUserId" was null or undefined when calling clearVideoSummaryTextById().'
+            );
+        }
+
+        if (requestParameters['id'] == null) {
+            throw new runtime.RequiredError(
+                'id',
+                'Required parameter "id" was null or undefined when calling clearVideoSummaryTextById().'
+            );
+        }
+
+        const queryParameters: any = {};
+
+        const headerParameters: runtime.HTTPHeaders = {};
+
+        if (requestParameters['xUserId'] != null) {
+            headerParameters['X-User-Id'] = String(requestParameters['xUserId']);
+        }
+
+
+        let urlPath = `/api/preprocess/videos/summaries/{id}/text`;
+        urlPath = urlPath.replace(`{${"id"}}`, encodeURIComponent(String(requestParameters['id'])));
+
+        const response = await this.request({
+            path: urlPath,
+            method: 'DELETE',
+            headers: headerParameters,
+            query: queryParameters,
+        }, initOverrides);
+
+        return new runtime.JSONApiResponse(response, (jsonValue) => ApiResponseVoidFromJSON(jsonValue));
+    }
+
+    /**
+     */
+    async clearVideoSummaryTextById(requestParameters: ClearVideoSummaryTextByIdRequest, initOverrides?: RequestInit | runtime.InitOverrideFunction): Promise<ApiResponseVoid> {
+        const response = await this.clearVideoSummaryTextByIdRaw(requestParameters, initOverrides);
+        return await response.value();
+    }
+
+    /**
+     */
+    async clearVideoSummaryTextsByIdsRaw(requestParameters: ClearVideoSummaryTextsByIdsRequest, initOverrides?: RequestInit | runtime.InitOverrideFunction): Promise<runtime.ApiResponse<ApiResponseVoid>> {
+        if (requestParameters['xUserId'] == null) {
+            throw new runtime.RequiredError(
+                'xUserId',
+                'Required parameter "xUserId" was null or undefined when calling clearVideoSummaryTextsByIds().'
+            );
+        }
+
+        if (requestParameters['requestBody'] == null) {
+            throw new runtime.RequiredError(
+                'requestBody',
+                'Required parameter "requestBody" was null or undefined when calling clearVideoSummaryTextsByIds().'
+            );
+        }
+
+        const queryParameters: any = {};
+
+        const headerParameters: runtime.HTTPHeaders = {};
+
+        headerParameters['Content-Type'] = 'application/json';
+
+        if (requestParameters['xUserId'] != null) {
+            headerParameters['X-User-Id'] = String(requestParameters['xUserId']);
+        }
+
+
+        let urlPath = `/api/preprocess/videos/summaries/text`;
+
+        const response = await this.request({
+            path: urlPath,
+            method: 'DELETE',
+            headers: headerParameters,
+            query: queryParameters,
+            body: requestParameters['requestBody'],
+        }, initOverrides);
+
+        return new runtime.JSONApiResponse(response, (jsonValue) => ApiResponseVoidFromJSON(jsonValue));
+    }
+
+    /**
+     */
+    async clearVideoSummaryTextsByIds(requestParameters: ClearVideoSummaryTextsByIdsRequest, initOverrides?: RequestInit | runtime.InitOverrideFunction): Promise<ApiResponseVoid> {
+        const response = await this.clearVideoSummaryTextsByIdsRaw(requestParameters, initOverrides);
+        return await response.value();
+    }
+
+    /**
+     */
     async deleteAllAudioSummariesByUuidRaw(requestParameters: DeleteAllAudioSummariesByUuidRequest, initOverrides?: RequestInit | runtime.InitOverrideFunction): Promise<runtime.ApiResponse<ApiResponseVoid>> {
         if (requestParameters['xUserId'] == null) {
             throw new runtime.RequiredError(
@@ -361,6 +492,55 @@ export class PreprocessControllerApi extends runtime.BaseAPI {
      */
     async deleteAllImageSummariesByUuid(requestParameters: DeleteAllImageSummariesByUuidRequest, initOverrides?: RequestInit | runtime.InitOverrideFunction): Promise<ApiResponseVoid> {
         const response = await this.deleteAllImageSummariesByUuidRaw(requestParameters, initOverrides);
+        return await response.value();
+    }
+
+    /**
+     */
+    async deleteAllVideoSummariesByUuidRaw(requestParameters: DeleteAllVideoSummariesByUuidRequest, initOverrides?: RequestInit | runtime.InitOverrideFunction): Promise<runtime.ApiResponse<ApiResponseVoid>> {
+        if (requestParameters['xUserId'] == null) {
+            throw new runtime.RequiredError(
+                'xUserId',
+                'Required parameter "xUserId" was null or undefined when calling deleteAllVideoSummariesByUuid().'
+            );
+        }
+
+        if (requestParameters['uuid'] == null) {
+            throw new runtime.RequiredError(
+                'uuid',
+                'Required parameter "uuid" was null or undefined when calling deleteAllVideoSummariesByUuid().'
+            );
+        }
+
+        const queryParameters: any = {};
+
+        if (requestParameters['uuid'] != null) {
+            queryParameters['uuid'] = requestParameters['uuid'];
+        }
+
+        const headerParameters: runtime.HTTPHeaders = {};
+
+        if (requestParameters['xUserId'] != null) {
+            headerParameters['X-User-Id'] = String(requestParameters['xUserId']);
+        }
+
+
+        let urlPath = `/api/preprocess/videos/summaries/all`;
+
+        const response = await this.request({
+            path: urlPath,
+            method: 'DELETE',
+            headers: headerParameters,
+            query: queryParameters,
+        }, initOverrides);
+
+        return new runtime.JSONApiResponse(response, (jsonValue) => ApiResponseVoidFromJSON(jsonValue));
+    }
+
+    /**
+     */
+    async deleteAllVideoSummariesByUuid(requestParameters: DeleteAllVideoSummariesByUuidRequest, initOverrides?: RequestInit | runtime.InitOverrideFunction): Promise<ApiResponseVoid> {
+        const response = await this.deleteAllVideoSummariesByUuidRaw(requestParameters, initOverrides);
         return await response.value();
     }
 
@@ -549,6 +729,100 @@ export class PreprocessControllerApi extends runtime.BaseAPI {
      */
     async deleteImageSummaryById(requestParameters: DeleteImageSummaryByIdRequest, initOverrides?: RequestInit | runtime.InitOverrideFunction): Promise<ApiResponseVoid> {
         const response = await this.deleteImageSummaryByIdRaw(requestParameters, initOverrides);
+        return await response.value();
+    }
+
+    /**
+     */
+    async deleteVideoSummariesByIdsRaw(requestParameters: DeleteVideoSummariesByIdsRequest, initOverrides?: RequestInit | runtime.InitOverrideFunction): Promise<runtime.ApiResponse<ApiResponseVoid>> {
+        if (requestParameters['xUserId'] == null) {
+            throw new runtime.RequiredError(
+                'xUserId',
+                'Required parameter "xUserId" was null or undefined when calling deleteVideoSummariesByIds().'
+            );
+        }
+
+        if (requestParameters['requestBody'] == null) {
+            throw new runtime.RequiredError(
+                'requestBody',
+                'Required parameter "requestBody" was null or undefined when calling deleteVideoSummariesByIds().'
+            );
+        }
+
+        const queryParameters: any = {};
+
+        const headerParameters: runtime.HTTPHeaders = {};
+
+        headerParameters['Content-Type'] = 'application/json';
+
+        if (requestParameters['xUserId'] != null) {
+            headerParameters['X-User-Id'] = String(requestParameters['xUserId']);
+        }
+
+
+        let urlPath = `/api/preprocess/videos/summaries`;
+
+        const response = await this.request({
+            path: urlPath,
+            method: 'DELETE',
+            headers: headerParameters,
+            query: queryParameters,
+            body: requestParameters['requestBody'],
+        }, initOverrides);
+
+        return new runtime.JSONApiResponse(response, (jsonValue) => ApiResponseVoidFromJSON(jsonValue));
+    }
+
+    /**
+     */
+    async deleteVideoSummariesByIds(requestParameters: DeleteVideoSummariesByIdsRequest, initOverrides?: RequestInit | runtime.InitOverrideFunction): Promise<ApiResponseVoid> {
+        const response = await this.deleteVideoSummariesByIdsRaw(requestParameters, initOverrides);
+        return await response.value();
+    }
+
+    /**
+     */
+    async deleteVideoSummaryByIdRaw(requestParameters: DeleteVideoSummaryByIdRequest, initOverrides?: RequestInit | runtime.InitOverrideFunction): Promise<runtime.ApiResponse<ApiResponseVoid>> {
+        if (requestParameters['xUserId'] == null) {
+            throw new runtime.RequiredError(
+                'xUserId',
+                'Required parameter "xUserId" was null or undefined when calling deleteVideoSummaryById().'
+            );
+        }
+
+        if (requestParameters['id'] == null) {
+            throw new runtime.RequiredError(
+                'id',
+                'Required parameter "id" was null or undefined when calling deleteVideoSummaryById().'
+            );
+        }
+
+        const queryParameters: any = {};
+
+        const headerParameters: runtime.HTTPHeaders = {};
+
+        if (requestParameters['xUserId'] != null) {
+            headerParameters['X-User-Id'] = String(requestParameters['xUserId']);
+        }
+
+
+        let urlPath = `/api/preprocess/videos/summaries/{id}`;
+        urlPath = urlPath.replace(`{${"id"}}`, encodeURIComponent(String(requestParameters['id'])));
+
+        const response = await this.request({
+            path: urlPath,
+            method: 'DELETE',
+            headers: headerParameters,
+            query: queryParameters,
+        }, initOverrides);
+
+        return new runtime.JSONApiResponse(response, (jsonValue) => ApiResponseVoidFromJSON(jsonValue));
+    }
+
+    /**
+     */
+    async deleteVideoSummaryById(requestParameters: DeleteVideoSummaryByIdRequest, initOverrides?: RequestInit | runtime.InitOverrideFunction): Promise<ApiResponseVoid> {
+        const response = await this.deleteVideoSummaryByIdRaw(requestParameters, initOverrides);
         return await response.value();
     }
 
@@ -806,18 +1080,18 @@ export class PreprocessControllerApi extends runtime.BaseAPI {
 
     /**
      */
-    async reprocessRaw(requestParameters: ReprocessRequest, initOverrides?: RequestInit | runtime.InitOverrideFunction): Promise<runtime.ApiResponse<ApiResponseTaskAckResponse>> {
+    async getVideoFileByIdRaw(requestParameters: GetVideoFileByIdRequest, initOverrides?: RequestInit | runtime.InitOverrideFunction): Promise<runtime.ApiResponse<Blob>> {
         if (requestParameters['xUserId'] == null) {
             throw new runtime.RequiredError(
                 'xUserId',
-                'Required parameter "xUserId" was null or undefined when calling reprocess().'
+                'Required parameter "xUserId" was null or undefined when calling getVideoFileById().'
             );
         }
 
-        if (requestParameters['uuid'] == null) {
+        if (requestParameters['id'] == null) {
             throw new runtime.RequiredError(
-                'uuid',
-                'Required parameter "uuid" was null or undefined when calling reprocess().'
+                'id',
+                'Required parameter "id" was null or undefined when calling getVideoFileById().'
             );
         }
 
@@ -830,23 +1104,80 @@ export class PreprocessControllerApi extends runtime.BaseAPI {
         }
 
 
-        let urlPath = `/api/preprocess/{uuid}/reprocess`;
-        urlPath = urlPath.replace(`{${"uuid"}}`, encodeURIComponent(String(requestParameters['uuid'])));
+        let urlPath = `/api/preprocess/videos/{id}/file`;
+        urlPath = urlPath.replace(`{${"id"}}`, encodeURIComponent(String(requestParameters['id'])));
 
         const response = await this.request({
             path: urlPath,
-            method: 'POST',
+            method: 'GET',
             headers: headerParameters,
             query: queryParameters,
         }, initOverrides);
 
-        return new runtime.JSONApiResponse(response, (jsonValue) => ApiResponseTaskAckResponseFromJSON(jsonValue));
+        return new runtime.BlobApiResponse(response);
     }
 
     /**
      */
-    async reprocess(requestParameters: ReprocessRequest, initOverrides?: RequestInit | runtime.InitOverrideFunction): Promise<ApiResponseTaskAckResponse> {
-        const response = await this.reprocessRaw(requestParameters, initOverrides);
+    async getVideoFileById(requestParameters: GetVideoFileByIdRequest, initOverrides?: RequestInit | runtime.InitOverrideFunction): Promise<Blob> {
+        const response = await this.getVideoFileByIdRaw(requestParameters, initOverrides);
+        return await response.value();
+    }
+
+    /**
+     */
+    async getVideoSummariesByUuidRaw(requestParameters: GetVideoSummariesByUuidRequest, initOverrides?: RequestInit | runtime.InitOverrideFunction): Promise<runtime.ApiResponse<ApiResponsePageVideoSummary>> {
+        if (requestParameters['xUserId'] == null) {
+            throw new runtime.RequiredError(
+                'xUserId',
+                'Required parameter "xUserId" was null or undefined when calling getVideoSummariesByUuid().'
+            );
+        }
+
+        if (requestParameters['uuid'] == null) {
+            throw new runtime.RequiredError(
+                'uuid',
+                'Required parameter "uuid" was null or undefined when calling getVideoSummariesByUuid().'
+            );
+        }
+
+        const queryParameters: any = {};
+
+        if (requestParameters['uuid'] != null) {
+            queryParameters['uuid'] = requestParameters['uuid'];
+        }
+
+        if (requestParameters['page'] != null) {
+            queryParameters['page'] = requestParameters['page'];
+        }
+
+        if (requestParameters['size'] != null) {
+            queryParameters['size'] = requestParameters['size'];
+        }
+
+        const headerParameters: runtime.HTTPHeaders = {};
+
+        if (requestParameters['xUserId'] != null) {
+            headerParameters['X-User-Id'] = String(requestParameters['xUserId']);
+        }
+
+
+        let urlPath = `/api/preprocess/videos/summaries`;
+
+        const response = await this.request({
+            path: urlPath,
+            method: 'GET',
+            headers: headerParameters,
+            query: queryParameters,
+        }, initOverrides);
+
+        return new runtime.JSONApiResponse(response, (jsonValue) => ApiResponsePageVideoSummaryFromJSON(jsonValue));
+    }
+
+    /**
+     */
+    async getVideoSummariesByUuid(requestParameters: GetVideoSummariesByUuidRequest, initOverrides?: RequestInit | runtime.InitOverrideFunction): Promise<ApiResponsePageVideoSummary> {
+        const response = await this.getVideoSummariesByUuidRaw(requestParameters, initOverrides);
         return await response.value();
     }
 
@@ -893,6 +1224,52 @@ export class PreprocessControllerApi extends runtime.BaseAPI {
      */
     async preprocess(requestParameters: PreprocessRequest, initOverrides?: RequestInit | runtime.InitOverrideFunction): Promise<ApiResponseTaskAckResponse> {
         const response = await this.preprocessRaw(requestParameters, initOverrides);
+        return await response.value();
+    }
+
+    /**
+     */
+    async reprocessRaw(requestParameters: ReprocessRequest, initOverrides?: RequestInit | runtime.InitOverrideFunction): Promise<runtime.ApiResponse<ApiResponseTaskAckResponse>> {
+        if (requestParameters['xUserId'] == null) {
+            throw new runtime.RequiredError(
+                'xUserId',
+                'Required parameter "xUserId" was null or undefined when calling reprocess().'
+            );
+        }
+
+        if (requestParameters['uuid'] == null) {
+            throw new runtime.RequiredError(
+                'uuid',
+                'Required parameter "uuid" was null or undefined when calling reprocess().'
+            );
+        }
+
+        const queryParameters: any = {};
+
+        const headerParameters: runtime.HTTPHeaders = {};
+
+        if (requestParameters['xUserId'] != null) {
+            headerParameters['X-User-Id'] = String(requestParameters['xUserId']);
+        }
+
+
+        let urlPath = `/api/preprocess/{uuid}/reprocess`;
+        urlPath = urlPath.replace(`{${"uuid"}}`, encodeURIComponent(String(requestParameters['uuid'])));
+
+        const response = await this.request({
+            path: urlPath,
+            method: 'POST',
+            headers: headerParameters,
+            query: queryParameters,
+        }, initOverrides);
+
+        return new runtime.JSONApiResponse(response, (jsonValue) => ApiResponseTaskAckResponseFromJSON(jsonValue));
+    }
+
+    /**
+     */
+    async reprocess(requestParameters: ReprocessRequest, initOverrides?: RequestInit | runtime.InitOverrideFunction): Promise<ApiResponseTaskAckResponse> {
+        const response = await this.reprocessRaw(requestParameters, initOverrides);
         return await response.value();
     }
 

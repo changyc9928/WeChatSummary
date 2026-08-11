@@ -261,8 +261,10 @@ public class MessageProcessorService {
         } else if ("语音消息".equals(type) || localType == LOCAL_TYPE_AUDIO) {
             String audioHash = extractPathHash(userId, uuid, msg.getContent(), msg.getRawContent());
             return "(语音转译: " + getAudioSummary(audioHash) + ")";
-        } else if ("视频消息".equals(type) || localType == LOCAL_TYPE_VIDEO || "文件".equals(type)
-            || localType == LOCAL_TYPE_FILE) {
+        } else if ("视频消息".equals(type) || localType == LOCAL_TYPE_VIDEO) {
+            String videoHash = extractPathHash(userId, uuid, msg.getContent(), msg.getRawContent());
+            return "(视频描述：" + getVideoSummary(videoHash) + ")";
+        } else if ("文件".equals(type) || localType == LOCAL_TYPE_FILE) {
             return "[" + type + "消息，暂未处理]";
         } else if ("引用消息".equals(type) || localType == LOCAL_TYPE_REFER_MESSAGE) {
             String raw = msg.getRawContent();
@@ -301,7 +303,7 @@ public class MessageProcessorService {
 
         String lowerPath = relativePath.toLowerCase();
         if (lowerPath.startsWith("images") || lowerPath.startsWith("emojis")
-            || lowerPath.startsWith("voices")) {
+            || lowerPath.startsWith("voices") || lowerPath.startsWith("videos")) {
 
             // Correct path construction: uploadDir / userId / uuid / relativePath
             Path resolvedPath = storagePaths.sessionDir(userId, uuid).resolve(relativePath);
@@ -364,5 +366,13 @@ public class MessageProcessorService {
         }
         return cacheService.getAudioSummary(hash)
             .orElse("语音无描述");
+    }
+
+    private String getVideoSummary(String hash) {
+        if (!StringUtils.hasText(hash)) {
+            return "未找到视频";
+        }
+        return cacheService.getVideoSummary(hash)
+            .orElse("视频无描述");
     }
 }

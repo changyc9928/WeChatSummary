@@ -17,15 +17,12 @@ import * as runtime from '../runtime';
 import type {
   ApiResponseAuthResponse,
   AuthRequest,
-  ErrorResponse,
 } from '../models/index';
 import {
     ApiResponseAuthResponseFromJSON,
     ApiResponseAuthResponseToJSON,
     AuthRequestFromJSON,
     AuthRequestToJSON,
-    ErrorResponseFromJSON,
-    ErrorResponseToJSON,
 } from '../models/index';
 
 export interface LoginRequest {

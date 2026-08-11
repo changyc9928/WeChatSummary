@@ -17,15 +17,12 @@ import * as runtime from '../runtime';
 import type {
   ApiResponseListSessionResponseDTO,
   ApiResponseUploadSessionResponse,
-  ErrorResponse,
 } from '../models/index';
 import {
     ApiResponseListSessionResponseDTOFromJSON,
     ApiResponseListSessionResponseDTOToJSON,
     ApiResponseUploadSessionResponseFromJSON,
     ApiResponseUploadSessionResponseToJSON,
-    ErrorResponseFromJSON,
-    ErrorResponseToJSON,
 } from '../models/index';
 
 export interface GetAvailableSessionsRequest {

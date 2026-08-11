@@ -18,7 +18,6 @@ import type {
   ApiResponseChatPreviewResponse,
   ApiResponseSummaryProgressResponse,
   ApiResponseTaskAckResponse,
-  ErrorResponse,
   SummaryRequestDTO,
 } from '../models/index';
 import {
@@ -28,8 +27,6 @@ import {
     ApiResponseSummaryProgressResponseToJSON,
     ApiResponseTaskAckResponseFromJSON,
     ApiResponseTaskAckResponseToJSON,
-    ErrorResponseFromJSON,
-    ErrorResponseToJSON,
     SummaryRequestDTOFromJSON,
     SummaryRequestDTOToJSON,
 } from '../models/index';

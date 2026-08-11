@@ -211,6 +211,15 @@ public class TaskCoordinatorService {
             return new TaskProgress(TaskStatus.RUNNING, total, remaining);
         }
 
+        // 3.5 Counter context still present -> RUNNING. This covers both the window where
+        // queued messages have not been consumed yet and the final markdown compilation that
+        // runs after the last consumer thread finishes (threads are gone, the counter key is
+        // only deleted once the .md artifact exists). Prevents the UI from flickering back to
+        // an IDLING start button mid/end-of-task.
+        if (Boolean.TRUE.equals(redisTemplate.hasKey(COUNTER_PREFIX + uuid))) {
+            return new TaskProgress(TaskStatus.RUNNING, total, remaining);
+        }
+
         // 4. Otherwise -> IDLING
         return new TaskProgress(TaskStatus.IDLING, total, remaining);
     }

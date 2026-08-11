@@ -9,6 +9,7 @@ models/ApiResponseChatPreviewResponse.ts
 models/ApiResponseListSessionResponseDTO.ts
 models/ApiResponsePageAudioSummary.ts
 models/ApiResponsePageImageSummaryEntity.ts
+models/ApiResponsePageVideoSummary.ts
 models/ApiResponseSummaryProgressResponse.ts
 models/ApiResponseTaskAckResponse.ts
 models/ApiResponseTaskProgress.ts
@@ -19,10 +20,10 @@ models/AuthRequest.ts
 models/AuthResponse.ts
 models/ChatPreviewResponse.ts
 models/ChatPreviewRow.ts
-models/ErrorResponse.ts
 models/ImageSummaryEntity.ts
 models/PageAudioSummary.ts
 models/PageImageSummaryEntity.ts
+models/PageVideoSummary.ts
 models/PageableObject.ts
 models/SessionResponseDTO.ts
 models/SortObject.ts
@@ -31,5 +32,6 @@ models/SummaryRequestDTO.ts
 models/TaskAckResponse.ts
 models/TaskProgress.ts
 models/UploadSessionResponse.ts
+models/VideoSummary.ts
 models/index.ts
 runtime.ts

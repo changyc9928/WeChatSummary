@@ -8,10 +8,12 @@ import usePreprocess from './hooks/usePreprocess';
 import useSummaryStatus from './hooks/useSummaryStatus';
 import useImageSummaries from './hooks/useImageSummaries';
 import useAudioSummaries from './hooks/useAudioSummaries';
+import useVideoSummaries from './hooks/useVideoSummaries';
 import LoginPage from './pages/LoginPage';
 import DashboardPage from './pages/DashboardPage';
 import ImagesPage from './pages/ImagesPage';
 import AudiosPage from './pages/AudiosPage';
+import VideosPage from './pages/VideosPage';
 
 export default function App() {
   const { theme, toggleTheme } = useTheme();
@@ -19,7 +21,7 @@ export default function App() {
 
   const [file, setFile] = useState(null);
   const [uuidInput, setUuidInput] = useState('');
-  const [currentView, setCurrentView] = useState('dashboard'); // 'dashboard' | 'images' | 'audios'
+  const [currentView, setCurrentView] = useState('dashboard');
   const [activeModalImage, setActiveModalImage] = useState(null);
 
   const sessions = useSessions(currentUser);
@@ -32,6 +34,7 @@ export default function App() {
   });
   const images = useImageSummaries({ uuidInput, currentUser });
   const audios = useAudioSummaries({ uuidInput, currentUser });
+  const videos = useVideoSummaries({ uuidInput, currentUser });
   const upload = useUpload({
     currentUser,
     onUploaded: (assignedUuid) => {
@@ -47,7 +50,7 @@ export default function App() {
   };
 
   if (!currentUser) {
-    return <LoginPage theme={theme} onToggleTheme={toggleTheme} onLoginSuccess={login} />;
+    return <LoginPage onLoginSuccess={login} onToggleTheme={toggleTheme} theme={theme}/>;
   }
 
   const loading = {
@@ -63,9 +66,9 @@ export default function App() {
   if (currentView === 'images') {
     return (
       <ImagesPage
-        theme={theme}
-        onToggleTheme={toggleTheme}
         onBack={() => setCurrentView('dashboard')}
+        onToggleTheme={toggleTheme}
+        theme={theme}
         uuidInput={uuidInput}
         currentUser={currentUser}
         images={{
@@ -91,9 +94,9 @@ export default function App() {
   if (currentView === 'audios') {
     return (
       <AudiosPage
-        theme={theme}
-        onToggleTheme={toggleTheme}
         onBack={() => setCurrentView('dashboard')}
+        onToggleTheme={toggleTheme}
+        theme={theme}
         uuidInput={uuidInput}
         audios={{
           summaries: audios.audioSummaries,
@@ -117,38 +120,68 @@ export default function App() {
     );
   }
 
+  if (currentView === 'videos') {
+    return (
+      <VideosPage
+        onBack={() => setCurrentView('dashboard')}
+        onToggleTheme={toggleTheme}
+        theme={theme}
+        uuidInput={uuidInput}
+        videos={{
+          summaries: videos.videoSummaries,
+          loading: videos.loadingVideos,
+          pagination: videos.videoPagination,
+          fetchSummaries: videos.fetchVideoSummaries,
+          selectedIds: videos.selectedVideoIds,
+          setSelectedIds: videos.setSelectedVideoIds,
+          deleting: videos.deleting,
+          clearingText: videos.clearingText,
+          batchDeleting: videos.batchDeleting,
+          batchClearingText: videos.batchClearingText,
+          error: videos.error,
+          deleteVideo: videos.deleteVideo,
+          clearText: videos.clearVideoText,
+          batchDelete: videos.batchDeleteVideos,
+          batchClearText: videos.batchClearVideoTexts
+        }}
+        onRefreshProgress={(uuid) => preprocess.checkProgress(uuid)}
+      />
+    );
+  }
+
   return (
     <DashboardPage
-      theme={theme}
-      onToggleTheme={toggleTheme}
       currentUser={currentUser}
-      onLogout={handleLogout}
-      file={file}
-      setFile={setFile}
-      upload={upload}
-      uuidInput={uuidInput}
-      setUuidInput={setUuidInput}
-      sessions={sessions.sessions}
-      loadingSessions={sessions.loadingSessions}
       fetchSessions={sessions.fetchSessions}
+      file={file}
       loading={loading}
-      preprocess={{
-        isFinished: preprocess.isFinished,
-        progress: preprocess.progress,
-        onStart: preprocess.startPreprocess,
-        onAbort: preprocess.abortPreprocess,
-        onReprocess: preprocess.reprocess
-      }}
-      preprocessError={preprocess.error}
-      timeWindow={timeWindow}
-      summary={{
-        state: summary.summaryState,
-        onStart: summary.startSummary,
-        onPause: summary.pauseSummary,
-        onRestart: summary.restartSummary
-      }}
+      loadingSessions={sessions.loadingSessions}
+      onLogout={handleLogout}
       onNavigateToImages={() => setCurrentView('images')}
       onNavigateToAudios={() => setCurrentView('audios')}
+      onNavigateToVideos={() => setCurrentView('videos')}
+      onToggleTheme={toggleTheme}
+      preprocess={{
+        abortPreprocess: preprocess.abortPreprocess,
+        isFinished: preprocess.isFinished,
+        progress: preprocess.progress,
+        reprocess: preprocess.reprocess,
+        startPreprocess: preprocess.startPreprocess
+      }}
+      preprocessError={preprocess.error}
+      sessions={sessions.sessions}
+      setFile={setFile}
+      setUuidInput={setUuidInput}
+      summary={{
+        pauseSummary: summary.pauseSummary,
+        restartSummary: summary.restartSummary,
+        startSummary: summary.startSummary,
+        summaryState: summary.summaryState
+      }}
+      theme={theme}
+      timeWindow={timeWindow}
+      upload={upload}
+      uuidInput={uuidInput}
       activeModalImage={activeModalImage}
       setActiveModalImage={setActiveModalImage}
     />

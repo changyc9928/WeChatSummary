@@ -16,7 +16,7 @@ import org.springframework.stereotype.Service;
 /**
  * Service responsible for scanning uploaded batch assets under user-isolated directories,
  * initializing task coordination states, and producing messaging payloads to RabbitMQ for
- * individual asynchronous media (images, emojis, voice notes) processing.
+ * individual asynchronous media (images, emojis, voice notes, videos) processing.
  */
 @Service
 @RequiredArgsConstructor
@@ -83,8 +83,10 @@ public class MediaProducerService {
         Path imagesDir = baseDir.resolve("images");
         Path emojisDir = baseDir.resolve("emojis");
         Path voicesDir = baseDir.resolve("voices");
+        Path videosDir = baseDir.resolve("videos");
 
-        int totalMediaFiles = countFiles(imagesDir) + countFiles(emojisDir) + countFiles(voicesDir);
+        int totalMediaFiles = countFiles(imagesDir) + countFiles(emojisDir) + countFiles(voicesDir)
+            + countFiles(videosDir);
         log.info(
             "Media file discovery scan completed for user UUID: [{}] and session UUID: [{}]. Aggregate media items discovered: {}",
             userId, uuid, totalMediaFiles);
@@ -99,6 +101,7 @@ public class MediaProducerService {
             scanAndPublish(userId, uuid, imagesDir, RabbitConfig.IMAGE_ROUTING_KEY);
             scanAndPublish(userId, uuid, emojisDir, RabbitConfig.IMAGE_ROUTING_KEY);
             scanAndPublish(userId, uuid, voicesDir, RabbitConfig.AUDIO_ROUTING_KEY);
+            scanAndPublish(userId, uuid, videosDir, RabbitConfig.VIDEO_ROUTING_KEY);
 
             if (!coordinatorService.isAborted(uuid)) {
                 log.info(

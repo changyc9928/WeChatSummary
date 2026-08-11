@@ -128,8 +128,32 @@ public class AiConfig {
     public ChatClient multimodalChatClient(
         @Qualifier("multimodalChatModel") OpenAiChatModel multimodalChatModel) {
         return ChatClient.builder(multimodalChatModel)
-            // Optional baseline injection point configuration examples:
-            // .defaultSystem("You are a multi-modal WeChat analysis engine expert...")
+            .build();
+    }
+
+    @Bean(name = "videoChatModel")
+    public OpenAiChatModel videoChatModel(
+        @Value("${custom-ai.video.base-url}") String baseUrl,
+        @Value("${custom-ai.video.api-key}") String apiKey,
+        @Value("${custom-ai.video.model}") String model,
+        @Value("${custom-ai.video.timeout}") Duration timeout) {
+
+        OpenAiChatOptions options = OpenAiChatOptions.builder()
+            .model(model)
+            .baseUrl(baseUrl)
+            .apiKey(apiKey)
+            .timeout(timeout)
+            .build();
+
+        return OpenAiChatModel.builder()
+            .options(options)
+            .build();
+    }
+
+    @Bean(name = "videoChatClient")
+    public ChatClient videoChatClient(
+        @Qualifier("videoChatModel") OpenAiChatModel videoChatModel) {
+        return ChatClient.builder(videoChatModel)
             .build();
     }
 }

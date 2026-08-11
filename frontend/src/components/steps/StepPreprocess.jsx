@@ -15,6 +15,7 @@ export default function StepPreprocess({
   errorPreprocess,
   onNavigateToImages,
   onNavigateToAudios,
+  onNavigateToVideos,
   currentUser,
   selectedStartTime,
   setSelectedStartTime,
@@ -26,7 +27,9 @@ export default function StepPreprocess({
   const isRunning = status === 'RUNNING';
   const isPaused = status === 'PAUSED';
 
-  const isCompleted = status === 'COMPLETED' || (!preprocessProgress && isPreprocessFinished);
+  const isCompleted = status === 'COMPLETED'
+    || (!preprocessProgress && isPreprocessFinished)
+    || (preprocessProgress != null && preprocessProgress.progressPercentage >= 100);
 
   const progressVal = preprocessProgress && preprocessProgress.progressPercentage != null
     ? Math.round(preprocessProgress.progressPercentage)
@@ -112,10 +115,11 @@ export default function StepPreprocess({
         <div style={styles.dbErrorBox}>{t('preprocess.selectDatasetFirst')}</div>
       ) : (
         <div style={styles.actionButtonGroup}>
-          {/* Universal Access to Audio and Image Tables */}
+          {/* Universal Access to Audio, Image and Video Tables */}
           <div style={{ display: 'flex', gap: '8px', flexWrap: 'wrap', marginBottom: '12px' }}>
             <button onClick={onNavigateToImages} style={styles.button}>{t('preprocess.viewImages')}</button>
             <button onClick={onNavigateToAudios} style={styles.button}>{t('preprocess.viewAudios')}</button>
+            <button onClick={onNavigateToVideos} style={styles.button}>{t('preprocess.viewVideos')}</button>
           </div>
 
           {/* State: IDLING / Pending */}

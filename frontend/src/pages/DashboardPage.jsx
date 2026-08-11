@@ -29,6 +29,7 @@ export default function DashboardPage({
   summary,
   onNavigateToImages,
   onNavigateToAudios,
+  onNavigateToVideos,
   activeModalImage,
   setActiveModalImage
 }) {
@@ -45,65 +46,66 @@ export default function DashboardPage({
             </p>
           </div>
           <div style={{ display: 'flex', gap: '8px', alignItems: 'center' }}>
-            <LanguageToggle />
-            <ThemeToggle theme={theme} onToggle={onToggleTheme} />
+            <LanguageToggle/>
+            <ThemeToggle onToggle={onToggleTheme} theme={theme}/>
             <button onClick={onLogout} style={styles.buttonDangerSmall}>{t('dashboard.logout')}</button>
           </div>
         </div>
       </header>
 
       <DatasetSelector
-        uuidInput={uuidInput}
-        setUuidInput={setUuidInput}
-        sessions={sessions}
-        loadingSessions={loadingSessions}
         fetchSessions={fetchSessions}
+        loadingSessions={loadingSessions}
+        sessions={sessions}
+        setUuidInput={setUuidInput}
+        uuidInput={uuidInput}
       />
 
       {/* Row 1: Step 1 (Full Width) */}
       <div style={{ width: '100%', display: 'block', marginBottom: '20px' }}>
         <StepUpload
-          file={file}
-          setFile={setFile}
-          handleUpload={upload.handle}
-          loading={loading.upload}
           errorUpload={upload.error}
+          file={file}
+          handleUpload={upload.handle}
+          loadingUpload={loading.upload}
+          setFile={setFile}
         />
       </div>
 
       {/* Row 2: Step 2 (Full Width) */}
       <div style={{ width: '100%', display: 'block', marginBottom: '20px' }}>
         <StepPreprocess
-          uuidInput={uuidInput}
-          isPreprocessFinished={preprocess.isFinished}
-          preprocessProgress={preprocess.progress}
-          handleStartPreprocess={preprocess.onStart}
-          handleAbortPreprocess={preprocess.onAbort}
-          handleReprocessPreprocess={preprocess.onReprocess}
-          loading={loading}
-          errorPreprocess={preprocessError}
-          onNavigateToImages={onNavigateToImages}
-          onNavigateToAudios={onNavigateToAudios}
           currentUser={currentUser}
-          selectedStartTime={timeWindow.selectedStartTime}
-          setSelectedStartTime={timeWindow.setSelectedStartTime}
+          errorPreprocess={preprocessError}
+          handleAbortPreprocess={preprocess.abortPreprocess}
+          handleReprocessPreprocess={preprocess.reprocess}
+          handleStartPreprocess={preprocess.startPreprocess}
+          isPreprocessFinished={preprocess.isFinished}
+          loading={loading}
+          onNavigateToAudios={onNavigateToAudios}
+          onNavigateToImages={onNavigateToImages}
+          onNavigateToVideos={onNavigateToVideos}
+          preprocessProgress={preprocess.progress}
           selectedEndTime={timeWindow.selectedEndTime}
+          selectedStartTime={timeWindow.selectedStartTime}
           setSelectedEndTime={timeWindow.setSelectedEndTime}
+          setSelectedStartTime={timeWindow.setSelectedStartTime}
+          uuidInput={uuidInput}
         />
       </div>
 
       {/* Row 3: Step 3 (Full Width) */}
       <div style={{ width: '100%', display: 'block' }}>
         <StepSummary
-          uuidInput={uuidInput}
+          handlePauseSummary={summary.pauseSummary}
+          handleRestartSummary={summary.restartSummary}
+          handleStartSummary={summary.startSummary}
           isPreprocessFinished={preprocess.isFinished}
-          summaryState={summary.state}
-          handleStartSummary={summary.onStart}
-          handlePauseSummary={summary.onPause}
-          handleRestartSummary={summary.onRestart}
           loading={loading}
-          selectedStartTime={timeWindow.selectedStartTime}
           selectedEndTime={timeWindow.selectedEndTime}
+          selectedStartTime={timeWindow.selectedStartTime}
+          summaryState={summary.summaryState}
+          uuidInput={uuidInput}
         />
       </div>
 
