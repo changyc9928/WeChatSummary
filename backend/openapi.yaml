@@ -3,8 +3,11 @@ info:
   title: OpenAPI definition
   version: v0
 servers:
-- url: http://localhost:8081
+- url: http://localhost:8080
   description: Generated server url
+tags:
+- name: tool-controller
+  description: Distributable local tools (bridge.exe)
 paths:
   /api/summary/{uuid}:
     post:
@@ -222,6 +225,33 @@ paths:
             '*/*':
               schema:
                 $ref: "#/components/schemas/ApiResponseAuthResponse"
+  /api/tools/bridge/meta:
+    get:
+      tags:
+      - tool-controller
+      summary: "Metadata for the bridge.exe download (present, size, SHA-256)"
+      operationId: meta
+      responses:
+        "200":
+          description: OK
+          content:
+            '*/*':
+              schema:
+                $ref: "#/components/schemas/ApiResponseBridgeToolMeta"
+  /api/tools/bridge/download:
+    get:
+      tags:
+      - tool-controller
+      summary: Download bridge.exe (Windows sidecar); 404 with build instructions
+        when absent
+      operationId: download
+      responses:
+        "200":
+          description: OK
+          content:
+            '*/*':
+              schema:
+                type: object
   /api/summary/status-pool/{uuid}:
     get:
       tags:
@@ -878,6 +908,32 @@ components:
       properties:
         uuid:
           type: string
+    ApiResponseBridgeToolMeta:
+      type: object
+      properties:
+        code:
+          type: integer
+          format: int32
+        message:
+          type: string
+        data:
+          $ref: "#/components/schemas/BridgeToolMeta"
+    BridgeToolMeta:
+      type: object
+      properties:
+        present:
+          type: boolean
+        fileName:
+          type: string
+        sizeBytes:
+          type: integer
+          format: int64
+        sha256:
+          type: string
+        downloadUrl:
+          type: string
+        help:
+          type: string
     ApiResponseSummaryProgressResponse:
       type: object
       properties:
@@ -1018,29 +1074,29 @@ components:
     PageableObject:
       type: object
       properties:
-        paged:
-          type: boolean
-        pageNumber:
-          type: integer
-          format: int32
-        pageSize:
-          type: integer
-          format: int32
-        unpaged:
-          type: boolean
         sort:
           $ref: "#/components/schemas/SortObject"
         offset:
           type: integer
           format: int64
+        pageSize:
+          type: integer
+          format: int32
+        pageNumber:
+          type: integer
+          format: int32
+        unpaged:
+          type: boolean
+        paged:
+          type: boolean
     SortObject:
       type: object
       properties:
-        sorted:
+        empty:
           type: boolean
         unsorted:
           type: boolean
-        empty:
+        sorted:
           type: boolean
     VideoSummary:
       type: object

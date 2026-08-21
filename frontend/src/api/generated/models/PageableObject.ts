@@ -29,30 +29,6 @@ import {
 export interface PageableObject {
     /**
      * 
-     * @type {boolean}
-     * @memberof PageableObject
-     */
-    paged?: boolean;
-    /**
-     * 
-     * @type {number}
-     * @memberof PageableObject
-     */
-    pageNumber?: number;
-    /**
-     * 
-     * @type {number}
-     * @memberof PageableObject
-     */
-    pageSize?: number;
-    /**
-     * 
-     * @type {boolean}
-     * @memberof PageableObject
-     */
-    unpaged?: boolean;
-    /**
-     * 
      * @type {SortObject}
      * @memberof PageableObject
      */
@@ -63,6 +39,30 @@ export interface PageableObject {
      * @memberof PageableObject
      */
     offset?: number;
+    /**
+     * 
+     * @type {number}
+     * @memberof PageableObject
+     */
+    pageSize?: number;
+    /**
+     * 
+     * @type {number}
+     * @memberof PageableObject
+     */
+    pageNumber?: number;
+    /**
+     * 
+     * @type {boolean}
+     * @memberof PageableObject
+     */
+    unpaged?: boolean;
+    /**
+     * 
+     * @type {boolean}
+     * @memberof PageableObject
+     */
+    paged?: boolean;
 }
 
 /**
@@ -82,12 +82,12 @@ export function PageableObjectFromJSONTyped(json: any, ignoreDiscriminator: bool
     }
     return {
         
-        'paged': json['paged'] == null ? undefined : json['paged'],
-        'pageNumber': json['pageNumber'] == null ? undefined : json['pageNumber'],
-        'pageSize': json['pageSize'] == null ? undefined : json['pageSize'],
-        'unpaged': json['unpaged'] == null ? undefined : json['unpaged'],
         'sort': json['sort'] == null ? undefined : SortObjectFromJSON(json['sort']),
         'offset': json['offset'] == null ? undefined : json['offset'],
+        'pageSize': json['pageSize'] == null ? undefined : json['pageSize'],
+        'pageNumber': json['pageNumber'] == null ? undefined : json['pageNumber'],
+        'unpaged': json['unpaged'] == null ? undefined : json['unpaged'],
+        'paged': json['paged'] == null ? undefined : json['paged'],
     };
 }
 
@@ -102,12 +102,12 @@ export function PageableObjectToJSONTyped(value?: PageableObject | null, ignoreD
 
     return {
         
-        'paged': value['paged'],
-        'pageNumber': value['pageNumber'],
-        'pageSize': value['pageSize'],
-        'unpaged': value['unpaged'],
         'sort': SortObjectToJSON(value['sort']),
         'offset': value['offset'],
+        'pageSize': value['pageSize'],
+        'pageNumber': value['pageNumber'],
+        'unpaged': value['unpaged'],
+        'paged': value['paged'],
     };
 }
 

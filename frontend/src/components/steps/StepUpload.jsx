@@ -11,7 +11,7 @@ export default function StepUpload({ file, setFile, handleUpload, loadingUpload,
         <h3 style={styles.cardTitle}>{t('upload.title')}</h3>
         <span style={styles.lockBadge}>{t('upload.ready')}</span>
       </div>
-      <form onSubmit={handleUpload} style={styles.form}>
+      <form onSubmit={(e) => handleUpload(e, file)} style={styles.form}>
         <input 
           type="file" 
           onChange={(e) => setFile(e.target.files[0])} 

@@ -11,6 +11,20 @@ frontend/dist/
 frontend/.vite/
 frontend/src/api/generated/
 
+# Local build artifacts (in-workspace Go caches used by this repo's tooling)
+.gocache/
+.gotmp/
+.gopath/
+exporter/bridge.exe
+exporter/bridge
+
+# Distributable tool binaries (built locally, served by the backend)
+tools/
+tools/*.exe
+
+raw-extract/
+tmpzip/
+
 # OS / IDE
 .DS_Store
 .idea/

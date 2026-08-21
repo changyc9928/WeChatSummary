@@ -3,6 +3,7 @@ import {
   AuthControllerApi,
   ChatSummaryControllerApi,
   PreprocessControllerApi,
+  ToolControllerApi,
   UploadControllerApi
 } from './generated/apis';
 import { API_BASE_URL } from '../config';
@@ -82,4 +83,5 @@ export const apiClient = {
   chatSummary: new ChatSummaryControllerApi(configuration),
   preprocess: new PreprocessControllerApi(configuration),
   upload: new UploadControllerApi(configuration),
+  tools: new ToolControllerApi(configuration),
 };

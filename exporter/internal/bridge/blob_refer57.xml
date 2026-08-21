@@ -1,0 +1,57 @@
+wxid_uko2qxqdw8s422:
+<?xml version="1.0"?>
+<msg>
+	<appmsg appid="" sdkver="0">
+		<title>是我知道的那个梁吗</title>
+		<type>57</type>
+		<appattach>
+			<cdnthumbaeskey />
+			<aeskey />
+		</appattach>
+		<refermsg>
+			<type>49</type>
+			<svrid>8595730716518106654</svrid>
+			<fromusr>28141105522@chatroom</fromusr>
+			<chatusr>wxid_o8ukrtbxo1uq22</chatusr>
+			<displayname>小鱼干ovo</displayname>
+			<content>&lt;msg&gt;&lt;appmsg appid=""  sdkver="0"&gt;&lt;title&gt;群聊的聊天记录&lt;/title&gt;&lt;des&gt;良、:那不如我回家住，你住我单人间
+小寻ovo:不儿你还有两个地方可以住吗
+良、:我有家
+良、:我只是现在住着单人间...&lt;/des&gt;&lt;type&gt;19&lt;/type&gt;&lt;action&gt;view&lt;/action&gt;&lt;url&gt;https://support.weixin.qq.com/cgi-bin/mmsupport-bin/readtemplate?t=page/favorite_record__w_unsupport&amp;amp;from=singlemessage&amp;amp;isappinstalled=0&lt;/url&gt;&lt;appattach&gt;&lt;cdnthumbaeskey&gt;&lt;/cdnthumbaeskey&gt;&lt;aeskey&gt;&lt;/aeskey&gt;&lt;/appattach&gt;&lt;recorditem&gt;&lt;![CDATA[&lt;recordinfo&gt;&lt;info&gt;良、: 那不如我回家住，你住我单人间
+小寻ovo: 不儿你还有两个地方可以住吗
+良、: 我有家
+良、: 我只是现在住着单人间&lt;/info&gt;&lt;desc&gt;良、: 那不如我回家住，你住我单人间
+小寻ovo: 不儿你还有两个地方可以住吗
+良、: 我有家
+良、: 我只是现在住着单人间&lt;/desc&gt;&lt;/recordinfo&gt;]]&gt;&lt;/recorditem&gt;&lt;/appmsg&gt;&lt;fromusername&gt;wxid_o8ukrtbxo1uq22&lt;/fromusername&gt;&lt;appinfo&gt;&lt;version&gt;1&lt;/version&gt;&lt;appname&gt;&lt;/appname&gt;&lt;isforceupdate&gt;1&lt;/isforceupdate&gt;&lt;/appinfo&gt;&lt;extcommoninfo&gt;&lt;media_expire_at&gt;1787485891&lt;/media_expire_at&gt;&lt;/extcommoninfo&gt;&lt;/msg&gt;</content>
+			<msgsource>&lt;msgsource&gt;&lt;sequence_id&gt;2303200&lt;/sequence_id&gt;
+	&lt;alnode&gt;
+		&lt;fr&gt;2&lt;/fr&gt;
+	&lt;/alnode&gt;
+	&lt;passthrough&gt;
+		&lt;forward_depth&gt;1&lt;/forward_depth&gt;
+	&lt;/passthrough&gt;
+	&lt;sec_msg_node&gt;
+		&lt;uuid&gt;ea411ee311cf59d2b4427b1135395cdf_&lt;/uuid&gt;
+		&lt;risk-file-flag /&gt;
+		&lt;risk-file-md5-list /&gt;
+	&lt;/sec_msg_node&gt;
+	&lt;silence&gt;1&lt;/silence&gt;
+	&lt;membercount&gt;112&lt;/membercount&gt;
+	&lt;signature&gt;N0_V1_ysj+iwqB|v1_z+oGLAl+&lt;/signature&gt;
+	&lt;tmp_node&gt;
+		&lt;publisher-id&gt;&lt;/publisher-id&gt;
+	&lt;/tmp_node&gt;
+&lt;/msgsource&gt;
+</msgsource>
+			<createtime>1787053891</createtime>
+		</refermsg>
+	</appmsg>
+	<fromusername>wxid_uko2qxqdw8s422</fromusername>
+	<scene>0</scene>
+	<appinfo>
+		<version>1</version>
+		<appname></appname>
+	</appinfo>
+	<commenturl></commenturl>
+</msg>

@@ -55,6 +55,7 @@ services:
       STORAGE_UPLOAD_DIR: /app/uploads
     volumes:
       - ./uploads:/app/uploads
+      - ./tools:/app/tools
     depends_on:
       - postgres
       - rabbitmq

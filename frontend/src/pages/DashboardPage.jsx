@@ -7,6 +7,7 @@ import StepSummary from '../components/steps/StepSummary';
 import ThemeToggle from '../components/common/ThemeToggle';
 import LanguageToggle from '../components/common/LanguageToggle';
 import ImageLightboxModal from '../components/common/ImageLightboxModal';
+import LocalScanPanel from '../components/panels/LocalScanPanel';
 import useLanguage from '../hooks/useLanguage';
 
 export default function DashboardPage({
@@ -61,12 +62,17 @@ export default function DashboardPage({
         uuidInput={uuidInput}
       />
 
+      {/* Row 0: Local key bridge (optional helper, drives the native sidecar) */}
+      <div style={{ width: '100%', display: 'block', marginBottom: '20px' }}>
+        <LocalScanPanel />
+      </div>
+
       {/* Row 1: Step 1 (Full Width) */}
       <div style={{ width: '100%', display: 'block', marginBottom: '20px' }}>
         <StepUpload
           errorUpload={upload.error}
           file={file}
-          handleUpload={upload.handle}
+          handleUpload={upload.handleUpload}
           loadingUpload={loading.upload}
           setFile={setFile}
         />

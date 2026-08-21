@@ -64,6 +64,7 @@ custom-ai:
 
 storage:
   upload-dir: ./uploads
+  tools-dir: ./tools
 
 processing:
   image-max-size-bytes: 5000000
