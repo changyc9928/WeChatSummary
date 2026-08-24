@@ -11,7 +11,8 @@ export default function VideosPage({
   onBack,
   uuidInput,
   videos,
-  onRefreshProgress
+  onRefreshProgress,
+  currentUser
 }) {
   const { t } = useLanguage();
   const handleDeleteVideo = async (id) => {
@@ -67,6 +68,7 @@ export default function VideosPage({
         handleBatchClearVideoTexts={handleBatchClearVideoTexts}
         loading={loading}
         errorVideos={videos.error}
+        currentUser={currentUser}
       />
     </div>
   );

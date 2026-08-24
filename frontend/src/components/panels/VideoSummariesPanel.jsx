@@ -1,6 +1,79 @@
-import React from 'react';
+import React, { useState, useEffect } from 'react';
 import { styles } from '../../styles/dashboardStyles';
+import { apiClient } from '../../api/client';
 import useLanguage from '../../hooks/useLanguage';
+
+function VideoPlayer({ id, currentUser }) {
+  const [url, setUrl] = useState(null);
+  const [loading, setLoading] = useState(true);
+  const [enlarged, setEnlarged] = useState(false);
+
+  useEffect(() => {
+    if (!id || !currentUser) return;
+    let objectUrl;
+    let active = true;
+    setLoading(true);
+    apiClient.preprocess.getVideoFileById({ xUserId: currentUser.uuid, id })
+      .then((blob) => {
+        if (!active) return;
+        objectUrl = URL.createObjectURL(blob);
+        setUrl(objectUrl);
+      })
+      .catch(() => {})
+      .finally(() => { if (active) setLoading(false); });
+    return () => {
+      active = false;
+      if (objectUrl) URL.revokeObjectURL(objectUrl);
+    };
+  }, [id, currentUser]);
+
+  if (loading) return <span style={{ fontSize: '0.75rem', color: 'var(--text-muted)' }}>…</span>;
+  if (!url) return <span style={{ fontSize: '0.75rem', color: 'var(--text-muted)' }}>—</span>;
+
+  if (enlarged) {
+    return (
+      <div
+        onClick={() => setEnlarged(false)}
+        style={{
+          position: 'fixed', inset: 0, zIndex: 1000,
+          background: 'rgba(0,0,0,0.85)',
+          display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', gap: '12px'
+        }}
+      >
+        <video
+          controls
+          src={url}
+          onClick={(e) => e.stopPropagation()}
+          style={{ width: '90vw', maxWidth: '1100px', maxHeight: '82vh', borderRadius: '8px', background: '#000' }}
+        />
+        <button
+          onClick={(e) => { e.stopPropagation(); setEnlarged(false); }}
+          style={{ padding: '8px 18px', borderRadius: '6px', border: 'none', cursor: 'pointer', background: 'rgba(255,255,255,0.15)', color: '#fff', fontSize: '0.9rem' }}
+        >关闭 / Close</button>
+      </div>
+    );
+  }
+
+  return (
+    <div style={{ position: 'relative', display: 'inline-block' }}>
+      <video
+        controls
+        muted
+        src={url}
+        style={{ width: '100%', borderRadius: '6px', background: '#000', display: 'block' }}
+      />
+      <button
+        onClick={() => setEnlarged(true)}
+        title="放大 / Enlarge (then use the fullscreen icon)"
+        style={{
+          position: 'absolute', top: '6px', right: '6px',
+          width: '30px', height: '30px', borderRadius: '4px', border: 'none', cursor: 'pointer',
+          background: 'rgba(0,0,0,0.55)', color: '#fff', fontSize: '15px', lineHeight: '30px', padding: 0
+        }}
+      >⛶</button>
+    </div>
+  );
+}
 
 export default function VideoSummariesPanel({
   uuidInput,
@@ -15,7 +88,8 @@ export default function VideoSummariesPanel({
   handleBatchDeleteVideos,
   handleBatchClearVideoTexts,
   loading,
-  errorVideos
+  errorVideos,
+  currentUser
 }) {
   const { t } = useLanguage();
   const toggleSelectAll = (e) => {
@@ -64,19 +138,23 @@ export default function VideoSummariesPanel({
       ) : (
         <>
           <div style={styles.tableWrapper}>
-            <table style={styles.table}>
+            <table style={{ ...styles.table, tableLayout: 'fixed' }}>
               <thead>
                 <tr style={styles.tr}>
-                  <th style={styles.th}><input type="checkbox" onChange={toggleSelectAll} checked={selectedVideoIds.length === safeSummaries.length && safeSummaries.length > 0} /></th>
+                  <th style={{ ...styles.th, width: '40px' }}><input type="checkbox" onChange={toggleSelectAll} checked={selectedVideoIds.length === safeSummaries.length && safeSummaries.length > 0} /></th>
+                  <th style={styles.th}>{t('videos.playback')}</th>
                   <th style={styles.th}>{t('videos.transcript')}</th>
                   <th style={styles.th}>{t('videos.aiSummary')}</th>
-                  <th style={styles.th}>{t('common.actions')}</th>
+                  <th style={{ ...styles.th, width: '110px' }}>{t('common.actions')}</th>
                 </tr>
               </thead>
               <tbody>
                 {safeSummaries.map((item) => (
                   <tr key={item.id} style={styles.tr}>
                     <td style={styles.td}><input type="checkbox" checked={selectedVideoIds.includes(item.id)} onChange={() => toggleSelectOne(item.id)} /></td>
+                    <td style={styles.td}>
+                      <VideoPlayer id={item.id} currentUser={currentUser} />
+                    </td>
                     <td style={styles.td}>
                       <div style={styles.transcriptBox}>{item.transcript || <span style={styles.emptySummaryBadge}>{t('videos.noTranscript')}</span>}</div>
                     </td>

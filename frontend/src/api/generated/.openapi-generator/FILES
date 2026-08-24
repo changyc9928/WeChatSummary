@@ -10,6 +10,7 @@ models/ApiResponseBridgeToolMeta.ts
 models/ApiResponseChatPreviewResponse.ts
 models/ApiResponseListSessionResponseDTO.ts
 models/ApiResponsePageAudioSummary.ts
+models/ApiResponsePageEmojiSummaryEntity.ts
 models/ApiResponsePageImageSummaryEntity.ts
 models/ApiResponsePageVideoSummary.ts
 models/ApiResponseSummaryProgressResponse.ts
@@ -23,8 +24,10 @@ models/AuthResponse.ts
 models/BridgeToolMeta.ts
 models/ChatPreviewResponse.ts
 models/ChatPreviewRow.ts
+models/EmojiSummaryEntity.ts
 models/ImageSummaryEntity.ts
 models/PageAudioSummary.ts
+models/PageEmojiSummaryEntity.ts
 models/PageImageSummaryEntity.ts
 models/PageVideoSummary.ts
 models/PageableObject.ts

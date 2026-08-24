@@ -160,6 +160,29 @@ paths:
             '*/*':
               schema:
                 $ref: "#/components/schemas/ApiResponseTaskAckResponse"
+  /api/preprocess/{uuid}/restart:
+    post:
+      tags:
+      - preprocess-controller
+      operationId: restartPreprocess
+      parameters:
+      - name: X-User-Id
+        in: header
+        required: true
+        schema:
+          type: string
+      - name: uuid
+        in: path
+        required: true
+        schema:
+          type: string
+      responses:
+        "200":
+          description: OK
+          content:
+            '*/*':
+              schema:
+                $ref: "#/components/schemas/ApiResponseTaskAckResponse"
   /api/files/upload:
     post:
       tags:
@@ -740,6 +763,138 @@ paths:
             '*/*':
               schema:
                 $ref: "#/components/schemas/ApiResponseVoid"
+  /api/preprocess/emojis/{id}/file:
+    get:
+      tags:
+      - preprocess-controller
+      operationId: getEmojiFileById
+      parameters:
+      - name: X-User-Id
+        in: header
+        required: true
+        schema:
+          type: string
+      - name: id
+        in: path
+        required: true
+        schema:
+          type: string
+      responses:
+        "200":
+          description: OK
+          content:
+            '*/*':
+              schema:
+                type: string
+                format: binary
+  /api/preprocess/emojis/summaries:
+    get:
+      tags:
+      - preprocess-controller
+      operationId: getEmojiSummariesByUuid
+      parameters:
+      - name: X-User-Id
+        in: header
+        required: true
+        schema:
+          type: string
+      - name: uuid
+        in: query
+        required: true
+        schema:
+          type: string
+      - name: page
+        in: query
+        required: false
+        schema:
+          type: integer
+          format: int32
+          default: 0
+      - name: size
+        in: query
+        required: false
+        schema:
+          type: integer
+          format: int32
+          default: 20
+      responses:
+        "200":
+          description: OK
+          content:
+            '*/*':
+              schema:
+                $ref: "#/components/schemas/ApiResponsePageEmojiSummaryEntity"
+    delete:
+      tags:
+      - preprocess-controller
+      operationId: deleteEmojiSummariesByIds
+      parameters:
+      - name: X-User-Id
+        in: header
+        required: true
+        schema:
+          type: string
+      requestBody:
+        content:
+          application/json:
+            schema:
+              type: array
+              items:
+                type: string
+        required: true
+      responses:
+        "200":
+          description: OK
+          content:
+            '*/*':
+              schema:
+                $ref: "#/components/schemas/ApiResponseVoid"
+  /api/preprocess/emojis/summaries/{id}:
+    delete:
+      tags:
+      - preprocess-controller
+      operationId: deleteEmojiSummaryById
+      parameters:
+      - name: X-User-Id
+        in: header
+        required: true
+        schema:
+          type: string
+      - name: id
+        in: path
+        required: true
+        schema:
+          type: string
+      responses:
+        "200":
+          description: OK
+          content:
+            '*/*':
+              schema:
+                $ref: "#/components/schemas/ApiResponseVoid"
+  /api/preprocess/emojis/summaries/all:
+    delete:
+      tags:
+      - preprocess-controller
+      operationId: deleteAllEmojiSummariesByUuid
+      parameters:
+      - name: X-User-Id
+        in: header
+        required: true
+        schema:
+          type: string
+      - name: uuid
+        in: query
+        required: true
+        schema:
+          type: string
+      responses:
+        "200":
+          description: OK
+          content:
+            '*/*':
+              schema:
+                $ref: "#/components/schemas/ApiResponseVoid"
   /api/preprocess/audios/summaries/{id}:
     delete:
       tags:
@@ -1154,6 +1309,62 @@ components:
           type: array
           items:
             $ref: "#/components/schemas/ImageSummaryEntity"
+        number:
+          type: integer
+          format: int32
+        sort:
+          $ref: "#/components/schemas/SortObject"
+        pageable:
+          $ref: "#/components/schemas/PageableObject"
+        numberOfElements:
+          type: integer
+          format: int32
+        first:
+          type: boolean
+        last:
+          type: boolean
+        empty:
+          type: boolean
+    ApiResponsePageEmojiSummaryEntity:
+      type: object
+      properties:
+        code:
+          type: integer
+          format: int32
+        message:
+          type: string
+        data:
+          $ref: "#/components/schemas/PageEmojiSummaryEntity"
+    EmojiSummaryEntity:
+      type: object
+      properties:
+        id:
+          type: string
+        emojiHash:
+          type: string
+        filePath:
+          type: string
+        summary:
+          type: string
+        createdAt:
+          type: string
+          format: date-time
+    PageEmojiSummaryEntity:
+      type: object
+      properties:
+        totalPages:
+          type: integer
+          format: int32
+        totalElements:
+          type: integer
+          format: int64
+        size:
+          type: integer
+          format: int32
+        content:
+          type: array
+          items:
+            $ref: "#/components/schemas/EmojiSummaryEntity"
         number:
           type: integer
           format: int32

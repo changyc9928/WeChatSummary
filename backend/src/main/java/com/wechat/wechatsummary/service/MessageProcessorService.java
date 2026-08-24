@@ -338,13 +338,13 @@ public class MessageProcessorService {
         if (!StringUtils.hasText(hash)) {
             return "未知表情";
         }
-        return cacheService.getImageSummary(hash)
+        return cacheService.getEmojiSummary(hash)
             .or(() -> {
                 if (sourceContent != null) {
                     Matcher m = MD5_EXTRACT_PATTERN.matcher(sourceContent.toLowerCase());
                     if (m.find()) {
                         String rawMd5 = m.group(1);
-                        return cacheService.getImageSummary(rawMd5);
+                        return cacheService.getEmojiSummary(rawMd5);
                     }
                 }
                 return Optional.empty();

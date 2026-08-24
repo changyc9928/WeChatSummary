@@ -11,11 +11,13 @@ export default function StepPreprocess({
   handleStartPreprocess,
   handleAbortPreprocess,
   handleReprocessPreprocess,
+  handleRestartPreprocess,
   loading,
   errorPreprocess,
   onNavigateToImages,
   onNavigateToAudios,
   onNavigateToVideos,
+  onNavigateToEmojis,
   currentUser,
   selectedStartTime,
   setSelectedStartTime,
@@ -65,6 +67,11 @@ export default function StepPreprocess({
 
   const handleReprocessClick = async () => {
     await handleReprocessPreprocess();
+    setPreviewVersion(v => v + 1);
+  };
+
+  const handleRestartClick = async () => {
+    await handleRestartPreprocess();
     setPreviewVersion(v => v + 1);
   };
 
@@ -120,6 +127,7 @@ export default function StepPreprocess({
             <button onClick={onNavigateToImages} style={styles.button}>{t('preprocess.viewImages')}</button>
             <button onClick={onNavigateToAudios} style={styles.button}>{t('preprocess.viewAudios')}</button>
             <button onClick={onNavigateToVideos} style={styles.button}>{t('preprocess.viewVideos')}</button>
+            <button onClick={onNavigateToEmojis} style={styles.button}>{t('preprocess.viewEmojis')}</button>
           </div>
 
           {/* State: IDLING / Pending */}
@@ -156,6 +164,13 @@ export default function StepPreprocess({
                 style={{ ...styles.buttonSuccess, width: '100%', marginTop: '10px' }}
               >
                 {loading.preprocess ? t('preprocess.resuming') : t('preprocess.resume')}
+              </button>
+              <button
+                onClick={handleRestartClick}
+                disabled={loading.restartPreprocess}
+                style={{ ...styles.buttonWarningSmall, width: '100%', marginTop: '8px' }}
+              >
+                {loading.restartPreprocess ? t('preprocess.restarting') : t('preprocess.restart')}
               </button>
             </div>
           )}
@@ -198,6 +213,14 @@ export default function StepPreprocess({
                 style={{ ...styles.button, width: '100%' }}
               >
                 {loading.reprocess ? t('preprocess.reprocessing') : t('preprocess.reprocess')}
+              </button>
+
+              <button
+                onClick={handleRestartClick}
+                disabled={loading.restartPreprocess}
+                style={{ ...styles.buttonWarningSmall, width: '100%' }}
+              >
+                {loading.restartPreprocess ? t('preprocess.restarting') : t('preprocess.restart')}
               </button>
 
               {/* Chat Log Preview & Calendar Time Window Selection */}

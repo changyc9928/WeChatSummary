@@ -31,6 +31,7 @@ export default function DashboardPage({
   onNavigateToImages,
   onNavigateToAudios,
   onNavigateToVideos,
+  onNavigateToEmojis,
   activeModalImage,
   setActiveModalImage
 }) {
@@ -85,12 +86,14 @@ export default function DashboardPage({
           errorPreprocess={preprocessError}
           handleAbortPreprocess={preprocess.abortPreprocess}
           handleReprocessPreprocess={preprocess.reprocess}
+          handleRestartPreprocess={preprocess.restartPreprocess}
           handleStartPreprocess={preprocess.startPreprocess}
           isPreprocessFinished={preprocess.isFinished}
           loading={loading}
           onNavigateToAudios={onNavigateToAudios}
           onNavigateToImages={onNavigateToImages}
           onNavigateToVideos={onNavigateToVideos}
+          onNavigateToEmojis={onNavigateToEmojis}
           preprocessProgress={preprocess.progress}
           selectedEndTime={timeWindow.selectedEndTime}
           selectedStartTime={timeWindow.selectedStartTime}

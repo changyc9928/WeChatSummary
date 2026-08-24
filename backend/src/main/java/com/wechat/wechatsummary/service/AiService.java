@@ -4,7 +4,8 @@ import com.openai.errors.InternalServerException;
 import com.openai.errors.RateLimitException;
 import java.net.URI;
 import java.util.Base64;
-import lombok.RequiredArgsConstructor;
+import java.util.concurrent.Semaphore;
+import java.util.function.Supplier;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.ai.audio.transcription.AudioTranscriptionPrompt;
 import org.springframework.ai.audio.transcription.AudioTranscriptionResponse;
@@ -15,17 +16,18 @@ import org.springframework.ai.chat.prompt.Prompt;
 import org.springframework.ai.content.Media;
 import org.springframework.ai.openai.OpenAiAudioTranscriptionModel;
 import org.springframework.beans.factory.annotation.Qualifier;
+import org.springframework.beans.factory.annotation.Value;
 import org.springframework.retry.annotation.Backoff;
 import org.springframework.retry.annotation.Retryable;
 import org.springframework.stereotype.Service;
 import org.springframework.util.MimeType;
+import org.springframework.web.client.HttpServerErrorException;
 
 /**
  * Service responsible for interacting with various AI capabilities including audio transcription,
  * text summaries, rolling chat analysis, and image description.
  */
 @Service
-@RequiredArgsConstructor
 @Slf4j
 public class AiService {
 
@@ -33,6 +35,52 @@ public class AiService {
     private final @Qualifier("multimodalChatClient") ChatClient multimodalChatClient;
     private final @Qualifier("videoChatClient") ChatClient videoChatClient;
     private final OpenAiAudioTranscriptionModel transcriptionModel;
+
+    /**
+     * Caps the number of concurrent outbound calls to the shared AI provider. The RabbitMQ media
+     * consumers can run many parallel workers (up to {@code rabbit.max-concurrent-consumers}) and a
+     * (re)processing run dispatches a burst of requests that easily exceeds the provider's
+     * request-rate quota, resulting in HTTP 429 (Too Many Requests) storms. Throttling here keeps
+     * parallel calls bounded so retries can recover instead of being overwhelmed. The effective
+     * permit count is derived from {@code custom-ai.multimodal.max-concurrent-percentage} of the
+     * total worker pool (always at least 1).
+     */
+    private final Semaphore providerThrottle;
+
+    public AiService(
+        ChatClient chatClient,
+        @Qualifier("multimodalChatClient") ChatClient multimodalChatClient,
+        @Qualifier("videoChatClient") ChatClient videoChatClient,
+        OpenAiAudioTranscriptionModel transcriptionModel,
+        @Value("${custom-ai.multimodal.max-concurrent-requests:10}") Integer maxConcurrentRequests,
+        @Value("${custom-ai.multimodal.max-concurrent-percentage:10}") Integer maxConcurrentPercentage,
+        @Value("${rabbit.max-concurrent-consumers:10}") Integer maxConcurrentConsumers) {
+
+        this.chatClient = chatClient;
+        this.multimodalChatClient = multimodalChatClient;
+        this.videoChatClient = videoChatClient;
+        this.transcriptionModel = transcriptionModel;
+
+        int totalConsumers = Math.max(3, maxConcurrentConsumers != null ? maxConcurrentConsumers : 10);
+        int percentageLimit = (int) Math.max(1,
+            Math.round(totalConsumers * (maxConcurrentPercentage != null ? maxConcurrentPercentage : 10) / 100.0));
+        int configuredLimit = (maxConcurrentRequests != null && maxConcurrentRequests > 0)
+            ? maxConcurrentRequests : percentageLimit;
+        int permits = Math.max(1, Math.min(percentageLimit, configuredLimit));
+
+        log.info("AI provider throttle initialized with {} concurrent permit(s) (percentageLimit={}, configuredLimit={}, totalConsumers={})",
+            permits, percentageLimit, configuredLimit, totalConsumers);
+        this.providerThrottle = new Semaphore(permits);
+    }
+
+    private <T> T callThrottled(Supplier<T> call) {
+        providerThrottle.acquireUninterruptibly();
+        try {
+            return call.get();
+        } finally {
+            providerThrottle.release();
+        }
+    }
 
     /**
      * Calls the Whisper transcription model with automatic retry support.
@@ -43,11 +91,11 @@ public class AiService {
      * @return transcription response containing the text metadata
      */
     @Retryable(
-        retryFor = {RateLimitException.class},
-        maxAttempts = 3,
+        retryFor = {RateLimitException.class, HttpServerErrorException.class},
+        maxAttempts = 6,
         backoff = @Backoff(
             delay = 30000,
-            maxDelay = 3600000,
+            maxDelay = 600000,
             multiplier = 2.0,
             random = true
         )
@@ -145,10 +193,10 @@ public class AiService {
 
         try {
             // Correct Spring AI fluent chain:
-            return chatClient.prompt()
+            return callThrottled(() -> chatClient.prompt()
                 .system(systemPrompt)
                 .user(userPrompt)
-                .call().content(); // <-- Pass the target class type right here
+                .call().content()); // <-- Pass the target class type right here
 
         } catch (Exception e) {
             log.error("Failed to execute audio summary AI request via ChatClient", e);
@@ -212,13 +260,13 @@ public class AiService {
             """;
 
         try {
-            String summaryResult = chatClient.prompt()
+            String summaryResult = callThrottled(() -> chatClient.prompt()
 //                .system(refineSystemPrompt)
                 .user(user -> user.text(userPrompt)
                     .param("historyContext", historyContext)
                     .param("currentChunk", currentChunk))
                 .call()
-                .content();
+                .content());
 
             log.info("Rolling chat history analysis completed successfully.");
             return summaryResult;
@@ -244,12 +292,13 @@ public class AiService {
      * @return summary text describing the processed image composition
      */
     @Retryable(
-        retryFor = Exception.class,
-        maxAttempts = 4,
+        retryFor = {RateLimitException.class, HttpServerErrorException.class},
+        maxAttempts = 10,
         backoff = @Backoff(
-            delay = 2000,
+            delay = 15000,
             multiplier = 2.0,
-            maxDelay = 10000
+            maxDelay = 180000,
+            random = true
         )
     )
     public String generateSummary(byte[] imageBytes, String mimeType, String filePath) {
@@ -272,9 +321,9 @@ public class AiService {
 
         Prompt prompt = new Prompt(userMessage);
 
-        ChatResponse response = multimodalChatClient.prompt(prompt)
+        ChatResponse response = callThrottled(() -> multimodalChatClient.prompt(prompt)
             .call()
-            .chatResponse();
+            .chatResponse());
 
         if (response == null
             || response.getResult() == null
@@ -298,9 +347,9 @@ public class AiService {
      * @return transcription/description text of the frame
      */
     @Retryable(
-        retryFor = Exception.class,
-        maxAttempts = 3,
-        backoff = @Backoff(delay = 2000, multiplier = 2.0, maxDelay = 10000)
+        retryFor = {RateLimitException.class, HttpServerErrorException.class},
+        maxAttempts = 10,
+        backoff = @Backoff(delay = 15000, multiplier = 2.0, maxDelay = 180000, random = true)
     )
     public String transcribeVideoFrame(byte[] frameBytes, int frameIndex) {
         log.info("Transcribing video frame index {}", frameIndex);
@@ -313,7 +362,7 @@ public class AiService {
             .build();
 
         Prompt prompt = new Prompt(userMessage);
-        ChatResponse response = videoChatClient.prompt(prompt).call().chatResponse();
+        ChatResponse response = callThrottled(() -> videoChatClient.prompt(prompt).call().chatResponse());
 
         if (response == null || response.getResult() == null || response.getResult().getOutput() == null) {
             throw new RuntimeException("Video AI returned empty response for frame #" + frameIndex);
@@ -328,9 +377,9 @@ public class AiService {
      * @return unified video summary text
      */
     @Retryable(
-        retryFor = Exception.class,
-        maxAttempts = 3,
-        backoff = @Backoff(delay = 2000, multiplier = 2.0, maxDelay = 10000)
+        retryFor = {RateLimitException.class, HttpServerErrorException.class},
+        maxAttempts = 8,
+        backoff = @Backoff(delay = 15000, multiplier = 2.0, maxDelay = 180000, random = true)
     )
     public String summarizeVideoTranscriptions(java.util.List<String> frameTranscriptions) {
         log.info("Summarizing {} frame transcriptions into unified video summary", frameTranscriptions.size());
@@ -342,11 +391,11 @@ public class AiService {
         String systemPrompt = "你是一个专业的视频内容分析AI。我将提供从一个视频中随机/等间隔抽取的若干关键帧的视觉描述与文字转写。请将这些帧的信息进行综合归纳，生成一份连贯、准确、结构清晰的视频总结。";
         String userPrompt = "以下是抽取帧的描述内容：\n\n" + sb.toString() + "\n请结合以上所有帧的内容，总结这个视频的主要内容、场景变化与核心信息，直接输出总结文本即可：";
 
-        return chatClient.prompt()
+        return callThrottled(() -> chatClient.prompt()
             .system(systemPrompt)
             .user(userPrompt)
             .call()
-            .content();
+            .content());
     }
 
 //    /**

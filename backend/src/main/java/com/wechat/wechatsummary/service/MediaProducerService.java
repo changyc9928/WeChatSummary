@@ -99,7 +99,7 @@ public class MediaProducerService {
             log.info(
                 "Publishing media parsing items to message broker exchange for parallel ingestion routing...");
             scanAndPublish(userId, uuid, imagesDir, RabbitConfig.IMAGE_ROUTING_KEY);
-            scanAndPublish(userId, uuid, emojisDir, RabbitConfig.IMAGE_ROUTING_KEY);
+            scanAndPublish(userId, uuid, emojisDir, RabbitConfig.EMOJI_ROUTING_KEY);
             scanAndPublish(userId, uuid, voicesDir, RabbitConfig.AUDIO_ROUTING_KEY);
             scanAndPublish(userId, uuid, videosDir, RabbitConfig.VIDEO_ROUTING_KEY);
 

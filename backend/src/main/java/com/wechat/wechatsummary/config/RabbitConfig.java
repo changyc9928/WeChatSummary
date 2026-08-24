@@ -1,5 +1,6 @@
 package com.wechat.wechatsummary.config;
 
+import org.springframework.amqp.core.AcknowledgeMode;
 import org.springframework.amqp.core.Binding;
 import org.springframework.amqp.core.BindingBuilder;
 import org.springframework.amqp.core.Queue;
@@ -39,6 +40,11 @@ public class RabbitConfig {
     public static final String VIDEO_QUEUE = "video.queue";
 
     /**
+     * Dedicated AMQP queue identifier for animated sticker (emoji) processing operations.
+     */
+    public static final String EMOJI_QUEUE = "emoji.queue";
+
+    /**
      * Binding routing key utilized to target the image processing infrastructure.
      */
     public static final String IMAGE_ROUTING_KEY = "media.image";
@@ -52,6 +58,11 @@ public class RabbitConfig {
      * Binding routing key utilized to target the video processing infrastructure.
      */
     public static final String VIDEO_ROUTING_KEY = "media.video";
+
+    /**
+     * Binding routing key utilized to target the animated sticker (emoji) processing infrastructure.
+     */
+    public static final String EMOJI_ROUTING_KEY = "media.emoji";
 
     @Value("${rabbit.concurrent-consumers:3}")
     private int concurrentConsumers;
@@ -81,6 +92,9 @@ public class RabbitConfig {
         factory.setConcurrentConsumers(concurrentConsumers);
         factory.setMaxConcurrentConsumers(maxConcurrentConsumers);
         factory.setPrefetchCount(prefetchCount);
+        // Manual acknowledgment: listeners explicitly ack/nack so failed media can be
+        // requeued with a delay instead of being silently dropped.
+        factory.setAcknowledgeMode(AcknowledgeMode.MANUAL);
 
         return factory;
     }
@@ -174,5 +188,32 @@ public class RabbitConfig {
             .bind(videoQueue)
             .to(mediaExchange)
             .with(VIDEO_ROUTING_KEY);
+    }
+
+    // --- Emoji Queue & Bindings Infrastructure ---
+
+    /**
+     * Provisions a durable queue dedicated to handling animated sticker (emoji) transactions.
+     *
+     * @return a durable emoji Queue instance
+     */
+    @Bean
+    public Queue emojiQueue() {
+        return new Queue(EMOJI_QUEUE, true);
+    }
+
+    /**
+     * Binds the emoji queue to the media topic exchange using the designated emoji routing key.
+     *
+     * @param emojiQueue    the configured emoji queue bean
+     * @param mediaExchange the centralized media topic exchange bean
+     * @return a configured Binding instance
+     */
+    @Bean
+    public Binding emojiBinding(Queue emojiQueue, TopicExchange mediaExchange) {
+        return BindingBuilder
+            .bind(emojiQueue)
+            .to(mediaExchange)
+            .with(EMOJI_ROUTING_KEY);
     }
 }

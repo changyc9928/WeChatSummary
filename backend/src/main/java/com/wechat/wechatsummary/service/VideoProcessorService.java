@@ -75,6 +75,9 @@ public class VideoProcessorService {
                         transcriptions.add(frameTranscription);
                     } catch (Exception ex) {
                         log.warn("Failed to transcribe frame #{} for video {}: {}", i + 1, filePath, ex.getMessage());
+                        // Propagate so the whole video task is requeued and retried instead of
+                        // persisting an incomplete/empty summary.
+                        throw new RuntimeException("Frame transcription failed for video " + filePath, ex);
                     }
                 }
 
@@ -87,6 +90,7 @@ public class VideoProcessorService {
                 }
             } else {
                 log.warn("No frames extracted for video file: {}", filePath);
+                throw new RuntimeException("No frames could be extracted for video " + filePath);
             }
 
             cacheService.saveVideoSummary(entity);
@@ -94,6 +98,9 @@ public class VideoProcessorService {
 
         } catch (Exception e) {
             log.error("Fatal exception encountered while processing video resource context: {}", filePath, e);
+            // Re-throw so the media listener can requeue the message with a delay and retry
+            // instead of silently persisting an empty summary (e.g. on transient AI 429/5xx errors).
+            throw new RuntimeException("Video processing failed for " + filePath, e);
         }
     }
 

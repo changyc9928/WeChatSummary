@@ -3,10 +3,12 @@ package com.wechat.wechatsummary.service;
 import com.wechat.wechatsummary.entity.AudioSummary;
 import com.wechat.wechatsummary.entity.ChatSummaryStatus;
 import com.wechat.wechatsummary.entity.ChatSummaryTask;
+import com.wechat.wechatsummary.entity.EmojiSummaryEntity;
 import com.wechat.wechatsummary.entity.ImageSummaryEntity;
 import com.wechat.wechatsummary.entity.VideoSummary;
 import com.wechat.wechatsummary.repository.AudioSummaryRepository;
 import com.wechat.wechatsummary.repository.ChatSummaryTaskRepository;
+import com.wechat.wechatsummary.repository.EmojiSummaryRepository;
 import com.wechat.wechatsummary.repository.ImageSummaryRepository;
 import com.wechat.wechatsummary.repository.VideoSummaryRepository;
 import java.util.HashMap;
@@ -35,6 +37,7 @@ public class WeChatSummaryCacheService {
     private final ImageSummaryRepository imageSummaryRepository;
     private final AudioSummaryRepository audioSummaryRepository;
     private final VideoSummaryRepository videoSummaryRepository;
+    private final EmojiSummaryRepository emojiSummaryRepository;
     private final ChatSummaryTaskRepository taskRepository;
     private final StringRedisTemplate redisTemplate;
     private final CacheManager cacheManager;
@@ -53,7 +56,6 @@ public class WeChatSummaryCacheService {
     /**
      * Retrieves cached summary string or loads from DB.
      */
-    @Cacheable(cacheNames = "image_summary", key = "#hash", sync = true)
     public Optional<String> getImageSummary(String hash) {
         log.info(
                 "Cache miss for image_summary signature target [{}]. Querying relational persistence layers...",
@@ -76,7 +78,7 @@ public class WeChatSummaryCacheService {
      * Persists an image summary entity to DB and invalidates image summary list
      * caches.
      */
-    @CacheEvict(cacheNames = "image_summary_list", key = "#entity.filePath")
+    @CacheEvict(cacheNames = "image_summary_list", allEntries = true)
     public ImageSummaryEntity saveImageSummary(ImageSummaryEntity entity) {
         log.info("Persisting image summary record for hash: [{}]", entity.getImageHash());
         ImageSummaryEntity saved = imageSummaryRepository.save(entity);
@@ -137,6 +139,98 @@ public class WeChatSummaryCacheService {
     }
 
     // =========================================================================
+    // 1.5 EMOJI (ANIMATED STICKER) SUMMARY LAYER (DB + Cache Abstraction)
+    // =========================================================================
+
+    /**
+     * Checks if an emoji summary record exists by hash.
+     */
+    public Optional<EmojiSummaryEntity> findEmojiSummaryByHash(String hash) {
+        return emojiSummaryRepository.findByEmojiHash(hash);
+    }
+
+    /**
+     * Retrieves cached emoji summary string or loads from DB.
+     */
+    public Optional<String> getEmojiSummary(String hash) {
+        log.info(
+                "Cache miss for emoji_summary signature target [{}]. Querying relational persistence layers...",
+                hash);
+        return emojiSummaryRepository.findByEmojiHash(hash).map(EmojiSummaryEntity::getSummary);
+    }
+
+    /**
+     * Caches emoji summary entity records scoped by target session/chat UUID.
+     */
+    @Cacheable(cacheNames = "emoji_summary_list", key = "#uuid", sync = true)
+    public List<EmojiSummaryEntity> getEmojiSummariesByUuid(String uuid) {
+        log.info(
+                "Cache miss for emoji_summary_list for UUID: [{}]. Querying relational persistence layer...",
+                uuid);
+        return emojiSummaryRepository.findByFilePathContainingUuid(uuid);
+    }
+
+    /**
+     * Persists an emoji summary entity to DB and invalidates emoji summary list caches.
+     */
+    @CacheEvict(cacheNames = "emoji_summary_list", allEntries = true)
+    public EmojiSummaryEntity saveEmojiSummary(EmojiSummaryEntity entity) {
+        log.info("Persisting emoji summary record for hash: [{}]", entity.getEmojiHash());
+        EmojiSummaryEntity saved = emojiSummaryRepository.save(entity);
+        evictEmojiSummary(entity.getEmojiHash());
+        return saved;
+    }
+
+    /**
+     * Deletes a single emoji summary record by ID (hash) and evicts relevant caches.
+     */
+    @CacheEvict(cacheNames = "emoji_summary_list", allEntries = true)
+    public void deleteEmojiSummaryById(String id) {
+        log.info("Request to delete emoji summary record for ID: [{}]", id);
+        if (emojiSummaryRepository.existsById(id)) {
+            emojiSummaryRepository.deleteById(id);
+            evictEmojiSummary(id);
+            log.info("Successfully deleted emoji summary record and evicted caches for ID: [{}]", id);
+        } else {
+            log.warn("Deletion skipped. No record found for ID: [{}]", id);
+        }
+    }
+
+    /**
+     * Batch deletes emoji summary records by IDs (hashes) and evicts relevant caches.
+     */
+    @CacheEvict(cacheNames = "emoji_summary_list", allEntries = true)
+    public void deleteEmojiSummariesByIds(List<String> ids) {
+        if (ids == null || ids.isEmpty()) {
+            log.warn("Batch deletion aborted. Provided ID list is empty or null.");
+            return;
+        }
+
+        log.info("Request to batch delete [{}] emoji summary records.", ids.size());
+        for (String id : ids) {
+            if (emojiSummaryRepository.existsById(id)) {
+                emojiSummaryRepository.deleteById(id);
+                evictEmojiSummary(id);
+            }
+        }
+        log.info("Completed batch deletion and cache eviction for provided IDs.");
+    }
+
+    @CachePut(cacheNames = "emoji_summary", key = "#hash")
+    public Optional<String> putEmojiSummary(String hash, String summary) {
+        if (log.isDebugEnabled()) {
+            log.debug("Explicitly updating emoji cache entry mapping for hash key: {}", hash);
+        }
+        return Optional.ofNullable(summary);
+    }
+
+    @CacheEvict(cacheNames = "emoji_summary", key = "#hash")
+    public void evictEmojiSummary(String hash) {
+        log.info("Evicting and invalidating emoji cache address segment mapping for key hash: [{}]",
+                hash);
+    }
+
+    // =========================================================================
     // 2. AUDIO MEDIA SUMMARY CACHE (Spring Cache Driven)
     // =========================================================================
 
@@ -147,7 +241,6 @@ public class WeChatSummaryCacheService {
         return audioSummaryRepository.findByFileHash(hash);
     }
 
-    @Cacheable(cacheNames = "audio_summary", key = "#hash", sync = true)
     public Optional<String> getAudioSummary(String hash) {
         log.info(
                 "Cache miss for audio_summary signature target [{}]. Falling back to underlying persistence tables...",
@@ -278,7 +371,6 @@ public class WeChatSummaryCacheService {
         return videoSummaryRepository.findByFileHash(hash);
     }
 
-    @Cacheable(cacheNames = "video_summary", key = "#hash", sync = true)
     public Optional<String> getVideoSummary(String hash) {
         log.info(
                 "Cache miss for video_summary signature target [{}]. Querying relational persistence layer...",

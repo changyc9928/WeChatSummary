@@ -34,12 +34,12 @@ spring:
       base-url: https://integrate.api.nvidia.com/v1
       chat:
         temperature: 0.1
-        timeout: 60m
+        timeout: 120s
         options:
-          model: deepseek-ai/deepseek-v4-flash
+          model: minimaxai/minimax-m3
       audio:
         transcription:
-          timeout: 60m
+          timeout: 300s
           base-url: http://localhost:48000/v1/
           options:
             model: large-v3
@@ -53,13 +53,13 @@ custom-ai:
   multimodal:
     base-url: https://integrate.api.nvidia.com/v1
     api-key: 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
-    model: meta/llama-3.2-90b-vision-instruct
-    timeout: 60m
+    model: meta/llama-3.2-11b-vision-instruct
+    timeout: 120s
   video:
     base-url: https://integrate.api.nvidia.com/v1
     api-key: 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
-    model: meta/llama-3.2-90b-vision-instruct
-    timeout: 60m
+    model: meta/llama-3.2-11b-vision-instruct
+    timeout: 120s
     frame-count: 5
 
 storage:

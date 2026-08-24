@@ -1,8 +1,8 @@
 package com.wechat.wechatsummary.listener;
 
 import com.wechat.wechatsummary.config.RabbitConfig;
+import com.wechat.wechatsummary.service.EmojiProcessorService;
 import com.wechat.wechatsummary.service.MediaMessageHandler;
-import com.wechat.wechatsummary.service.VideoProcessorService;
 import com.rabbitmq.client.Channel;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
@@ -13,16 +13,16 @@ import org.springframework.stereotype.Component;
 @Component
 @RequiredArgsConstructor
 @Slf4j
-public class VideoListener {
+public class EmojiListener {
 
-    private final VideoProcessorService videoProcessorService;
+    private final EmojiProcessorService emojiProcessorService;
     private final MediaMessageHandler mediaMessageHandler;
 
-    @RabbitListener(queues = RabbitConfig.VIDEO_QUEUE)
-    public void receiveVideo(Message message, Channel channel) throws java.io.IOException {
+    @RabbitListener(queues = RabbitConfig.EMOJI_QUEUE)
+    public void receive(Message message, Channel channel) throws java.io.IOException {
         try {
-            mediaMessageHandler.handle(message, "video", videoProcessorService::processVideoSummary,
-                RabbitConfig.VIDEO_ROUTING_KEY);
+            mediaMessageHandler.handle(message, "emoji", emojiProcessorService::processImage,
+                RabbitConfig.EMOJI_ROUTING_KEY);
         } finally {
             channel.basicAck(message.getMessageProperties().getDeliveryTag(), false);
         }

@@ -92,6 +92,9 @@ public class ImageProcessorService {
         } catch (Exception e) {
             log.error("Fatal exception encountered while processing image resource context: {}",
                 filePath, e);
+            // Re-throw so the media listener can requeue the message with a delay and retry
+            // instead of silently dropping the summary (e.g. on transient AI 429/5xx errors).
+            throw new RuntimeException("Image processing failed for " + filePath, e);
         }
     }
 

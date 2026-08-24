@@ -5,17 +5,21 @@ import com.wechat.wechatsummary.dto.ApiResponse;
 import com.wechat.wechatsummary.dto.TaskAckResponse;
 import com.wechat.wechatsummary.dto.TaskProgress;
 import com.wechat.wechatsummary.entity.AudioSummary;
+import com.wechat.wechatsummary.entity.EmojiSummaryEntity;
 import com.wechat.wechatsummary.entity.ImageSummaryEntity;
 import com.wechat.wechatsummary.exception.BadRequestException;
 import com.wechat.wechatsummary.exception.BusinessException;
 import com.wechat.wechatsummary.service.AudioProcessorService;
+import com.wechat.wechatsummary.service.EmojiProcessorService;
 import com.wechat.wechatsummary.service.ImageProcessorService;
 import com.wechat.wechatsummary.service.MediaProducerService;
 import com.wechat.wechatsummary.service.MessageProcessorService;
 import com.wechat.wechatsummary.entity.VideoSummary;
 import com.wechat.wechatsummary.service.TaskCoordinatorService;
 import com.wechat.wechatsummary.service.VideoProcessorService;
+import com.wechat.wechatsummary.service.StoragePaths;
 import java.io.IOException;
+import java.nio.file.Files;
 import java.util.List;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
@@ -54,7 +58,9 @@ public class PreprocessController {
     private final ImageProcessorService imageProcessorService;
     private final AudioProcessorService audioProcessorService;
     private final VideoProcessorService videoProcessorService;
+    private final EmojiProcessorService emojiProcessorService;
     private final HttpConfig httpConfig;
+    private final StoragePaths storagePaths;
 
     @PostMapping("/{uuid}")
     public ApiResponse<TaskAckResponse> preprocess(
@@ -113,6 +119,48 @@ public class PreprocessController {
         throw new BadRequestException(
             "Failed to abort preprocessing. No active threads found or task context missing for UUID: "
                 + uuid);
+    }
+
+    /**
+     * Aborts any in-flight preprocessing run, wipes previously generated artifacts, and kicks off a
+     * clean re-run of the full media ingestion and markdown compilation pipeline.
+     */
+    @PostMapping("/{uuid}/restart")
+    public ApiResponse<TaskAckResponse> restartPreprocess(
+        @RequestHeader("X-User-Id") String userId,
+        @PathVariable String uuid) {
+        log.info(
+            "REST endpoint invoked to RESTART preprocessing for user UUID: [{}] and session UUID: [{}]",
+            userId, uuid);
+
+        // 1. Interrupt any active worker threads and clear stale task context counters
+        taskCoordinatorService.abortTask(uuid);
+
+        // 2. Remove the prior compiled markdown artifact so the task is no longer COMPLETED
+        try {
+            Files.deleteIfExists(storagePaths.processedMarkdown(userId, uuid));
+            log.info(
+                "Removed existing processed markdown for user UUID: [{}] and session UUID: [{}]",
+                userId, uuid);
+        } catch (IOException e) {
+            log.warn(
+                "Failed to delete processed markdown during restart for user UUID: [{}] and session UUID: [{}]",
+                userId, uuid, e);
+        }
+
+        // 3. Re-run the full preprocessing pipeline from scratch
+        try {
+            producerService.preprocess(userId, uuid);
+        } catch (IOException e) {
+            log.error(
+                "Failed to restart preprocessing for user UUID: [{}] and session UUID: [{}]",
+                userId, uuid, e);
+            throw new BusinessException(HttpStatus.INTERNAL_SERVER_ERROR,
+                "Failed to restart preprocessing");
+        }
+
+        return ApiResponse.success("Preprocessing restarted",
+            new TaskAckResponse(uuid, null, "Preprocessing restarted"));
     }
 
     @GetMapping("/{uuid}/progress")
@@ -389,6 +437,75 @@ public class PreprocessController {
                 .contentType(MediaType.parseMediaType(fileObj.contentType()))
                 .header(HttpHeaders.CACHE_CONTROL, "max-age=" + httpConfig.getCacheMaxAge().toSeconds())
                 .body(fileObj.resource()))
+            .orElseGet(() -> ResponseEntity.notFound().build());
+    }
+
+    // =========================================================================
+    // EMOJI (ANIMATED STICKER) SUMMARY MANAGEMENT ENDPOINTS
+    // =========================================================================
+
+    @GetMapping("/emojis/summaries")
+    public ApiResponse<Page<EmojiSummaryEntity>> getEmojiSummariesByUuid(
+        @RequestHeader("X-User-Id") String userId,
+        @RequestParam("uuid") String uuid,
+        @RequestParam(defaultValue = "0") int page,
+        @RequestParam(defaultValue = "20") int size) {
+
+        log.info(
+            "REST endpoint invoked to retrieve emoji summaries for user UUID: [{}] and session UUID: [{}] (page: {}, size: {})",
+            userId, uuid, page, size);
+        Pageable pageable = PageRequest.of(page, size);
+        Page<EmojiSummaryEntity> summaries = emojiProcessorService.getEmojiSummariesByUuid(uuid,
+            pageable);
+
+        return ApiResponse.success(summaries);
+    }
+
+    @DeleteMapping("/emojis/summaries/{id}")
+    public ApiResponse<Void> deleteEmojiSummaryById(
+        @RequestHeader("X-User-Id") String userId,
+        @PathVariable String id) {
+        log.info(
+            "REST endpoint invoked to delete emoji summary record with ID: [{}] for user UUID: [{}]",
+            id, userId);
+        emojiProcessorService.deleteEmojiSummaryById(id);
+        return ApiResponse.success("Emoji summary deleted", null);
+    }
+
+    @DeleteMapping("/emojis/summaries")
+    public ApiResponse<Void> deleteEmojiSummariesByIds(
+        @RequestHeader("X-User-Id") String userId,
+        @RequestBody List<String> ids) {
+        log.info(
+            "REST endpoint invoked to batch delete [{}] emoji summary records for user UUID: [{}]",
+            ids != null ? ids.size() : 0, userId);
+        emojiProcessorService.deleteEmojiSummariesByIds(ids);
+        return ApiResponse.success("Emoji summaries deleted", null);
+    }
+
+    @DeleteMapping("/emojis/summaries/all")
+    public ApiResponse<Void> deleteAllEmojiSummariesByUuid(
+        @RequestHeader("X-User-Id") String userId,
+        @RequestParam("uuid") String uuid) {
+        log.info(
+            "REST endpoint invoked to delete ALL emoji summary records for user UUID: [{}] and session UUID: [{}]",
+            userId, uuid);
+        emojiProcessorService.deleteAllEmojiSummariesByUuid(uuid);
+        return ApiResponse.success("All emoji summaries deleted", null);
+    }
+
+    @GetMapping("/emojis/{id}/file")
+    public ResponseEntity<Resource> getEmojiFileById(
+        @RequestHeader("X-User-Id") String userId,
+        @PathVariable String id) {
+        log.info("REST endpoint invoked to fetch emoji file for ID: [{}] and user UUID: [{}]", id,
+            userId);
+
+        return emojiProcessorService.getEmojiFileById(id)
+            .map(fileRes -> ResponseEntity.ok()
+                .contentType(MediaType.parseMediaType(fileRes.contentType()))
+                .header(HttpHeaders.CACHE_CONTROL, "max-age=" + httpConfig.getCacheMaxAge().toSeconds())
+                .body(fileRes.resource()))
             .orElseGet(() -> ResponseEntity.notFound().build());
     }
 }

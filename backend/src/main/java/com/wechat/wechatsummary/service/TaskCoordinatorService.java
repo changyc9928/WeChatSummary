@@ -77,6 +77,23 @@ public class TaskCoordinatorService {
     }
 
     /**
+     * Removes a previously registered worker thread once it has finished processing (successfully
+     * or after a retry hand-off), so aborted/paused interrupts no longer target stale threads.
+     *
+     * @param uuid   The batch transaction identifier.
+     * @param thread The finished worker thread instance.
+     */
+    public void unregisterThread(String uuid, Thread thread) {
+        if (thread == null) {
+            return;
+        }
+        Set<Thread> threads = activeThreadsMap.get(uuid);
+        if (threads != null) {
+            threads.remove(thread);
+        }
+    }
+
+    /**
      * Instantly aborts all active worker threads, stores a flag in Redis, and purges active counter
      * data for the given UUID.
      *

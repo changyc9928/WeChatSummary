@@ -9,11 +9,13 @@ import useSummaryStatus from './hooks/useSummaryStatus';
 import useImageSummaries from './hooks/useImageSummaries';
 import useAudioSummaries from './hooks/useAudioSummaries';
 import useVideoSummaries from './hooks/useVideoSummaries';
+import useEmojiSummaries from './hooks/useEmojiSummaries';
 import LoginPage from './pages/LoginPage';
 import DashboardPage from './pages/DashboardPage';
 import ImagesPage from './pages/ImagesPage';
 import AudiosPage from './pages/AudiosPage';
 import VideosPage from './pages/VideosPage';
+import EmojisPage from './pages/EmojisPage';
 
 export default function App() {
   const { theme, toggleTheme } = useTheme();
@@ -23,6 +25,7 @@ export default function App() {
   const [uuidInput, setUuidInput] = useState('');
   const [currentView, setCurrentView] = useState('dashboard');
   const [activeModalImage, setActiveModalImage] = useState(null);
+  const [activeModalEmoji, setActiveModalEmoji] = useState(null);
 
   const sessions = useSessions(currentUser);
   const timeWindow = useTimeWindow(uuidInput);
@@ -35,6 +38,7 @@ export default function App() {
   const images = useImageSummaries({ uuidInput, currentUser });
   const audios = useAudioSummaries({ uuidInput, currentUser });
   const videos = useVideoSummaries({ uuidInput, currentUser });
+  const emojis = useEmojiSummaries({ uuidInput, currentUser });
   const upload = useUpload({
     currentUser,
     onUploaded: (assignedUuid) => {
@@ -58,6 +62,7 @@ export default function App() {
     preprocess: preprocess.loading,
     abortPreprocess: preprocess.aborting,
     reprocess: preprocess.reprocessing,
+    restartPreprocess: preprocess.restarting,
     start: summary.loading,
     pauseSummary: summary.pausing,
     restartSummary: summary.restarting
@@ -98,6 +103,7 @@ export default function App() {
         onToggleTheme={toggleTheme}
         theme={theme}
         uuidInput={uuidInput}
+        currentUser={currentUser}
         audios={{
           summaries: audios.audioSummaries,
           loading: audios.loadingAudios,
@@ -127,6 +133,7 @@ export default function App() {
         onToggleTheme={toggleTheme}
         theme={theme}
         uuidInput={uuidInput}
+        currentUser={currentUser}
         videos={{
           summaries: videos.videoSummaries,
           loading: videos.loadingVideos,
@@ -149,6 +156,34 @@ export default function App() {
     );
   }
 
+  if (currentView === 'emojis') {
+    return (
+      <EmojisPage
+        onBack={() => setCurrentView('dashboard')}
+        onToggleTheme={toggleTheme}
+        theme={theme}
+        uuidInput={uuidInput}
+        currentUser={currentUser}
+        emojis={{
+          emojiSummaries: emojis.emojiSummaries,
+          loadingEmojis: emojis.loadingEmojis,
+          emojiPagination: emojis.emojiPagination,
+          fetchEmojiSummaries: emojis.fetchEmojiSummaries,
+          selectedEmojiIds: emojis.selectedEmojiIds,
+          setSelectedEmojiIds: emojis.setSelectedEmojiIds,
+          deleting: emojis.deleting,
+          batchDeleting: emojis.batchDeleting,
+          error: emojis.error,
+          deleteEmoji: emojis.deleteEmoji,
+          batchDeleteEmojis: emojis.batchDeleteEmojis
+        }}
+        onRefreshProgress={(uuid) => preprocess.checkProgress(uuid)}
+        activeModalEmoji={activeModalEmoji}
+        setActiveModalEmoji={setActiveModalEmoji}
+      />
+    );
+  }
+
   return (
     <DashboardPage
       currentUser={currentUser}
@@ -160,12 +195,14 @@ export default function App() {
       onNavigateToImages={() => setCurrentView('images')}
       onNavigateToAudios={() => setCurrentView('audios')}
       onNavigateToVideos={() => setCurrentView('videos')}
+      onNavigateToEmojis={() => setCurrentView('emojis')}
       onToggleTheme={toggleTheme}
       preprocess={{
         abortPreprocess: preprocess.abortPreprocess,
         isFinished: preprocess.isFinished,
         progress: preprocess.progress,
         reprocess: preprocess.reprocess,
+        restartPreprocess: preprocess.restartPreprocess,
         startPreprocess: preprocess.startPreprocess
       }}
       preprocessError={preprocess.error}

@@ -16,6 +16,7 @@
 import * as runtime from '../runtime';
 import type {
   ApiResponsePageAudioSummary,
+  ApiResponsePageEmojiSummaryEntity,
   ApiResponsePageImageSummaryEntity,
   ApiResponsePageVideoSummary,
   ApiResponseTaskAckResponse,
@@ -25,6 +26,8 @@ import type {
 import {
     ApiResponsePageAudioSummaryFromJSON,
     ApiResponsePageAudioSummaryToJSON,
+    ApiResponsePageEmojiSummaryEntityFromJSON,
+    ApiResponsePageEmojiSummaryEntityToJSON,
     ApiResponsePageImageSummaryEntityFromJSON,
     ApiResponsePageImageSummaryEntityToJSON,
     ApiResponsePageVideoSummaryFromJSON,
@@ -67,6 +70,11 @@ export interface DeleteAllAudioSummariesByUuidRequest {
     uuid: string;
 }
 
+export interface DeleteAllEmojiSummariesByUuidRequest {
+    xUserId: string;
+    uuid: string;
+}
+
 export interface DeleteAllImageSummariesByUuidRequest {
     xUserId: string;
     uuid: string;
@@ -83,6 +91,16 @@ export interface DeleteAudioSummariesByIdsRequest {
 }
 
 export interface DeleteAudioSummaryByIdRequest {
+    xUserId: string;
+    id: string;
+}
+
+export interface DeleteEmojiSummariesByIdsRequest {
+    xUserId: string;
+    requestBody: Array<string>;
+}
+
+export interface DeleteEmojiSummaryByIdRequest {
     xUserId: string;
     id: string;
 }
@@ -113,6 +131,18 @@ export interface GetAudioFileByIdRequest {
 }
 
 export interface GetAudioSummariesByUuidRequest {
+    xUserId: string;
+    uuid: string;
+    page?: number;
+    size?: number;
+}
+
+export interface GetEmojiFileByIdRequest {
+    xUserId: string;
+    id: string;
+}
+
+export interface GetEmojiSummariesByUuidRequest {
     xUserId: string;
     uuid: string;
     page?: number;
@@ -154,6 +184,11 @@ export interface PreprocessRequest {
 }
 
 export interface ReprocessRequest {
+    xUserId: string;
+    uuid: string;
+}
+
+export interface RestartPreprocessRequest {
     xUserId: string;
     uuid: string;
 }
@@ -448,6 +483,55 @@ export class PreprocessControllerApi extends runtime.BaseAPI {
 
     /**
      */
+    async deleteAllEmojiSummariesByUuidRaw(requestParameters: DeleteAllEmojiSummariesByUuidRequest, initOverrides?: RequestInit | runtime.InitOverrideFunction): Promise<runtime.ApiResponse<ApiResponseVoid>> {
+        if (requestParameters['xUserId'] == null) {
+            throw new runtime.RequiredError(
+                'xUserId',
+                'Required parameter "xUserId" was null or undefined when calling deleteAllEmojiSummariesByUuid().'
+            );
+        }
+
+        if (requestParameters['uuid'] == null) {
+            throw new runtime.RequiredError(
+                'uuid',
+                'Required parameter "uuid" was null or undefined when calling deleteAllEmojiSummariesByUuid().'
+            );
+        }
+
+        const queryParameters: any = {};
+
+        if (requestParameters['uuid'] != null) {
+            queryParameters['uuid'] = requestParameters['uuid'];
+        }
+
+        const headerParameters: runtime.HTTPHeaders = {};
+
+        if (requestParameters['xUserId'] != null) {
+            headerParameters['X-User-Id'] = String(requestParameters['xUserId']);
+        }
+
+
+        let urlPath = `/api/preprocess/emojis/summaries/all`;
+
+        const response = await this.request({
+            path: urlPath,
+            method: 'DELETE',
+            headers: headerParameters,
+            query: queryParameters,
+        }, initOverrides);
+
+        return new runtime.JSONApiResponse(response, (jsonValue) => ApiResponseVoidFromJSON(jsonValue));
+    }
+
+    /**
+     */
+    async deleteAllEmojiSummariesByUuid(requestParameters: DeleteAllEmojiSummariesByUuidRequest, initOverrides?: RequestInit | runtime.InitOverrideFunction): Promise<ApiResponseVoid> {
+        const response = await this.deleteAllEmojiSummariesByUuidRaw(requestParameters, initOverrides);
+        return await response.value();
+    }
+
+    /**
+     */
     async deleteAllImageSummariesByUuidRaw(requestParameters: DeleteAllImageSummariesByUuidRequest, initOverrides?: RequestInit | runtime.InitOverrideFunction): Promise<runtime.ApiResponse<ApiResponseVoid>> {
         if (requestParameters['xUserId'] == null) {
             throw new runtime.RequiredError(
@@ -635,6 +719,100 @@ export class PreprocessControllerApi extends runtime.BaseAPI {
      */
     async deleteAudioSummaryById(requestParameters: DeleteAudioSummaryByIdRequest, initOverrides?: RequestInit | runtime.InitOverrideFunction): Promise<ApiResponseVoid> {
         const response = await this.deleteAudioSummaryByIdRaw(requestParameters, initOverrides);
+        return await response.value();
+    }
+
+    /**
+     */
+    async deleteEmojiSummariesByIdsRaw(requestParameters: DeleteEmojiSummariesByIdsRequest, initOverrides?: RequestInit | runtime.InitOverrideFunction): Promise<runtime.ApiResponse<ApiResponseVoid>> {
+        if (requestParameters['xUserId'] == null) {
+            throw new runtime.RequiredError(
+                'xUserId',
+                'Required parameter "xUserId" was null or undefined when calling deleteEmojiSummariesByIds().'
+            );
+        }
+
+        if (requestParameters['requestBody'] == null) {
+            throw new runtime.RequiredError(
+                'requestBody',
+                'Required parameter "requestBody" was null or undefined when calling deleteEmojiSummariesByIds().'
+            );
+        }
+
+        const queryParameters: any = {};
+
+        const headerParameters: runtime.HTTPHeaders = {};
+
+        headerParameters['Content-Type'] = 'application/json';
+
+        if (requestParameters['xUserId'] != null) {
+            headerParameters['X-User-Id'] = String(requestParameters['xUserId']);
+        }
+
+
+        let urlPath = `/api/preprocess/emojis/summaries`;
+
+        const response = await this.request({
+            path: urlPath,
+            method: 'DELETE',
+            headers: headerParameters,
+            query: queryParameters,
+            body: requestParameters['requestBody'],
+        }, initOverrides);
+
+        return new runtime.JSONApiResponse(response, (jsonValue) => ApiResponseVoidFromJSON(jsonValue));
+    }
+
+    /**
+     */
+    async deleteEmojiSummariesByIds(requestParameters: DeleteEmojiSummariesByIdsRequest, initOverrides?: RequestInit | runtime.InitOverrideFunction): Promise<ApiResponseVoid> {
+        const response = await this.deleteEmojiSummariesByIdsRaw(requestParameters, initOverrides);
+        return await response.value();
+    }
+
+    /**
+     */
+    async deleteEmojiSummaryByIdRaw(requestParameters: DeleteEmojiSummaryByIdRequest, initOverrides?: RequestInit | runtime.InitOverrideFunction): Promise<runtime.ApiResponse<ApiResponseVoid>> {
+        if (requestParameters['xUserId'] == null) {
+            throw new runtime.RequiredError(
+                'xUserId',
+                'Required parameter "xUserId" was null or undefined when calling deleteEmojiSummaryById().'
+            );
+        }
+
+        if (requestParameters['id'] == null) {
+            throw new runtime.RequiredError(
+                'id',
+                'Required parameter "id" was null or undefined when calling deleteEmojiSummaryById().'
+            );
+        }
+
+        const queryParameters: any = {};
+
+        const headerParameters: runtime.HTTPHeaders = {};
+
+        if (requestParameters['xUserId'] != null) {
+            headerParameters['X-User-Id'] = String(requestParameters['xUserId']);
+        }
+
+
+        let urlPath = `/api/preprocess/emojis/summaries/{id}`;
+        urlPath = urlPath.replace(`{${"id"}}`, encodeURIComponent(String(requestParameters['id'])));
+
+        const response = await this.request({
+            path: urlPath,
+            method: 'DELETE',
+            headers: headerParameters,
+            query: queryParameters,
+        }, initOverrides);
+
+        return new runtime.JSONApiResponse(response, (jsonValue) => ApiResponseVoidFromJSON(jsonValue));
+    }
+
+    /**
+     */
+    async deleteEmojiSummaryById(requestParameters: DeleteEmojiSummaryByIdRequest, initOverrides?: RequestInit | runtime.InitOverrideFunction): Promise<ApiResponseVoid> {
+        const response = await this.deleteEmojiSummaryByIdRaw(requestParameters, initOverrides);
         return await response.value();
     }
 
@@ -926,6 +1104,109 @@ export class PreprocessControllerApi extends runtime.BaseAPI {
      */
     async getAudioSummariesByUuid(requestParameters: GetAudioSummariesByUuidRequest, initOverrides?: RequestInit | runtime.InitOverrideFunction): Promise<ApiResponsePageAudioSummary> {
         const response = await this.getAudioSummariesByUuidRaw(requestParameters, initOverrides);
+        return await response.value();
+    }
+
+    /**
+     */
+    async getEmojiFileByIdRaw(requestParameters: GetEmojiFileByIdRequest, initOverrides?: RequestInit | runtime.InitOverrideFunction): Promise<runtime.ApiResponse<Blob>> {
+        if (requestParameters['xUserId'] == null) {
+            throw new runtime.RequiredError(
+                'xUserId',
+                'Required parameter "xUserId" was null or undefined when calling getEmojiFileById().'
+            );
+        }
+
+        if (requestParameters['id'] == null) {
+            throw new runtime.RequiredError(
+                'id',
+                'Required parameter "id" was null or undefined when calling getEmojiFileById().'
+            );
+        }
+
+        const queryParameters: any = {};
+
+        const headerParameters: runtime.HTTPHeaders = {};
+
+        if (requestParameters['xUserId'] != null) {
+            headerParameters['X-User-Id'] = String(requestParameters['xUserId']);
+        }
+
+
+        let urlPath = `/api/preprocess/emojis/{id}/file`;
+        urlPath = urlPath.replace(`{${"id"}}`, encodeURIComponent(String(requestParameters['id'])));
+
+        const response = await this.request({
+            path: urlPath,
+            method: 'GET',
+            headers: headerParameters,
+            query: queryParameters,
+        }, initOverrides);
+
+        return new runtime.BlobApiResponse(response);
+    }
+
+    /**
+     */
+    async getEmojiFileById(requestParameters: GetEmojiFileByIdRequest, initOverrides?: RequestInit | runtime.InitOverrideFunction): Promise<Blob> {
+        const response = await this.getEmojiFileByIdRaw(requestParameters, initOverrides);
+        return await response.value();
+    }
+
+    /**
+     */
+    async getEmojiSummariesByUuidRaw(requestParameters: GetEmojiSummariesByUuidRequest, initOverrides?: RequestInit | runtime.InitOverrideFunction): Promise<runtime.ApiResponse<ApiResponsePageEmojiSummaryEntity>> {
+        if (requestParameters['xUserId'] == null) {
+            throw new runtime.RequiredError(
+                'xUserId',
+                'Required parameter "xUserId" was null or undefined when calling getEmojiSummariesByUuid().'
+            );
+        }
+
+        if (requestParameters['uuid'] == null) {
+            throw new runtime.RequiredError(
+                'uuid',
+                'Required parameter "uuid" was null or undefined when calling getEmojiSummariesByUuid().'
+            );
+        }
+
+        const queryParameters: any = {};
+
+        if (requestParameters['uuid'] != null) {
+            queryParameters['uuid'] = requestParameters['uuid'];
+        }
+
+        if (requestParameters['page'] != null) {
+            queryParameters['page'] = requestParameters['page'];
+        }
+
+        if (requestParameters['size'] != null) {
+            queryParameters['size'] = requestParameters['size'];
+        }
+
+        const headerParameters: runtime.HTTPHeaders = {};
+
+        if (requestParameters['xUserId'] != null) {
+            headerParameters['X-User-Id'] = String(requestParameters['xUserId']);
+        }
+
+
+        let urlPath = `/api/preprocess/emojis/summaries`;
+
+        const response = await this.request({
+            path: urlPath,
+            method: 'GET',
+            headers: headerParameters,
+            query: queryParameters,
+        }, initOverrides);
+
+        return new runtime.JSONApiResponse(response, (jsonValue) => ApiResponsePageEmojiSummaryEntityFromJSON(jsonValue));
+    }
+
+    /**
+     */
+    async getEmojiSummariesByUuid(requestParameters: GetEmojiSummariesByUuidRequest, initOverrides?: RequestInit | runtime.InitOverrideFunction): Promise<ApiResponsePageEmojiSummaryEntity> {
+        const response = await this.getEmojiSummariesByUuidRaw(requestParameters, initOverrides);
         return await response.value();
     }
 
@@ -1270,6 +1551,52 @@ export class PreprocessControllerApi extends runtime.BaseAPI {
      */
     async reprocess(requestParameters: ReprocessRequest, initOverrides?: RequestInit | runtime.InitOverrideFunction): Promise<ApiResponseTaskAckResponse> {
         const response = await this.reprocessRaw(requestParameters, initOverrides);
+        return await response.value();
+    }
+
+    /**
+     */
+    async restartPreprocessRaw(requestParameters: RestartPreprocessRequest, initOverrides?: RequestInit | runtime.InitOverrideFunction): Promise<runtime.ApiResponse<ApiResponseTaskAckResponse>> {
+        if (requestParameters['xUserId'] == null) {
+            throw new runtime.RequiredError(
+                'xUserId',
+                'Required parameter "xUserId" was null or undefined when calling restartPreprocess().'
+            );
+        }
+
+        if (requestParameters['uuid'] == null) {
+            throw new runtime.RequiredError(
+                'uuid',
+                'Required parameter "uuid" was null or undefined when calling restartPreprocess().'
+            );
+        }
+
+        const queryParameters: any = {};
+
+        const headerParameters: runtime.HTTPHeaders = {};
+
+        if (requestParameters['xUserId'] != null) {
+            headerParameters['X-User-Id'] = String(requestParameters['xUserId']);
+        }
+
+
+        let urlPath = `/api/preprocess/{uuid}/restart`;
+        urlPath = urlPath.replace(`{${"uuid"}}`, encodeURIComponent(String(requestParameters['uuid'])));
+
+        const response = await this.request({
+            path: urlPath,
+            method: 'POST',
+            headers: headerParameters,
+            query: queryParameters,
+        }, initOverrides);
+
+        return new runtime.JSONApiResponse(response, (jsonValue) => ApiResponseTaskAckResponseFromJSON(jsonValue));
+    }
+
+    /**
+     */
+    async restartPreprocess(requestParameters: RestartPreprocessRequest, initOverrides?: RequestInit | runtime.InitOverrideFunction): Promise<ApiResponseTaskAckResponse> {
+        const response = await this.restartPreprocessRaw(requestParameters, initOverrides);
         return await response.value();
     }
 

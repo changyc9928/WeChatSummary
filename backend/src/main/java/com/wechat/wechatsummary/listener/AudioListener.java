@@ -3,8 +3,10 @@ package com.wechat.wechatsummary.listener;
 import com.wechat.wechatsummary.config.RabbitConfig;
 import com.wechat.wechatsummary.service.AudioProcessorService;
 import com.wechat.wechatsummary.service.MediaMessageHandler;
+import com.rabbitmq.client.Channel;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.amqp.core.Message;
 import org.springframework.amqp.rabbit.annotation.RabbitListener;
 import org.springframework.stereotype.Component;
 
@@ -17,7 +19,12 @@ public class AudioListener {
     private final MediaMessageHandler mediaMessageHandler;
 
     @RabbitListener(queues = RabbitConfig.AUDIO_QUEUE)
-    public void receiveAudio(String message) {
-        mediaMessageHandler.handle(message, "audio", audioProcessorService::processAudioSummary);
+    public void receiveAudio(Message message, Channel channel) throws java.io.IOException {
+        try {
+            mediaMessageHandler.handle(message, "audio", audioProcessorService::processAudioSummary,
+                RabbitConfig.AUDIO_ROUTING_KEY);
+        } finally {
+            channel.basicAck(message.getMessageProperties().getDeliveryTag(), false);
+        }
     }
 }

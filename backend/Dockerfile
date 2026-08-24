@@ -10,6 +10,11 @@ RUN mvn -B -DskipTests package
 FROM eclipse-temurin:17-jre AS runtime
 WORKDIR /app
 
+USER root
+RUN apt-get update \
+    && apt-get install -y --no-install-recommends ffmpeg \
+    && rm -rf /var/lib/apt/lists/*
+
 USER ubuntu
 
 COPY --from=builder /app/target/*.jar app.jar

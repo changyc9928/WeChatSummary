@@ -1,6 +1,35 @@
-import React from 'react';
+import React, { useState, useEffect } from 'react';
 import { styles } from '../../styles/dashboardStyles';
+import { apiClient } from '../../api/client';
 import useLanguage from '../../hooks/useLanguage';
+
+function AudioPlayer({ id, currentUser }) {
+  const [url, setUrl] = useState(null);
+  const [loading, setLoading] = useState(true);
+
+  useEffect(() => {
+    if (!id || !currentUser) return;
+    let objectUrl;
+    let active = true;
+    setLoading(true);
+    apiClient.preprocess.getAudioFileById({ xUserId: currentUser.uuid, id })
+      .then((blob) => {
+        if (!active) return;
+        objectUrl = URL.createObjectURL(blob);
+        setUrl(objectUrl);
+      })
+      .catch(() => {})
+      .finally(() => { if (active) setLoading(false); });
+    return () => {
+      active = false;
+      if (objectUrl) URL.revokeObjectURL(objectUrl);
+    };
+  }, [id, currentUser]);
+
+  if (loading) return <span style={{ fontSize: '0.75rem', color: 'var(--text-muted)' }}>…</span>;
+  if (!url) return <span style={{ fontSize: '0.75rem', color: 'var(--text-muted)' }}>—</span>;
+  return <audio controls src={url} style={{ width: '100%', minWidth: '260px', maxWidth: '360px', height: '44px' }} />;
+}
 
 export default function AudioSummariesPanel({
   uuidInput,
@@ -15,7 +44,8 @@ export default function AudioSummariesPanel({
   handleBatchDeleteAudios,
   handleBatchClearAudioTexts,
   loading,
-  errorAudios
+  errorAudios,
+  currentUser
 }) {
   const { t } = useLanguage();
   const toggleSelectAll = (e) => {
@@ -68,6 +98,7 @@ export default function AudioSummariesPanel({
               <thead>
                 <tr style={styles.tr}>
                   <th style={styles.th}><input type="checkbox" onChange={toggleSelectAll} checked={selectedAudioIds.length === safeSummaries.length && safeSummaries.length > 0} /></th>
+                  <th style={styles.th}>{t('audios.playback')}</th>
                   <th style={styles.th}>{t('audios.transcript')}</th>
                   <th style={styles.th}>{t('audios.aiSummary')}</th>
                   <th style={styles.th}>{t('common.actions')}</th>
@@ -77,6 +108,9 @@ export default function AudioSummariesPanel({
                 {safeSummaries.map((item) => (
                   <tr key={item.id} style={styles.tr}>
                     <td style={styles.td}><input type="checkbox" checked={selectedAudioIds.includes(item.id)} onChange={() => toggleSelectOne(item.id)} /></td>
+                    <td style={styles.td}>
+                      <AudioPlayer id={item.id} currentUser={currentUser} />
+                    </td>
                     <td style={styles.td}>
                       <div style={styles.transcriptBox}>{item.transcript || <span style={styles.emptySummaryBadge}>{t('audios.noTranscript')}</span>}</div>
                     </td>

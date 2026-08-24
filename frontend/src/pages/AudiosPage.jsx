@@ -11,7 +11,8 @@ export default function AudiosPage({
   onBack,
   uuidInput,
   audios,
-  onRefreshProgress
+  onRefreshProgress,
+  currentUser
 }) {
   const { t } = useLanguage();
   const handleDeleteAudio = async (id) => {
@@ -67,6 +68,7 @@ export default function AudiosPage({
         handleBatchClearAudioTexts={handleBatchClearAudioTexts}
         loading={loading}
         errorAudios={audios.error}
+        currentUser={currentUser}
       />
     </div>
   );

@@ -198,6 +198,7 @@ export const translations = {
     'preprocess.viewImages': '📁 View Image Summaries',
     'preprocess.viewAudios': '🎙️ View Audio Summaries',
     'preprocess.viewVideos': '🎬 View Video Summaries',
+    'preprocess.viewEmojis': '😀 View Emoji Summaries',
     'preprocess.starting': 'Starting...',
     'preprocess.start': 'Start Preprocessing',
     'preprocess.tasksProcessed': 'Processed {done} of {total} tasks ({remaining} remaining)',
@@ -217,6 +218,8 @@ export const translations = {
     'preprocess.noPreview': 'No preview rows available.',
     'preprocess.reprocess': 'Re-preprocess (regenerate markdown)',
     'preprocess.reprocessing': 'Re-processing...',
+    'preprocess.restart': 'Restart Preprocessing',
+    'preprocess.restarting': 'Restarting...',
 
     'summary.title': 'Step 3: AI Summary',
     'summary.selectDatasetFirst': 'Select a dataset first.',
@@ -257,6 +260,7 @@ export const translations = {
     'audios.aiSummary': 'AI Audio Summary',
     'audios.noTranscript': 'No transcript text',
     'audios.clearText': 'Clear Text',
+    'audios.playback': 'Playback',
 
     'videos.title': 'Video Transcripts & Summaries',
     'videos.panelTitle': 'Video Transcripts & Summaries',
@@ -269,6 +273,16 @@ export const translations = {
     'videos.aiSummary': 'AI Video Summary',
     'videos.noTranscript': 'No transcript text',
     'videos.clearText': 'Clear Text',
+    'videos.playback': 'Playback',
+
+    'emojis.title': 'Animated Emoji Summaries',
+    'emojis.panelTitle': 'Animated Emoji Summaries',
+    'emojis.deleting': 'Deleting...',
+    'emojis.deleteSelected': 'Delete Selected ({count})',
+    'emojis.loading': 'Loading emoji summaries...',
+    'emojis.none': 'No processed emojis found for this dataset.',
+    'emojis.thumbnail': 'Emoji',
+    'emojis.aiSummary': 'AI Description / Summary',
 
     'modal.summary': 'Summary:',
     'modal.noSummary': 'No summary available.'
@@ -468,6 +482,7 @@ export const translations = {
     'preprocess.viewImages': '📁 查看图片摘要',
     'preprocess.viewAudios': '🎙️ 查看语音摘要',
     'preprocess.viewVideos': '🎬 查看视频摘要',
+    'preprocess.viewEmojis': '😀 查看表情摘要',
     'preprocess.starting': '启动中...',
     'preprocess.start': '开始预处理',
     'preprocess.tasksProcessed': '已处理 {total} 个任务中的 {done} 个（剩余 {remaining} 个）',
@@ -487,6 +502,8 @@ export const translations = {
     'preprocess.noPreview': '暂无预览数据。',
     'preprocess.reprocess': '重新预处理（重新生成 Markdown）',
     'preprocess.reprocessing': '重新处理中...',
+    'preprocess.restart': '重新开始预处理',
+    'preprocess.restarting': '重新开始中...',
 
     'summary.title': '第 3 步：AI 摘要',
     'summary.selectDatasetFirst': '请先选择数据集。',
@@ -527,6 +544,7 @@ export const translations = {
     'audios.aiSummary': 'AI 语音摘要',
     'audios.noTranscript': '暂无转录文本',
     'audios.clearText': '清除文本',
+    'audios.playback': '播放',
 
     'videos.title': '视频转录与摘要',
     'videos.panelTitle': '视频转录与摘要',
@@ -539,6 +557,16 @@ export const translations = {
     'videos.aiSummary': 'AI 视频摘要',
     'videos.noTranscript': '暂无转录文本',
     'videos.clearText': '清除文本',
+    'videos.playback': '播放',
+
+    'emojis.title': '动态表情摘要',
+    'emojis.panelTitle': '动态表情摘要',
+    'emojis.deleting': '删除中...',
+    'emojis.deleteSelected': '删除所选（{count}）',
+    'emojis.loading': '正在加载表情摘要...',
+    'emojis.none': '此数据集暂未处理到动态表情。',
+    'emojis.thumbnail': '表情',
+    'emojis.aiSummary': 'AI 描述 / 摘要',
 
     'modal.summary': '摘要：',
     'modal.noSummary': '暂无摘要。'
