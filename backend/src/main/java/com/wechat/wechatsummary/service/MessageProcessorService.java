@@ -20,6 +20,14 @@ import java.util.regex.Pattern;
 import java.util.stream.Stream;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import java.net.URI;
+import java.net.http.HttpClient;
+import java.net.http.HttpRequest;
+import java.net.http.HttpResponse;
+import java.time.Duration;
+import java.util.LinkedHashSet;
+import java.util.Map;
+import java.util.Set;
 import org.springframework.stereotype.Service;
 import org.springframework.util.StringUtils;
 
@@ -49,6 +57,32 @@ public class MessageProcessorService {
     );
 
     private static final Pattern WXID_PATTERN = Pattern.compile("wxid_[a-zA-Z0-9]{10,25}");
+
+    // Outbound HTTP client used to enrich shared links / URLs with their page title & description.
+    private static final HttpClient HTTP_CLIENT = HttpClient.newBuilder()
+        .connectTimeout(Duration.ofSeconds(5))
+        .followRedirects(HttpClient.Redirect.NORMAL)
+        .build();
+
+    // Matches URLs embedded directly in message text.
+    private static final Pattern URL_PATTERN =
+        Pattern.compile("https?://[^\\s<>\"'）)】,。、]+", Pattern.CASE_INSENSITIVE);
+    // Captures the <url> element inside shared-link (appmsg) payloads.
+    private static final Pattern URL_RAW_PATTERN = Pattern.compile("<url>(.*?)</url>");
+    // Forwarded chat-record payload structures.
+    private static final Pattern RECORDINFO_PATTERN =
+        Pattern.compile("<recordinfo>(.*)</recordinfo>", Pattern.DOTALL);
+    private static final Pattern DATAITEM_PATTERN =
+        Pattern.compile("<dataitem\\b(.*?)</dataitem>", Pattern.DOTALL);
+    private static final Pattern META_TAG_PATTERN = Pattern.compile("(?is)<meta\\b([^>]*)>");
+    private static final Pattern TITLE_TAG_PATTERN =
+        Pattern.compile("(?is)<title[^>]*>(.*?)</title>");
+    private static final Pattern ENTITY_HEX_PATTERN = Pattern.compile("&#x([0-9a-fA-F]+);");
+    private static final Pattern ENTITY_DEC_PATTERN = Pattern.compile("&#(\\d+);");
+    private static final Pattern ATTR_PATTERN = Pattern.compile("(\\w+)\\s*=\\s*[\"'](.*?)[\"']");
+
+    // WeChat localType code for forwarded chat-record messages.
+    private static final long LOCAL_TYPE_CHAT_RECORD = 81604378673L;
 
     // WeChat message type protocol codes (localType)
     private static final long LOCAL_TYPE_IMAGE = 3;
@@ -134,6 +168,8 @@ public class MessageProcessorService {
                 "Discovered {} text and multimedia frames. Initializing profile identity mappings...",
                 messages.size());
             Map<String, String> userMap = buildUserMap(messages);
+            // Per-run cache so the same URL is only fetched once during a single processing pass.
+            Map<String, String> linkCache = new HashMap<>();
             StringBuilder textBuilder = new StringBuilder();
 
             @SuppressWarnings("unchecked")
@@ -147,7 +183,7 @@ public class MessageProcessorService {
 
             int processedCount = 0;
             for (WeChatMessageDto msg : messages) {
-                String cleanContent = processMessageContent(userId, uuid, msg);
+                String cleanContent = processMessageContent(userId, uuid, msg, linkCache);
                 cleanContent = replaceWxidsWithNicknames(cleanContent, userMap);
 
                 String rawName =
@@ -244,7 +280,8 @@ public class MessageProcessorService {
      * Core router assessing WeChat message configurations, mapping metadata payloads, and
      * evaluating cached summaries.
      */
-    private String processMessageContent(String userId, String uuid, WeChatMessageDto msg) {
+    private String processMessageContent(String userId, String uuid, WeChatMessageDto msg,
+        Map<String, String> linkCache) {
         String content = msg.getContent();
         if (!StringUtils.hasText(content)) {
             content = "";
@@ -279,6 +316,8 @@ public class MessageProcessorService {
             return "(视频描述：" + getVideoSummary(videoHash) + ")";
         } else if ("文件".equals(type) || localType == LOCAL_TYPE_FILE) {
             return "[" + type + "消息，暂未处理]";
+        } else if ("聊天记录".equals(type) || localType == LOCAL_TYPE_CHAT_RECORD) {
+            return expandChatRecord(msg.getRawContent());
         } else if ("引用消息".equals(type) || localType == LOCAL_TYPE_REFER_MESSAGE) {
             String raw = msg.getRawContent();
             if (raw != null && raw.contains("<refermsg>")) {
@@ -302,7 +341,7 @@ public class MessageProcessorService {
                 }
             }
         }
-        return content;
+        return expandTextWithLinks(content, msg.getRawContent(), linkCache);
     }
 
     /**
@@ -409,5 +448,279 @@ public class MessageProcessorService {
         }
         return cacheService.getVideoSummary(hash)
             .orElse("视频无描述");
+    }
+
+    // ==========================================
+    // 💡 Chat-record & Link Expansion
+    // ==========================================
+
+    /**
+     * Expands a forwarded chat-record (聊天记录) message into an indented list of its inner
+     * messages, resolved from the embedded &lt;recordinfo&gt; payload.
+     */
+    private String expandChatRecord(String rawContent) {
+        if (!StringUtils.hasText(rawContent)) {
+            return "(聊天记录)";
+        }
+        String title = firstGroup(rawContent, TITLE_TAG_PATTERN, 1);
+        StringBuilder sb = new StringBuilder();
+        sb.append("(聊天记录：")
+            .append(StringUtils.hasText(title) ? decodeEntities(title.trim()) : "群聊的聊天记录")
+            .append(")\n");
+
+        String rec = firstGroup(rawContent, RECORDINFO_PATTERN, 1);
+        if (rec == null) {
+            return sb.toString().stripTrailing();
+        }
+
+        Matcher items = DATAITEM_PATTERN.matcher(rec);
+        while (items.find()) {
+            String item = items.group(1);
+            String datatype = firstGroup(item, Pattern.compile("datatype=\"(\\d+)\""), 1);
+            String desc = decodeEntities(
+                firstGroup(item, Pattern.compile("<datadesc>(.*?)</datadesc>", Pattern.DOTALL), 1));
+            String name = decodeEntities(
+                firstGroup(item, Pattern.compile("<sourcename>(.*?)</sourcename>"), 1));
+            String stime = decodeEntities(
+                firstGroup(item, Pattern.compile("<sourcetime>(.*?)</sourcetime>"), 1));
+            String ctime = firstGroup(item,
+                Pattern.compile("<srcMsgCreateTime>(\\d+)</srcMsgCreateTime>"), 1);
+            String time = StringUtils.hasText(stime) ? stime : (ctime != null ? formatUnix(ctime) : "");
+            String body = StringUtils.hasText(desc)
+                ? desc.replace("\n", "\n     ")
+                : mediaPlaceholder(datatype);
+            sb.append("  - ")
+                .append(StringUtils.hasText(name) ? name : "?")
+                .append(" (").append(time).append("): ")
+                .append(body).append("\n");
+        }
+        return sb.toString().stripTrailing();
+    }
+
+    /**
+     * Keeps the original text but appends a fetched title/description block for every URL it
+     * contains (and for any &lt;url&gt; element inside shared-link payloads).
+     */
+    private String expandTextWithLinks(String content, String rawContent,
+        Map<String, String> linkCache) {
+        if (!StringUtils.hasText(content)) {
+            return content == null ? "" : content;
+        }
+        Set<String> urls = new LinkedHashSet<>();
+        Matcher m = URL_PATTERN.matcher(content);
+        while (m.find()) {
+            urls.add(cleanUrl(m.group()));
+        }
+        if (rawContent != null) {
+            Matcher u = URL_RAW_PATTERN.matcher(rawContent);
+            while (u.find()) {
+                urls.add(cleanUrl(u.group(1)));
+            }
+        }
+        if (urls.isEmpty()) {
+            return content;
+        }
+        StringBuilder extra = new StringBuilder();
+        for (String url : urls) {
+            String cached = linkCache.get(url);
+            String preview;
+            if (cached == null) {
+                preview = fetchLinkPreview(url);
+                linkCache.put(url, preview == null ? "" : preview);
+            } else {
+                preview = cached.isEmpty() ? null : cached;
+            }
+            if (preview != null) {
+                extra.append("\n").append(preview);
+            }
+        }
+        return extra.length() == 0 ? content : content + extra;
+    }
+
+    /**
+     * Performs an outbound GET and extracts the page title and description (og/meta/twitter tags).
+     * Returns null on any failure so the caller simply keeps the original URL text.
+     */
+    private String fetchLinkPreview(String url) {
+        try {
+            URI uri = URI.create(url);
+            HttpRequest req = HttpRequest.newBuilder(uri)
+                .timeout(Duration.ofSeconds(8))
+                .header("User-Agent", "Mozilla/5.0 (compatible; WeChatSummary/1.0)")
+                .header("Accept", "text/html,application/xhtml+xml")
+                .GET()
+                .build();
+            HttpResponse<String> resp = HTTP_CLIENT.send(req,
+                HttpResponse.BodyHandlers.ofString(StandardCharsets.UTF_8));
+            String body = resp.body();
+            if (body == null) {
+                return null;
+            }
+            if (body.length() > 800_000) {
+                body = body.substring(0, 800_000);
+            }
+            String title = extractMeta(body, "title");
+            String desc = extractMeta(body, "description");
+            if (title == null && desc == null) {
+                return null;
+            }
+            StringBuilder b = new StringBuilder("🔗 ");
+            if (title != null) {
+                b.append("[").append(sanitize(title)).append("](").append(url).append(")");
+            } else {
+                b.append(url);
+            }
+            if (desc != null && !desc.isBlank()) {
+                b.append("\n   ").append(sanitize(desc));
+            }
+            return b.toString();
+        } catch (Exception e) {
+            return null;
+        }
+    }
+
+    /**
+     * Extracts the page title or description from raw HTML, preferring OpenGraph / Twitter cards.
+     */
+    private String extractMeta(String html, String kind) {
+        if ("title".equals(kind)) {
+            String t = firstGroup(html, TITLE_TAG_PATTERN, 1);
+            if (t != null) {
+                t = decodeEntities(t.trim());
+                if (!t.isEmpty()) {
+                    return t;
+                }
+            }
+        }
+        Map<String, String> props = new HashMap<>();
+        Matcher tag = META_TAG_PATTERN.matcher(html);
+        while (tag.find()) {
+            Map<String, String> a = parseAttrs(tag.group(1));
+            String key = a.get("property");
+            if (key == null) {
+                key = a.get("name");
+            }
+            String content = a.get("content");
+            if (key != null && content != null) {
+                props.put(key.toLowerCase(), content);
+            }
+        }
+        if ("title".equals(kind)) {
+            String v = props.get("og:title");
+            if (v != null && !v.isBlank()) {
+                return decodeEntities(v.trim());
+            }
+            v = props.get("twitter:title");
+            if (v != null && !v.isBlank()) {
+                return decodeEntities(v.trim());
+            }
+            return null;
+        }
+        String v = props.get("og:description");
+        if (v != null && !v.isBlank()) {
+            return decodeEntities(v.trim());
+        }
+        v = props.get("twitter:description");
+        if (v != null && !v.isBlank()) {
+            return decodeEntities(v.trim());
+        }
+        v = props.get("description");
+        if (v != null && !v.isBlank()) {
+            return decodeEntities(v.trim());
+        }
+        return null;
+    }
+
+    private static Map<String, String> parseAttrs(String s) {
+        Map<String, String> m = new HashMap<>();
+        if (s == null) {
+            return m;
+        }
+        Matcher a = ATTR_PATTERN.matcher(s);
+        while (a.find()) {
+            m.put(a.group(1).toLowerCase(), a.group(2));
+        }
+        return m;
+    }
+
+    private static String firstGroup(String s, Pattern p, int g) {
+        if (s == null) {
+            return null;
+        }
+        Matcher m = p.matcher(s);
+        return m.find() ? m.group(g) : null;
+    }
+
+    private static String decodeEntities(String s) {
+        if (s == null) {
+            return "";
+        }
+        s = s.replace("&amp;", "&").replace("&lt;", "<").replace("&gt;", ">")
+            .replace("&quot;", "\"").replace("&apos;", "'").replace("&nbsp;", " ");
+        Matcher m = ENTITY_HEX_PATTERN.matcher(s);
+        StringBuffer sb = new StringBuffer();
+        while (m.find()) {
+            int cp = Integer.parseInt(m.group(1), 16);
+            m.appendReplacement(sb, Matcher.quoteReplacement(new String(Character.toChars(cp))));
+        }
+        m.appendTail(sb);
+        s = sb.toString();
+        m = ENTITY_DEC_PATTERN.matcher(s);
+        sb = new StringBuffer();
+        while (m.find()) {
+            int cp = Integer.parseInt(m.group(1));
+            m.appendReplacement(sb, Matcher.quoteReplacement(new String(Character.toChars(cp))));
+        }
+        m.appendTail(sb);
+        return sb.toString();
+    }
+
+    private static String cleanUrl(String u) {
+        if (u == null) {
+            return "";
+        }
+        while (u.length() > 0 && ",.;:!?]）】,。、 ".indexOf(u.charAt(u.length() - 1)) >= 0) {
+            u = u.substring(0, u.length() - 1);
+        }
+        return u;
+    }
+
+    private static String sanitize(String s) {
+        if (s == null) {
+            return "";
+        }
+        s = s.replaceAll("\\s+", " ").trim();
+        if (s.length() > 300) {
+            s = s.substring(0, 300) + "…";
+        }
+        return s;
+    }
+
+    private static String mediaPlaceholder(String datatype) {
+        if ("3".equals(datatype)) {
+            return "[图片]";
+        }
+        if ("34".equals(datatype)) {
+            return "[语音]";
+        }
+        if ("43".equals(datatype)) {
+            return "[视频]";
+        }
+        if ("47".equals(datatype)) {
+            return "[表情]";
+        }
+        if ("49".equals(datatype)) {
+            return "[文件]";
+        }
+        return "[消息]";
+    }
+
+    private static String formatUnix(String secs) {
+        try {
+            return new java.text.SimpleDateFormat("yyyy-MM-dd HH:mm:ss")
+                .format(new java.util.Date(Long.parseLong(secs) * 1000L));
+        } catch (Exception e) {
+            return "";
+        }
     }
 }
