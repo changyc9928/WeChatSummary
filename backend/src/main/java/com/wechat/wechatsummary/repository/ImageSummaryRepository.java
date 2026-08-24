@@ -14,6 +14,13 @@ public interface ImageSummaryRepository extends JpaRepository<ImageSummaryEntity
     Optional<ImageSummaryEntity> findByImageHash(String imageHash);
 
     /**
+     * Finds an image entity whose stored file path contains the given fragment (e.g. an image
+     * md5 that is embedded in the on-disk file name). Enables resolving referenced images whose
+     * lookup key is an md5 rather than a path-derived hash.
+     */
+    Optional<ImageSummaryEntity> findByFilePathContaining(String fragment);
+
+    /**
      * Finds image entities where the file_path contains the session/chat UUID directory segment.
      */
     @Query("SELECT i FROM ImageSummaryEntity i WHERE i.filePath LIKE CONCAT('%/', :uuid, '/%')")

@@ -23,6 +23,15 @@ public class StoragePaths {
         return storageConfig.getUploadDir().resolve(userId);
     }
 
+    /**
+     * Absolute, normalized root under which all user session workspaces live. Used as the stable
+     * base for environment-independent media hashing (so the same file yields the same key whether
+     * processed inside the Docker container or on a developer's host machine).
+     */
+    public Path uploadRoot() {
+        return storageConfig.getUploadDir().toAbsolutePath().normalize();
+    }
+
     public Path sessionDir(String userId, String uuid) {
         return userDir(userId).resolve(uuid);
     }

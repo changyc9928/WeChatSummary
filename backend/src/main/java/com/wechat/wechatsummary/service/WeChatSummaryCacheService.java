@@ -64,6 +64,20 @@ public class WeChatSummaryCacheService {
     }
 
     /**
+     * Resolves an image summary by looking up the stored file path containing the given md5
+     * fragment. This is the primary mechanism for referenced images, whose lookup key is an md5
+     * (embedded in both the reference XML and the on-disk file name) rather than a path-derived
+     * hash.
+     */
+    public Optional<String> getImageSummaryByMd5(String md5) {
+        if (md5 == null || md5.isBlank()) {
+            return Optional.empty();
+        }
+        return imageSummaryRepository.findByFilePathContaining(md5)
+                .map(ImageSummaryEntity::getSummary);
+    }
+
+    /**
      * Caches image summary entity records scoped by target session/chat UUID.
      */
     @Cacheable(cacheNames = "image_summary_list", key = "#uuid", sync = true)

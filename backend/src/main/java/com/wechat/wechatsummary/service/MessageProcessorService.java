@@ -36,6 +36,7 @@ public class MessageProcessorService {
     private static final Pattern XML_CDNURL_PATTERN = Pattern.compile(
         "cdnurl\\s*=\\s*\"([^\"]+)\"");
     private static final Pattern MD5_EXTRACT_PATTERN = Pattern.compile("([a-f0-9]{32})");
+    private static final Pattern MD5_ATTR_PATTERN = Pattern.compile("md5=\"([a-f0-9]{32})\"");
     private static final Pattern REFER_TYPE_PATTERN = Pattern.compile(
         "<refermsg>.*<type>(\\d+)</type>.*</refermsg>", Pattern.DOTALL);
 
@@ -254,7 +255,19 @@ public class MessageProcessorService {
 
         if ("图片消息".equals(type) || localType == LOCAL_TYPE_IMAGE) {
             String imageHash = extractPathHash(userId, uuid, msg.getContent(), msg.getRawContent());
-            return "(图片描述：" + getImageSummary(imageHash) + ")";
+            Optional<String> imageSummary = StringUtils.hasText(imageHash)
+                ? cacheService.getImageSummary(imageHash)
+                : Optional.empty();
+            if (imageSummary.isEmpty() && StringUtils.hasText(msg.getRawContent())) {
+                // Some exports store the image only as a "[图片]" placeholder without a relative
+                // path. Fall back to the md5 embedded in the raw <img> payload, which matches the
+                // md5 in the on-disk file name.
+                String md5 = extractRefMediaMd5(msg.getRawContent());
+                if (StringUtils.hasText(md5)) {
+                    imageSummary = cacheService.getImageSummaryByMd5(md5);
+                }
+            }
+            return "(图片描述：" + imageSummary.orElse("图片无描述") + ")";
         } else if ("动画表情".equals(type) || localType == LOCAL_TYPE_EMOJI) {
             String emojiHash = extractPathHash(userId, uuid, msg.getContent(), msg.getRawContent());
             return "(动画表情描述: " + getEmojiSummary(emojiHash, msg.getContent()) + ")";
@@ -275,7 +288,11 @@ public class MessageProcessorService {
                     String mediaHash = extractHashFromXml(raw);
 
                     if (REFER_TYPE_IMAGE.equals(referType)) {
-                        return content + " (引用了图片: " + getImageSummary(mediaHash) + ")";
+                        String refMd5 = extractRefMediaMd5(raw);
+                        String desc = StringUtils.hasText(refMd5)
+                            ? cacheService.getImageSummaryByMd5(refMd5).orElse("图片无描述")
+                            : getImageSummary(mediaHash);
+                        return content + " (引用了图片: " + desc + ")";
                     } else if (REFER_TYPE_EMOJI.equals(referType)) {
                         return content + " (引用了动画表情: " + getEmojiSummary(mediaHash, raw)
                             + ")";
@@ -305,9 +322,14 @@ public class MessageProcessorService {
         if (lowerPath.startsWith("images") || lowerPath.startsWith("emojis")
             || lowerPath.startsWith("voices") || lowerPath.startsWith("videos")) {
 
-            // Correct path construction: uploadDir / userId / uuid / relativePath
-            Path resolvedPath = storagePaths.sessionDir(userId, uuid).resolve(relativePath);
-            return HashUtils.sha256(resolvedPath.toAbsolutePath().normalize().toString());
+            // Stable, environment-independent key: the file path relative to the upload root
+            // (e.g. "{userId}/{uuid}/images/..."). This guarantees the same image resolves to the
+            // same hash whether processing runs inside the Docker container (/app/uploads) or on a
+            // developer's host machine, preventing "图片无描述" fallback from path-prefix mismatches.
+            Path root = storagePaths.uploadRoot();
+            Path resolved = storagePaths.sessionDir(userId, uuid).resolve(relativePath)
+                .toAbsolutePath().normalize();
+            return HashUtils.sha256(root.relativize(resolved).toString());
         }
 
         String xmlHash = extractHashFromXml(rawContent);
@@ -328,6 +350,19 @@ public class MessageProcessorService {
         }
         Matcher md5Matcher = MD5_EXTRACT_PATTERN.matcher(rawContent.toLowerCase());
         return md5Matcher.find() ? md5Matcher.group(1) : "";
+    }
+
+    /**
+     * Extracts the canonical image md5 from a reference message's XML payload. The md5 attribute on
+     * the embedded {@code <img>} element matches the md5 embedded in the on-disk file name, allowing
+     * referenced images to be resolved to their stored description.
+     */
+    private String extractRefMediaMd5(String rawContent) {
+        if (!StringUtils.hasText(rawContent)) {
+            return "";
+        }
+        Matcher matcher = MD5_ATTR_PATTERN.matcher(rawContent);
+        return matcher.find() ? matcher.group(1) : "";
     }
 
     // ==========================================

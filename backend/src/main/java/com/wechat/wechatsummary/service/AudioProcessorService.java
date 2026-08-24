@@ -40,7 +40,9 @@ public class AudioProcessorService {
     public void processAudioSummary(String filePath) {
         log.info("Initiating audio processing pipeline execution for target file: [{}]", filePath);
         try {
-            String hash = HashUtils.sha256(filePath);
+            // Stable, environment-independent key (see ImageProcessorService for rationale).
+            Path absolute = Paths.get(filePath).toAbsolutePath().normalize();
+            String hash = HashUtils.sha256(storagePaths.uploadRoot().relativize(absolute).toString());
 
             Optional<AudioSummary> dbRecord = cacheService.findAudioSummaryByHash(hash);
 

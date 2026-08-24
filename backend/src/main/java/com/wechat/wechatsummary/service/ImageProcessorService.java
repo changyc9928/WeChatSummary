@@ -37,7 +37,12 @@ public class ImageProcessorService {
     public void processImage(String filePath) {
         log.info("Initiating image processing pipeline execution for target file: [{}]", filePath);
         try {
-            String hash = HashUtils.sha256(filePath);
+            // Stable, environment-independent key: the file path relative to the upload root. This
+            // matches the key computed during markdown generation regardless of whether processing
+            // runs inside the Docker container (/app/uploads) or on a host machine.
+            Path absolute = Paths.get(filePath).toAbsolutePath().normalize();
+            Path root = storagePaths.uploadRoot();
+            String hash = HashUtils.sha256(root.relativize(absolute).toString());
 
             Optional<ImageSummaryEntity> dbRecord = cacheService.findImageSummaryByHash(hash);
 
