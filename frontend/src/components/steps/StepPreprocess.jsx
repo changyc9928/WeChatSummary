@@ -130,9 +130,9 @@ export default function StepPreprocess({
             <button onClick={onNavigateToEmojis} style={styles.button}>{t('preprocess.viewEmojis')}</button>
           </div>
 
-          {/* State: IDLING / Pending */}
+          {/* State: IDLING / Pending - only the Start button, no chat log preview yet */}
           {!isCompleted && !isRunning && !isPaused && (
-            <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
+            <div style={{ display: 'flex', flexDirection: 'column', gap: '6px' }}>
               <button
                 onClick={handleStartPreprocess}
                 disabled={loading.preprocess}
@@ -140,10 +140,13 @@ export default function StepPreprocess({
               >
                 {loading.preprocess ? t('preprocess.starting') : t('preprocess.start')}
               </button>
+              <div style={{ fontSize: '0.75rem', color: 'var(--text-muted)' }}>
+                {t('preprocess.startHint')}
+              </div>
             </div>
           )}
 
-          {/* State: PAUSED */}
+          {/* State: PAUSED - yellow progress bar, only Resume or Start Over */}
           {isPaused && (
             <div style={styles.progressSection}>
               <div style={styles.progressLabelRow}>
@@ -151,7 +154,7 @@ export default function StepPreprocess({
                 <span>{progressVal}%</span>
               </div>
               <div style={styles.progressBarBg}>
-                <div style={{ ...styles.progressBarFill, width: `${progressVal}%`, backgroundColor: '#d97706' }} />
+                <div style={{ ...styles.progressBarFill, width: `${progressVal}%`, backgroundColor: '#eab308' }} />
               </div>
               {preprocessProgress.totalTasks != null && (
                 <div style={{ fontSize: '0.8rem', color: 'var(--text-muted)', marginTop: '4px' }}>
@@ -168,9 +171,9 @@ export default function StepPreprocess({
               <button
                 onClick={handleRestartClick}
                 disabled={loading.restartPreprocess}
-                style={{ ...styles.buttonWarningSmall, width: '100%', marginTop: '8px' }}
+                style={{ ...styles.buttonWarningSmall, width: '100%', marginTop: '8px', padding: '10px 16px', fontSize: '0.9rem' }}
               >
-                {loading.restartPreprocess ? t('preprocess.restarting') : t('preprocess.restart')}
+                {loading.restartPreprocess ? t('preprocess.startingOver') : t('preprocess.startOver')}
               </button>
             </div>
           )}
@@ -207,21 +210,33 @@ export default function StepPreprocess({
                 {t('preprocess.finished')}
               </div>
 
-              <button
-                onClick={handleReprocessClick}
-                disabled={loading.reprocess}
-                style={{ ...styles.button, width: '100%' }}
-              >
-                {loading.reprocess ? t('preprocess.reprocessing') : t('preprocess.reprocess')}
-              </button>
+              {/* Primary action: full pipeline restart (rescans all media files) */}
+              <div style={{ display: 'flex', flexDirection: 'column', gap: '4px' }}>
+                <button
+                  onClick={handleRestartClick}
+                  disabled={loading.restartPreprocess}
+                  style={{ ...styles.buttonWarning, width: '100%' }}
+                >
+                  {loading.restartPreprocess ? t('preprocess.restarting') : t('preprocess.restart')}
+                </button>
+                <div style={{ fontSize: '0.75rem', color: 'var(--text-muted)' }}>
+                  {t('preprocess.restartDesc')}
+                </div>
+              </div>
 
-              <button
-                onClick={handleRestartClick}
-                disabled={loading.restartPreprocess}
-                style={{ ...styles.buttonWarningSmall, width: '100%' }}
-              >
-                {loading.restartPreprocess ? t('preprocess.restarting') : t('preprocess.restart')}
-              </button>
+              {/* Secondary action: only regenerate the markdown file from existing summaries */}
+              <div style={{ display: 'flex', flexDirection: 'column', gap: '4px' }}>
+                <button
+                  onClick={handleReprocessClick}
+                  disabled={loading.reprocess}
+                  style={{ ...styles.buttonSecondary, width: '100%' }}
+                >
+                  {loading.reprocess ? t('preprocess.reprocessing') : t('preprocess.reprocess')}
+                </button>
+                <div style={{ fontSize: '0.75rem', color: 'var(--text-muted)' }}>
+                  {t('preprocess.reprocessDesc')}
+                </div>
+              </div>
 
               {/* Chat Log Preview & Calendar Time Window Selection */}
               <div style={{ border: '1px solid var(--border)', borderRadius: '8px', padding: '12px', background: 'var(--bg-card)', marginTop: '8px' }}>
