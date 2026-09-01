@@ -18,7 +18,7 @@ public interface ImageSummaryRepository extends JpaRepository<ImageSummaryEntity
      * md5 that is embedded in the on-disk file name). Enables resolving referenced images whose
      * lookup key is an md5 rather than a path-derived hash.
      */
-    Optional<ImageSummaryEntity> findByFilePathContaining(String fragment);
+    List<ImageSummaryEntity> findByFilePathContaining(String fragment);
 
     /**
      * Finds image entities where the file_path contains the session/chat UUID directory segment.

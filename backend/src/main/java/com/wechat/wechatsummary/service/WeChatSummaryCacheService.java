@@ -74,6 +74,8 @@ public class WeChatSummaryCacheService {
             return Optional.empty();
         }
         return imageSummaryRepository.findByFilePathContaining(md5)
+                .stream()
+                .findFirst()
                 .map(ImageSummaryEntity::getSummary);
     }
 
