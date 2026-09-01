@@ -30,13 +30,13 @@ spring:
 
   ai:
     openai:
-      api-key: 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
-      base-url: https://integrate.api.nvidia.com/v1
+      api-key: ${GEMINI_API_KEY}
+      base-url: https://generativelanguage.googleapis.com/v1beta/openai/
       chat:
         temperature: 0.1
-        timeout: 120s
+        timeout: 600s
         options:
-          model: minimaxai/minimax-m3
+          model: gemini-3.5-flash-lite
       audio:
         transcription:
           timeout: 300s
@@ -52,12 +52,12 @@ spring:
 custom-ai:
   multimodal:
     base-url: https://integrate.api.nvidia.com/v1
-    api-key: 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
+    api-key: ${NVIDIA_API_KEY}
     model: meta/llama-3.2-11b-vision-instruct
     timeout: 120s
   video:
     base-url: https://integrate.api.nvidia.com/v1
-    api-key: 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
+    api-key: ${NVIDIA_API_KEY}
     model: meta/llama-3.2-11b-vision-instruct
     timeout: 120s
     frame-count: 5
@@ -72,6 +72,7 @@ processing:
 
 summary:
   chunk-size-chars: 15000
+  combine-batch: 2
   progress-cap: 99.9
 
 task:

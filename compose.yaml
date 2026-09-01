@@ -52,6 +52,8 @@ services:
       SPRING_DATASOURCE_USERNAME: myuser
       SPRING_DATASOURCE_PASSWORD: secret
       SPRING_AI_OPENAI_AUDIO_TRANSCRIPTION_BASE_URL: http://whisper-api:8000/v1/
+      GEMINI_API_KEY: ${GEMINI_API_KEY}
+      NVIDIA_API_KEY: ${NVIDIA_API_KEY}
       STORAGE_UPLOAD_DIR: /app/uploads
     volumes:
       - ./uploads:/app/uploads

@@ -10,5 +10,6 @@ import org.springframework.stereotype.Component;
 public class SummaryConfig {
 
     private int chunkSizeChars = 15000;
+    private int combineBatch = 2;
     private double progressCap = 99.9;
 }

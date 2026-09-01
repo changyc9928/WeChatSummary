@@ -1,6 +1,7 @@
 package com.wechat.wechatsummary.service;
 
 import com.wechat.wechatsummary.config.StorageConfig;
+import java.io.IOException;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import lombok.RequiredArgsConstructor;
@@ -50,6 +51,42 @@ public class StoragePaths {
 
     public Path summaryTemp(String userId, String uuid) {
         return outputDir(userId).resolve(uuid + "_summary.temp");
+    }
+
+    /**
+     * Locates the raw chat export JSON sitting inside the session workspace
+     * ({@code uploadDir / {userId} / {uuid} / *.json}). This is the source of truth for the
+     * WeChat (talker) IDs that back the wxid-keyed identity registry. Returns {@code null} when no
+     * such file exists.
+     */
+    public Path rawExportJson(String userId, String uuid) {
+        Path dir = sessionDir(userId, uuid);
+        if (!Files.isDirectory(dir)) {
+            return null;
+        }
+        try (var stream = Files.list(dir)) {
+            return stream
+                .filter(path -> {
+                    if (Files.isDirectory(path)) {
+                        return false;
+                    }
+                    String name = path.getFileName().toString();
+                    return name.endsWith(".json") && !name.equals(uuid + "_identities.json");
+                })
+                .findFirst()
+                .orElse(null);
+        } catch (IOException e) {
+            return null;
+        }
+    }
+
+    /**
+     * Optional per-chat identity sidecar ({@code {uuid}_identities.json}) where the operator can
+     * supply authoritative aliases and social-media handles, keyed by wxid (preferred) or by a
+     * known display name. This overrides any auto-inferred alias mapping.
+     */
+    public Path identitiesFile(String userId, String uuid) {
+        return sessionDir(userId, uuid).resolve(uuid + "_identities.json");
     }
 
     /**

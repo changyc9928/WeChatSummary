@@ -2,6 +2,8 @@ package com.wechat.wechatsummary.entity;
 
 import jakarta.persistence.Column;
 import jakarta.persistence.Entity;
+import jakarta.persistence.EnumType;
+import jakarta.persistence.Enumerated;
 import jakarta.persistence.Id;
 import jakarta.persistence.PrePersist;
 import jakarta.persistence.Table;
@@ -27,6 +29,7 @@ public class ChatSummaryTask {
     private UUID id; // 存 UUID.toString()
 
     @Column(nullable = false, length = 20)
+    @Enumerated(EnumType.STRING)
     private ChatSummaryStatus status;
 
     // 💡 针对 Postgres 的优化：直接声明为 text 属性，去掉易报错的 @Lob

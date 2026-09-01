@@ -1,9 +1,14 @@
 package com.wechat.wechatsummary.service;
 
 import com.openai.errors.InternalServerException;
+import com.openai.errors.OpenAIIoException;
 import com.openai.errors.RateLimitException;
+import com.fasterxml.jackson.core.type.TypeReference;
+import com.fasterxml.jackson.databind.ObjectMapper;
 import java.net.URI;
 import java.util.Base64;
+import java.util.List;
+import java.util.Map;
 import java.util.concurrent.Semaphore;
 import java.util.function.Supplier;
 import lombok.extern.slf4j.Slf4j;
@@ -35,6 +40,29 @@ public class AiService {
     private final @Qualifier("multimodalChatClient") ChatClient multimodalChatClient;
     private final @Qualifier("videoChatClient") ChatClient videoChatClient;
     private final OpenAiAudioTranscriptionModel transcriptionModel;
+
+    private static final ObjectMapper ALIAS_MAPPER = new ObjectMapper();
+
+    /**
+     * Shared auditing system prompt. Instructs the model to act as a grounded, plain-spoken
+     * auditor of Malaysian-Chinese group chats and forbids empty buzzwords / hallucinated events.
+     * This is applied to every text-summarization call so the model is forced to retain specifics.
+     */
+    private static final String REFINE_SYSTEM_PROMPT = """
+        # 微信聊天记录摘要任务 - 严格规范
+
+        你是一个冷静、客观、专门处理大马华人网络社群（包含二次元/网黑/面子书撕逼）群聊记录的审计员。你必须使用极其接地气、通俗且直接的“吃瓜/纪实语调”，严禁对聊天内容进行任何学术化、社会学或哲学高度的升华。
+
+        ### 🚨 严格禁忌词与替代方案（违者扣除所有Token分）：
+        - 严禁使用以下虚空造词与神棍黑话：“模因”、“语境”、“身份认同”、“结构”、“博羞”、“模因义图”、“光复之战”、“权力纠纷”。
+        - 遇到群友用低俗语言人身攻击，直接写：“X用粗口/低俗语言（如叫爸爸、骂脏话）攻击Y”，严禁写成“探讨妇女权益/重演历史情节”。
+        - 遇到群友发语音胡言乱语，直接写：“群友语音胡口嗨/说废话转移视线”，严禁将其解读为“制造二次元侦探/组织教材/社会学隐喻”。
+        - 遇到大段英文表情包描述（如 "In the image...", "Without an image to analyze..."），这是系统的图片识别报错，请直接忽略，严禁将其翻译并脑补成群聊里的真实事件（例如不要把 book/notebook 脑补成“组织教材”）。
+
+        ### 📝 术语对照表：
+        - 547：一个大马本地的网络群组/团队名。
+        - OKU：指残疾人证（大马专属），在群内被群友用来当成“智障/免死金牌”互相嘴臭。
+        - lanjiao / 林北 / 塞林木：大马闽南语粗口，直接归类为“爆粗口/人身攻击”。""";
 
     /**
      * Caps the number of concurrent outbound calls to the shared AI provider. The RabbitMQ media
@@ -220,7 +248,7 @@ public class AiService {
      */
     @Retryable(
         retryFor = {RateLimitException.class,
-            InternalServerException.class},
+            InternalServerException.class, OpenAIIoException.class},
         maxAttempts = 10,
         backoff = @Backoff(delay = 30000, maxDelay = 3600000, multiplier = 2.0, random = true)
     )
@@ -233,35 +261,19 @@ public class AiService {
                 currentChunk != null ? currentChunk.length() : 0);
         }
 
-        String refineSystemPrompt = """
-            # 微信聊天记录摘要任务 - 严格规范
-            
-            你是一个冷静、客观、专门处理大马华人网络社群（包含二次元/网黑/面子书撕逼）群聊记录的审计员。你必须使用极其接地气、通俗且直接的“吃瓜/纪实语调”，严禁对聊天内容进行任何学术化、社会学或哲学高度的升华。
-            
-            ### 🚨 严格禁忌词与替代方案（违者扣除所有Token分）：
-            - 严禁使用以下虚空造词与神棍黑话：“模因”、“语境”、“身份认同”、“结构”、“博羞”、“模因义图”、“光复之战”、“权力纠纷”。
-            - 遇到群友用低俗语言人身攻击，直接写：“X用粗口/低俗语言（如叫爸爸、骂脏话）攻击Y”，严禁写成“探讨妇女权益/重演历史情节”。
-            - 遇到群友发语音胡言乱语，直接写：“群友语音胡口嗨/说废话转移视线”，严禁将其解读为“制造二次元侦探/组织教材/社会学隐喻”。
-            - 遇到大段英文表情包描述（如 "In the image...", "Without an image to analyze..."），这是系统的图片识别报错，请直接忽略，严禁将其翻译并脑补成群聊里的真实事件（例如不要把 book/notebook 脑补成“组织教材”）。
-            
-            ### 📝 术语对照表：
-            - 547：一个大马本地的网络群组/团队名。
-            - OKU：指残疾人证（大马专属），在群内被群友用来当成“智障/免死金牌”互相嘴臭。
-            - lanjiao / 林北 / 塞林木：大马闽南语粗口，直接归类为“爆粗口/人身攻击”。""";
-
         String userPrompt = """
             请以文本内容为主，有标记的媒体内容为辅来总结以下微信聊天记录。你的聊天总结需要包含前情内容。请直接输出最终文本就行，无须包含思考、注解、标签等等。你需要让读者从来开始也能读懂群聊内容
-            
+
             聊天内容：
             {currentChunk}
-            
+
             以下是前情提要，主要负责帮助你理解上面的聊天内容：
             {historyContext}
             """;
 
         try {
             String summaryResult = callThrottled(() -> chatClient.prompt()
-//                .system(refineSystemPrompt)
+                .system(REFINE_SYSTEM_PROMPT)
                 .user(user -> user.text(userPrompt)
                     .param("historyContext", historyContext)
                     .param("currentChunk", currentChunk))
@@ -278,6 +290,195 @@ public class AiService {
         } catch (Exception e) {
             log.error("Failed to execute rolling chat analysis via ChatClient", e);
             throw new RuntimeException("LLM request failed via ChatClient: " + e.getMessage(), e);
+        }
+    }
+
+    /**
+     * Summarizes a single chat chunk independently, without any prior context.
+     *
+     * <p>Used by the map-reduce pipeline so that every segment of the chat gets equal weight,
+     * instead of earlier segments being progressively compressed away by a rolling chain.</p>
+     *
+     * @param chunk the chat segment to summarize
+     * @return the independent summary of this chunk
+     */
+    @Retryable(
+        retryFor = {RateLimitException.class, InternalServerException.class,
+            OpenAIIoException.class},
+        maxAttempts = 10,
+        backoff = @Backoff(delay = 30000, maxDelay = 3600000, multiplier = 2.0, random = true)
+    )
+    public String summarizeSingleChunk(String chunk, String roster) {
+        log.info("Requesting independent chunk summary from ChatClient...");
+        if (log.isDebugEnabled()) {
+            log.debug("Chunk size: {} chars", chunk != null ? chunk.length() : 0);
+        }
+
+        String userPrompt = """
+            请总结以下这段微信聊天记录片段。你是一个冷静、客观、专门处理大马华人网络社群群聊记录的审计员，使用接地气、直接的“吃瓜/纪实语调”。
+
+            需要准确提取并保留：
+            - 参与的人物（昵称）
+            - 发生的具体事件与话题
+            - 争议 / 冲突的焦点与双方立场
+            - 关键决定、结论或后续安排
+            - 重要的时间与背景
+
+            %s
+
+            身份与命名要求（非常重要）：
+            - 严格参照上面的【群成员身份表】使用【规范名】来指代每个人，不要自创或混用不同称呼。
+            - 同一个人的不同外号 / 代称必须合并到同一个人，绝不可当成多个人。
+            - 写清每个事件的“主体”（谁做的）与“客体”（谁被描述 / 被谈论），不要张冠李戴。
+
+            严禁对内容进行学术化或哲学升华，直接输出最终总结文本，无须包含思考、注解或标签。
+
+            聊天片段：
+            %s
+            """.formatted(roster != null ? roster : "", chunk);
+
+        try {
+            return callThrottled(() -> chatClient.prompt()
+                .system(REFINE_SYSTEM_PROMPT)
+                .user(userPrompt)
+                .call()
+                .content());
+        } catch (RateLimitException | org.springframework.web.client.HttpServerErrorException e) {
+            log.warn("Transient error during chunk summary: {}. Retrying...", e.getMessage());
+            throw e;
+        } catch (Exception e) {
+            log.error("Failed to execute chunk summary via ChatClient", e);
+            throw new RuntimeException("LLM request failed via ChatClient: " + e.getMessage(), e);
+        }
+    }
+
+    /**
+     * Merges several independently produced chunk summaries into one coherent summary.
+     *
+     * <p>Applied repeatedly (hierarchically) until a single final summary remains. The prompt
+     * explicitly forbids dropping earlier segments, which is the failure mode of the old rolling
+     * approach.</p>
+     *
+     * @param summaries the chunk summaries to merge, in chronological order
+     * @return the merged summary
+     */
+    @Retryable(
+        retryFor = {RateLimitException.class, InternalServerException.class,
+            OpenAIIoException.class},
+        maxAttempts = 10,
+        backoff = @Backoff(delay = 30000, maxDelay = 3600000, multiplier = 2.0, random = true)
+    )
+    public String combineSummaries(List<String> summaries, String roster) {
+        log.info("Requesting merge of {} chunk summaries from ChatClient...", summaries.size());
+        StringBuilder sb = new StringBuilder();
+        for (int i = 0; i < summaries.size(); i++) {
+            sb.append("=== 第 ").append(i + 1).append(" 段总结 ===\n")
+                .append(summaries.get(i))
+                .append("\n\n");
+        }
+
+        String userPrompt = """
+            以下是同一段微信群聊记录按时间顺序分段的若干份总结。请将它们合并为一份连贯、完整、结构清晰的总总结。
+
+            合并时必须保留每一段里的关键人物、事件、冲突焦点、决定与结论，严禁因为篇幅而丢弃任何一段的实质内容（尤其是前面较早的段落）。请按时间或主题合理组织，直接输出最终总结文本，无须包含思考、注解或标签。
+
+            %s
+
+            身份与命名要求（非常重要）：
+            - 严格参照上面的【群成员身份表】使用【规范名】来指代每个人，不要自创或混用不同称呼。
+            - 同一个人的不同外号 / 代称必须合并到同一个人，绝不可当成多个人。
+            - 写清每个事件的“主体”（谁做的）与“客体”（谁被描述 / 被谈论），不要张冠李戴。
+
+            各段总结如下：
+            %s
+            """.formatted(roster != null ? roster : "", sb.toString());
+
+        try {
+            return callThrottled(() -> chatClient.prompt()
+                .system(REFINE_SYSTEM_PROMPT)
+                .user(userPrompt)
+                .call()
+                .content());
+        } catch (RateLimitException | org.springframework.web.client.HttpServerErrorException e) {
+            log.warn("Transient error during summary merge: {}. Retrying...", e.getMessage());
+            throw e;
+        } catch (Exception e) {
+            log.error("Failed to execute summary merge via ChatClient", e);
+            throw new RuntimeException("LLM request failed via ChatClient: " + e.getMessage(), e);
+        }
+    }
+
+    /**
+     * Detects nicknames / alternate references in a conversation slice and maps each back to a known
+     * WeChat id from the provided roster. Best-effort only; the operator sidecar always wins.
+     *
+     * @param sampleText a representative slice of the conversation
+     * @param rosterText the wxid-keyed participant roster (see {@code IdentityService#formatRoster})
+     * @return map of detected alias -> wxid (or canonical name) from the roster
+     */
+    @Retryable(
+        retryFor = {RateLimitException.class, InternalServerException.class,
+            OpenAIIoException.class},
+        maxAttempts = 5,
+        backoff = @Backoff(delay = 10000, maxDelay = 120000, multiplier = 2.0, random = true)
+    )
+    public Map<String, String> discoverAliases(String sampleText, String rosterText,
+        String mentionHint) {
+        log.info("Requesting alias discovery from ChatClient...");
+        String hintBlock = mentionHint == null || mentionHint.isBlank()
+            ? ""
+            : """
+
+            补充线索（由系统从对话结构中提取）：以下名字在对话中被“@”提及，但从未以该名字自己发送过消息（不在成员身份表中）。
+            请结合上下文判断它们是否实际上就是身份表中的某位成员——典型信号是：某成员在被@该名后，紧接着以针对该@内容的口吻（如第一人称、或直接回答该问题、或明显是被喊到的那个人）回应，则该@名就是那位成员（即同一人），应映射到该成员的规范名。
+            注意：即使该@名并非每次都由同一人接话，只要存在明确的“被@→该成员回应”的对应关系，就应合并。
+            %s
+            """.formatted(mentionHint);
+        String userPrompt = """
+            以下是某微信群的成员身份表（微信ID为唯一标识）与已知称呼：
+            %s
+
+            以下是该群聊天记录的一段文本。请找出文本中对群成员的“其他称呼 / 外号 / 代称”（即不在上述已知称呼中的名字），并判断它们实际指代身份表中的哪一个人。
+            只输出一个 JSON 对象，键为“其他称呼”，值为对应的“微信ID”或“规范名”（必须来自上面身份表）。如果无法确定或没有发现，输出空对象 {}。不要输出任何解释或代码围栏。
+            %s
+            """.formatted(rosterText, hintBlock + sampleText);
+
+        try {
+            String raw = callThrottled(() -> chatClient.prompt()
+                .system(REFINE_SYSTEM_PROMPT)
+                .user(userPrompt)
+                .call()
+                .content());
+            return parseAliasJson(raw);
+        } catch (RateLimitException | org.springframework.web.client.HttpServerErrorException e) {
+            log.warn("Transient error during alias discovery: {}. Retrying...", e.getMessage());
+            throw e;
+        } catch (Exception e) {
+            log.error("Failed to execute alias discovery via ChatClient", e);
+            return new java.util.LinkedHashMap<>();
+        }
+    }
+
+    private Map<String, String> parseAliasJson(String raw) {
+        if (raw == null || raw.isBlank()) {
+            return new java.util.LinkedHashMap<>();
+        }
+        String cleaned = raw.trim();
+        // Strip markdown code fences if the model wrapped the JSON.
+        if (cleaned.startsWith("```")) {
+            int firstNewline = cleaned.indexOf('\n');
+            cleaned = firstNewline >= 0 ? cleaned.substring(firstNewline + 1) : cleaned;
+            int lastFence = cleaned.lastIndexOf("```");
+            if (lastFence >= 0) {
+                cleaned = cleaned.substring(0, lastFence);
+            }
+        }
+        cleaned = cleaned.trim();
+        try {
+            return ALIAS_MAPPER.readValue(cleaned, new TypeReference<Map<String, String>>() {});
+        } catch (Exception e) {
+            log.warn("Could not parse alias JSON from model output: {}", e.getMessage());
+            return new java.util.LinkedHashMap<>();
         }
     }
 

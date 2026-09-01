@@ -8,6 +8,9 @@ import com.wechat.wechatsummary.entity.ChatSummaryStatus;
 import com.wechat.wechatsummary.entity.ChatSummaryTask;
 import com.wechat.wechatsummary.exception.ResourceNotFoundException;
 import com.wechat.wechatsummary.repository.ChatSummaryTaskRepository;
+import com.fasterxml.jackson.core.type.TypeReference;
+import com.fasterxml.jackson.databind.ObjectMapper;
+import java.io.IOException;
 import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
 import java.nio.file.Path;
@@ -39,6 +42,9 @@ public class ChatSummaryService {
     private final StoragePaths storagePaths;
     private final ChatSummaryTaskRepository taskRepository;
     private final SummaryConfig summaryConfig;
+    private final IdentityService identityService;
+
+    private static final ObjectMapper SUMMARY_MAPPER = new ObjectMapper();
 
     private final Map<UUID, Thread> activeThreads = new ConcurrentHashMap<>();
 
@@ -76,29 +82,17 @@ public class ChatSummaryService {
                 throw new RuntimeException("Cleaned log file is empty after applying filters.");
             }
 
-            int startIndex = 0;
-            String previousContextSummary;
+            // Build the wxid-keyed identity registry and the roster block injected into every prompt.
+            // Fully automatic (export senders + LLM alias discovery); an optional per-chat sidecar
+            // may refine it but is never required, so every chat works without hardcoded mappings.
+            String sampleText = buildAliasSample(rawContent);
+            Map<String, Participant> registry = identityService.buildRegistry(userId,
+                uuid.toString(), sampleText, rawContent);
+            String roster = identityService.formatRoster(registry);
 
-            if (Files.exists(tempProgressPath)) {
-                List<String> lines = Files.readAllLines(tempProgressPath, StandardCharsets.UTF_8);
-                if (!lines.isEmpty()) {
-                    int savedIndex = Integer.parseInt(lines.get(0).trim());
-                    startIndex = savedIndex + 1;
-                    previousContextSummary = String.join("\n", lines.subList(1, lines.size()));
-                    log.info("Resuming user UUID: [{}] task {} from chunk index: {}", userId, uuid,
-                        startIndex);
-                } else {
-                    previousContextSummary = "【以下是群聊数据的递进总结摘要：】";
-                }
-            } else {
-                previousContextSummary = "【以下是群聊数据的递进总结摘要：】";
-                String initialTempContent = "-1\n" + previousContextSummary;
-                Files.writeString(tempProgressPath, initialTempContent, StandardCharsets.UTF_8,
-                    StandardOpenOption.CREATE, StandardOpenOption.TRUNCATE_EXISTING);
-                log.info(
-                    "Initialized pristine workspace progress snapshot file for user UUID: [{}] and task: {}",
-                    userId, uuid);
-            }
+            // ---- Map phase: summarize each chunk independently (resumable) ----
+            List<String> chunkSummaries = loadChunkSummaries(tempProgressPath);
+            int startIndex = chunkSummaries.size();
 
             for (int i = startIndex; i < chunks.size(); i++) {
                 if (Thread.currentThread().isInterrupted()) {
@@ -108,20 +102,40 @@ public class ChatSummaryService {
                     return;
                 }
 
-                log.info("Processing segment ({}/{}) for user UUID: [{}] and task UUID: {}", i + 1,
-                    chunks.size(),
-                    userId, uuid);
+                log.info("Summarizing segment ({}/{}) for user UUID: [{}] and task UUID: {}", i + 1,
+                    chunks.size(), userId, uuid);
 
-                String rawModelOutput = aiService.callChatClientToSummarizeTextWithRetry(
-                    previousContextSummary, chunks.get(i));
-                previousContextSummary = rawModelOutput.trim();
-
-                String tempFileContent = i + "\n" + previousContextSummary;
-                Files.writeString(tempProgressPath, tempFileContent, StandardCharsets.UTF_8,
-                    StandardOpenOption.CREATE, StandardOpenOption.TRUNCATE_EXISTING);
+                String chunkSummary = aiService.summarizeSingleChunk(chunks.get(i), roster);
+                chunkSummaries.add(chunkSummary);
+                saveChunkSummaries(tempProgressPath, chunkSummaries);
             }
 
-            Files.writeString(resultTxtPath, previousContextSummary, StandardCharsets.UTF_8,
+            // ---- Reduce phase: hierarchically merge chunk summaries ----
+            List<String> level = new ArrayList<>(chunkSummaries);
+            int combineBatch = Math.max(2, summaryConfig.getCombineBatch());
+            while (level.size() > 1) {
+                if (Thread.currentThread().isInterrupted()) {
+                    log.info(
+                        "Pipeline thread for user UUID: [{}] detected interrupt signal during merge. Exiting.",
+                        userId);
+                    return;
+                }
+                List<String> nextLevel = new ArrayList<>();
+                for (int i = 0; i < level.size(); i += combineBatch) {
+                    List<String> batch = level.subList(i,
+                        Math.min(i + combineBatch, level.size()));
+                    if (batch.size() == 1) {
+                        // Nothing to merge with; carry the single summary forward unchanged.
+                        nextLevel.add(batch.get(0));
+                    } else {
+                        nextLevel.add(aiService.combineSummaries(new ArrayList<>(batch), roster));
+                    }
+                }
+                level = nextLevel;
+            }
+
+            String finalSummary = level.get(0);
+            Files.writeString(resultTxtPath, finalSummary, StandardCharsets.UTF_8,
                 StandardOpenOption.CREATE, StandardOpenOption.TRUNCATE_EXISTING);
             Files.deleteIfExists(tempProgressPath);
             log.info(
@@ -304,19 +318,16 @@ public class ChatSummaryService {
         if (Files.exists(tempProgressPath)) {
             double progress = 0.0;
             try {
-                List<String> lines = Files.readAllLines(tempProgressPath, StandardCharsets.UTF_8);
-                if (!lines.isEmpty()) {
-                    int processedIndex = Integer.parseInt(lines.get(0).trim());
+                List<String> chunkSummaries = loadChunkSummaries(tempProgressPath);
+                int doneChunks = chunkSummaries.size();
 
-Path targetFilePath = locateProcessedFile(storagePaths.outputDir(userId),
-                        uuid);
-                    String rawContent = Files.readString(targetFilePath, StandardCharsets.UTF_8);
-                    int totalChunks = splitContent(rawContent).size();
+                Path targetFilePath = locateProcessedFile(storagePaths.outputDir(userId), uuid);
+                String rawContent = Files.readString(targetFilePath, StandardCharsets.UTF_8);
+                int totalChunks = splitContent(rawContent).size();
 
-                    if (totalChunks > 0) {
-                        progress = Math.min(summaryConfig.getProgressCap(),
-                            ((double) (processedIndex + 1) / totalChunks) * 100);
-                    }
+                if (totalChunks > 0) {
+                    progress = Math.min(summaryConfig.getProgressCap(),
+                        ((double) doneChunks / totalChunks) * 100);
                 }
             } catch (Exception ignored) {
             }
@@ -327,13 +338,18 @@ Path targetFilePath = locateProcessedFile(storagePaths.outputDir(userId),
                 null);
         }
 
-        Optional<ChatSummaryTask> loggedTask = taskRepository.findById(uuid);
-        if (loggedTask.isPresent() && loggedTask.get().getStatus() == ChatSummaryStatus.FAILED) {
-            String errorMessage = loggedTask.get().getErrorMessage() != null
-                ? loggedTask.get().getErrorMessage()
-                : "An unexpected backend breakdown occurred.";
-            return new SummaryProgressResponse(uuid, ChatSummaryStatus.FAILED, 0.0, null,
-                errorMessage);
+        try {
+            Optional<ChatSummaryTask> loggedTask = taskRepository.findById(uuid);
+            if (loggedTask.isPresent()
+                && loggedTask.get().getStatus() == ChatSummaryStatus.FAILED) {
+                String errorMessage = loggedTask.get().getErrorMessage() != null
+                    ? loggedTask.get().getErrorMessage()
+                    : "An unexpected backend breakdown occurred.";
+                return new SummaryProgressResponse(uuid, ChatSummaryStatus.FAILED, 0.0, null,
+                    errorMessage);
+            }
+        } catch (Exception e) {
+            log.warn("Could not read task status row for {}: {}", uuid, e.getMessage());
         }
 
         return new SummaryProgressResponse(uuid, ChatSummaryStatus.INITIAL_STATE, 0.0, null, null);
@@ -374,5 +390,50 @@ Path targetFilePath = locateProcessedFile(storagePaths.outputDir(userId),
             start = end + 1;
         }
         return chunks;
+    }
+
+    /**
+     * Builds a representative slice of the conversation for the alias-discovery pass: the beginning
+     * plus a middle window, so nicknames that appear away from the start are still catchable.
+     */
+    private String buildAliasSample(String rawContent) {
+        int len = rawContent.length();
+        if (len <= 24000) {
+            return rawContent;
+        }
+        int mid = len / 2;
+        return rawContent.substring(0, Math.min(12000, len))
+            + rawContent.substring(Math.max(0, mid - 6000), Math.min(len, mid + 6000));
+    }
+
+    /**
+     * Loads previously completed per-chunk summaries from the progress snapshot so a paused or
+     * interrupted run can resume without re-summarizing already processed chunks.
+     */
+    private List<String> loadChunkSummaries(Path tempProgressPath) throws IOException {
+        if (!Files.exists(tempProgressPath)) {
+            return new ArrayList<>();
+        }
+        try {
+            String content = Files.readString(tempProgressPath, StandardCharsets.UTF_8);
+            List<String> summaries = SUMMARY_MAPPER.readValue(content,
+                new TypeReference<List<String>>() {});
+            return summaries != null ? summaries : new ArrayList<>();
+        } catch (Exception e) {
+            log.warn(
+                "Failed to parse existing progress snapshot for resume, restarting from scratch: {}",
+                e.getMessage());
+            return new ArrayList<>();
+        }
+    }
+
+    /**
+     * Persists the list of completed per-chunk summaries so progress survives pauses / interruptions.
+     */
+    private void saveChunkSummaries(Path tempProgressPath, List<String> summaries)
+        throws IOException {
+        String json = SUMMARY_MAPPER.writeValueAsString(summaries);
+        Files.writeString(tempProgressPath, json, StandardCharsets.UTF_8,
+            StandardOpenOption.CREATE, StandardOpenOption.TRUNCATE_EXISTING);
     }
 }
