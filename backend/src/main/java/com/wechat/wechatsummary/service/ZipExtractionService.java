@@ -1,6 +1,7 @@
 package com.wechat.wechatsummary.service;
 
-import com.fasterxml.jackson.databind.JsonNode;
+import com.fasterxml.jackson.core.JsonParser;
+import com.fasterxml.jackson.core.JsonToken;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.wechat.wechatsummary.dto.SessionResponseDTO;
 import java.io.BufferedInputStream;
@@ -43,6 +44,8 @@ public class ZipExtractionService {
         .withZone(ZoneId.systemDefault());
     private final StoragePaths storagePaths;
     private final ObjectMapper objectMapper;
+
+    private record ChatMetadata(String nickname, long minTimestamp, long maxTimestamp) {}
 
     /**
      * Stashes a multipart form upload file onto a temporary location, initializes a tracking UUID
@@ -226,37 +229,142 @@ public class ZipExtractionService {
                 rawFileName.toLowerCase().lastIndexOf(".json"));
 
             try {
-                JsonNode rootNode = objectMapper.readTree(jsonFile.toFile());
-                JsonNode sessionNode = rootNode.get("session");
+                ChatMetadata metadata = readChatMetadata(jsonFile);
+                String chatName = metadata.nickname() != null && !metadata.nickname().isEmpty()
+                    ? metadata.nickname()
+                    : fallbackTitle;
 
-                if (sessionNode != null) {
-                    String chatName =
-                        sessionNode.has("nickname") && !sessionNode.get("nickname").asText()
-                            .isEmpty()
-                            ? sessionNode.get("nickname").asText()
-                            : fallbackTitle;
+                long minTs = metadata.minTimestamp();
+                long maxTs = metadata.maxTimestamp();
 
-                    long firstTime = sessionNode.path("firstTimestamp").asLong(0);
-                    long lastTime = sessionNode.path("lastTimestamp").asLong(0);
-
-                    if (firstTime > 0 && lastTime > 0) {
-                        String startDate = CHAT_DATE_FORMATTER.format(
-                            Instant.ofEpochSecond(firstTime));
-                        String endDate = CHAT_DATE_FORMATTER.format(
-                            Instant.ofEpochSecond(lastTime));
-                        return String.format("%s (%s ~ %s)", chatName, startDate, endDate);
-                    }
-                    return chatName;
+                if (minTs > 0 && maxTs > 0) {
+                    String startDate = CHAT_DATE_FORMATTER.format(
+                        Instant.ofEpochSecond(minTs));
+                    String endDate = CHAT_DATE_FORMATTER.format(
+                        Instant.ofEpochSecond(maxTs));
+                    return String.format("%s (%s ~ %s)", chatName, startDate, endDate);
                 }
-                return fallbackTitle;
+                return chatName;
             } catch (Exception jsonErr) {
                 log.warn("Metadata structure error inside [{}], dropping back to clean filename.",
-                    rawFileName);
+                    rawFileName, jsonErr);
                 return fallbackTitle;
             }
         } catch (IOException e) {
             log.error("Failed to read system folder layers inside: [{}]", directory, e);
             return directory.getFileName().toString() + " (Read Failure)";
         }
+    }
+
+    private ChatMetadata readChatMetadata(Path jsonFile) throws IOException {
+        String nickname = null;
+        long firstTimestamp = 0;
+        long lastTimestamp = 0;
+        boolean hasValidOldTimestamps = false;
+        long minTimestamp = Long.MAX_VALUE;
+        long maxTimestamp = Long.MIN_VALUE;
+
+        try (JsonParser parser = objectMapper.getFactory().createParser(jsonFile.toFile())) {
+            if (parser.nextToken() != JsonToken.START_OBJECT) {
+                return new ChatMetadata(nickname, 0, 0);
+            }
+
+            while (parser.nextToken() != JsonToken.END_OBJECT) {
+                String fieldName = parser.currentName();
+                JsonToken token = parser.nextToken();
+
+                switch (fieldName) {
+                    case "session":
+                        if (token == JsonToken.START_OBJECT) {
+                            while (parser.nextToken() != JsonToken.END_OBJECT) {
+                                String sessionField = parser.currentName();
+                                JsonToken sessionToken = parser.nextToken();
+                                switch (sessionField) {
+                                    case "nickname":
+                                        if (sessionToken == JsonToken.VALUE_STRING) {
+                                            nickname = parser.getValueAsString();
+                                        }
+                                        break;
+                                    case "firstTimestamp":
+                                        if (sessionToken == JsonToken.VALUE_NUMBER_INT) {
+                                            firstTimestamp = parser.getLongValue();
+                                        }
+                                        break;
+                                    case "lastTimestamp":
+                                        if (sessionToken == JsonToken.VALUE_NUMBER_INT) {
+                                            lastTimestamp = parser.getLongValue();
+                                        }
+                                        break;
+                                    default:
+                                        if (sessionToken == JsonToken.START_OBJECT
+                                            || sessionToken == JsonToken.START_ARRAY) {
+                                            parser.skipChildren();
+                                        }
+                                        break;
+                                }
+                            }
+                            hasValidOldTimestamps = firstTimestamp > 0 && lastTimestamp > 0;
+                        }
+                        break;
+                    case "messages":
+                        if (token == JsonToken.START_ARRAY) {
+                            if (!hasValidOldTimestamps) {
+                                while (parser.nextToken() != JsonToken.END_ARRAY) {
+                                    if (parser.currentToken() == JsonToken.START_OBJECT) {
+                                        while (parser.nextToken() != JsonToken.END_OBJECT) {
+                                            String msgField = parser.currentName();
+                                            JsonToken msgToken = parser.nextToken();
+                                            if ("createTime".equals(msgField)
+                                                && (msgToken == JsonToken.VALUE_NUMBER_INT
+                                                    || msgToken == JsonToken.VALUE_NUMBER_FLOAT)) {
+                                                long ct = parser.getLongValue();
+                                                if (ct > 0) {
+                                                    if (ct < minTimestamp) {
+                                                        minTimestamp = ct;
+                                                    }
+                                                    if (ct > maxTimestamp) {
+                                                        maxTimestamp = ct;
+                                                    }
+                                                }
+                                            } else {
+                                                if (msgToken == JsonToken.START_OBJECT
+                                                    || msgToken == JsonToken.START_ARRAY) {
+                                                    parser.skipChildren();
+                                                }
+                                            }
+                                        }
+                                    } else if (parser.currentToken() != JsonToken.END_ARRAY) {
+                                        if (parser.currentToken() == JsonToken.START_ARRAY
+                                            || parser.currentToken() == JsonToken.START_OBJECT) {
+                                            parser.skipChildren();
+                                        }
+                                    }
+                                }
+                            } else {
+                                parser.skipChildren();
+                            }
+                        }
+                        break;
+                    default:
+                        if (token == JsonToken.START_OBJECT
+                            || token == JsonToken.START_ARRAY) {
+                            parser.skipChildren();
+                        }
+                        break;
+                }
+            }
+        }
+
+        if (hasValidOldTimestamps) {
+            return new ChatMetadata(nickname, firstTimestamp, lastTimestamp);
+        }
+
+        if (minTimestamp == Long.MAX_VALUE || maxTimestamp == Long.MIN_VALUE) {
+            log.debug("JSON file [{}] has no valid createTime values in messages array.",
+                jsonFile.getFileName());
+            return new ChatMetadata(nickname, 0, 0);
+        }
+
+        return new ChatMetadata(nickname, minTimestamp, maxTimestamp);
     }
 }

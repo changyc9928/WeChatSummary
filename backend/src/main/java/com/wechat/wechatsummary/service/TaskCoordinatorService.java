@@ -2,7 +2,6 @@ package com.wechat.wechatsummary.service;
 
 import com.wechat.wechatsummary.config.TaskConfig;
 import com.wechat.wechatsummary.dto.TaskProgress;
-import com.wechat.wechatsummary.dto.TaskStatus;
 import java.nio.file.Files;
 import java.util.Collections;
 import java.util.Map;
@@ -202,42 +201,74 @@ public class TaskCoordinatorService {
     }
 
     /**
-     * Dynamically determines task progress based on pause flag, artifact presence, and live thread
-     * status.
+     * Dynamically determines task progress. The processed Markdown file is the single source
+     * of truth for COMPLETED. Redis state and active-thread state only describe incomplete
+     * task progress.
+     *
+     * <p>Evaluation order:
+     * <ol>
+     *   <li>Processed MD exists → COMPLETED</li>
+     *   <li>Explicitly aborted/paused → PAUSED</li>
+     *   <li>Active threads → RUNNING</li>
+     *   <li>Counter key exists → RUNNING</li>
+     *   <li>Any Redis task context exists → RUNNING</li>
+     *   <li>Otherwise → IDLING</li>
+     * </ol>
      */
     public TaskProgress getTaskProgress(String uuid, String userId) {
-        // 1. Check if the task has been explicitly aborted/paused -> PAUSED
-        if (Boolean.TRUE.equals(redisTemplate.hasKey(ABORTED_PREFIX + uuid))) {
-            return new TaskProgress(TaskStatus.PAUSED, 0, 0);
-        }
-
-        // 2. Check if {uuid}_processed.md exists on disk -> COMPLETED
+        // 1. Processed Markdown exists → COMPLETED (authoritative, wins over all Redis state)
         if (Files.exists(storagePaths.processedMarkdown(userId, uuid))) {
-            return new TaskProgress(TaskStatus.COMPLETED, 0, 0);
+            return TaskProgress.completed(0);
         }
 
-        // Fetch counts for payload reporting if still in progress
+        // Fetch counts defensively; missing/invalid values become 0
         String totalStr = redisTemplate.opsForValue().get(TOTAL_PREFIX + uuid);
         String remainingStr = redisTemplate.opsForValue().get(COUNTER_PREFIX + uuid);
-        int total = totalStr != null ? Integer.parseInt(totalStr) : 0;
-        int remaining = remainingStr != null ? Integer.parseInt(remainingStr) : 0;
+        int total = safeParse(totalStr);
+        int remaining = safeParse(remainingStr);
+        boolean counterKeyPresent = Boolean.TRUE.equals(redisTemplate.hasKey(COUNTER_PREFIX + uuid));
+        boolean totalKeyPresent = Boolean.TRUE.equals(redisTemplate.hasKey(TOTAL_PREFIX + uuid));
 
-        // 3. Check if active threads exist for this UUID -> RUNNING
+        // 2. Explicitly aborted/paused → PAUSED
+        if (Boolean.TRUE.equals(redisTemplate.hasKey(ABORTED_PREFIX + uuid))) {
+            return TaskProgress.paused(total, remaining);
+        }
+
+        // 3. Active threads → RUNNING
         Set<Thread> activeThreads = activeThreadsMap.get(uuid);
         if (activeThreads != null && !activeThreads.isEmpty()) {
-            return new TaskProgress(TaskStatus.RUNNING, total, remaining);
+            return TaskProgress.running(total, remaining);
         }
 
-        // 3.5 Counter context still present -> RUNNING. This covers both the window where
-        // queued messages have not been consumed yet and the final markdown compilation that
-        // runs after the last consumer thread finishes (threads are gone, the counter key is
-        // only deleted once the .md artifact exists). Prevents the UI from flickering back to
-        // an IDLING start button mid/end-of-task.
-        if (Boolean.TRUE.equals(redisTemplate.hasKey(COUNTER_PREFIX + uuid))) {
-            return new TaskProgress(TaskStatus.RUNNING, total, remaining);
+        // 4. Counter key exists → RUNNING (covers window after threads finish but before
+        //    final Markdown compilation completes; prevents UI flicker to IDLING)
+        if (counterKeyPresent) {
+            return TaskProgress.running(total, remaining);
         }
 
-        // 4. Otherwise -> IDLING
-        return new TaskProgress(TaskStatus.IDLING, total, remaining);
+        // 5. Total key exists but counter not yet initialized → RUNNING, 0%
+        //    This handles the fresh-task window between initTaskContext and the first
+        //    consumer decrement. The counter has not been created yet, so remaining is
+        //    meaningless; report 0% to avoid a premature 100% flash.
+        if (totalKeyPresent) {
+            return TaskProgress.running(total, total);
+        }
+
+        // 6. No context at all → IDLING
+        return TaskProgress.idling();
+    }
+
+    /**
+     * Parses a Redis string value to int, treating null, non-numeric, and negative values as 0.
+     */
+    private int safeParse(String value) {
+        if (value == null) {
+            return 0;
+        }
+        try {
+            return Math.max(0, Integer.parseInt(value));
+        } catch (NumberFormatException e) {
+            return 0;
+        }
     }
 }
