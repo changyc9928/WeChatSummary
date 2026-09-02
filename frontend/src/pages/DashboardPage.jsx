@@ -32,6 +32,10 @@ export default function DashboardPage({
   onNavigateToAudios,
   onNavigateToVideos,
   onNavigateToEmojis,
+  onFetchImages,
+  onFetchAudios,
+  onFetchVideos,
+  onFetchEmojis,
   activeModalImage,
   setActiveModalImage
 }) {
@@ -90,6 +94,10 @@ export default function DashboardPage({
           handleStartPreprocess={preprocess.startPreprocess}
           isPreprocessFinished={preprocess.isFinished}
           loading={loading}
+          onFetchAudios={onFetchAudios}
+          onFetchEmojis={onFetchEmojis}
+          onFetchImages={onFetchImages}
+          onFetchVideos={onFetchVideos}
           onNavigateToAudios={onNavigateToAudios}
           onNavigateToImages={onNavigateToImages}
           onNavigateToVideos={onNavigateToVideos}

@@ -18,6 +18,10 @@ export default function StepPreprocess({
   onNavigateToAudios,
   onNavigateToVideos,
   onNavigateToEmojis,
+  onFetchImages,
+  onFetchAudios,
+  onFetchVideos,
+  onFetchEmojis,
   currentUser,
   selectedStartTime,
   setSelectedStartTime,
@@ -124,10 +128,10 @@ export default function StepPreprocess({
         <div style={styles.actionButtonGroup}>
           {/* Universal Access to Audio, Image and Video Tables */}
           <div style={{ display: 'flex', gap: '8px', flexWrap: 'wrap', marginBottom: '12px' }}>
-            <button onClick={onNavigateToImages} style={styles.button}>{t('preprocess.viewImages')}</button>
-            <button onClick={onNavigateToAudios} style={styles.button}>{t('preprocess.viewAudios')}</button>
-            <button onClick={onNavigateToVideos} style={styles.button}>{t('preprocess.viewVideos')}</button>
-            <button onClick={onNavigateToEmojis} style={styles.button}>{t('preprocess.viewEmojis')}</button>
+            <button onClick={() => { onFetchImages?.(); onNavigateToImages(); }} style={styles.button}>{t('preprocess.viewImages')}</button>
+            <button onClick={() => { onFetchAudios?.(); onNavigateToAudios(); }} style={styles.button}>{t('preprocess.viewAudios')}</button>
+            <button onClick={() => { onFetchVideos?.(); onNavigateToVideos(); }} style={styles.button}>{t('preprocess.viewVideos')}</button>
+            <button onClick={() => { onFetchEmojis?.(); onNavigateToEmojis(); }} style={styles.button}>{t('preprocess.viewEmojis')}</button>
           </div>
 
           {/* State: IDLING / Pending - only the Start button, no chat log preview yet */}

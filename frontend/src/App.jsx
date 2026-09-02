@@ -192,6 +192,10 @@ export default function App() {
       loading={loading}
       loadingSessions={sessions.loadingSessions}
       onLogout={handleLogout}
+      onFetchImages={() => images.fetchImageSummaries(uuidInput)}
+      onFetchAudios={() => audios.fetchAudioSummaries(uuidInput)}
+      onFetchVideos={() => videos.fetchVideoSummaries(uuidInput)}
+      onFetchEmojis={() => emojis.fetchEmojiSummaries(uuidInput)}
       onNavigateToImages={() => setCurrentView('images')}
       onNavigateToAudios={() => setCurrentView('audios')}
       onNavigateToVideos={() => setCurrentView('videos')}
