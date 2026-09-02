@@ -10,13 +10,16 @@ import java.io.InputStream;
 import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
 import java.nio.file.Path;
-import java.nio.file.StandardCopyOption;
+import java.nio.file.StandardOpenOption;
 import java.nio.file.attribute.BasicFileAttributes;
 import java.time.Instant;
 import java.time.ZoneId;
 import java.time.format.DateTimeFormatter;
+import java.util.ArrayList;
+import java.util.HashSet;
 import java.util.List;
 import java.util.Optional;
+import java.util.Set;
 import java.util.UUID;
 import java.util.stream.Collectors;
 import java.util.stream.Stream;
@@ -96,59 +99,174 @@ public class ZipExtractionService {
         return uuid;
     }
 
+    private record ZipEntryData(String name, boolean directory, byte[] content) {}
+
     /**
-     * Iterates through an unpacked archive payload sequence, validating that file components don't
-     * violate underlying location boundaries, and flattens out nested baseline paths.
+     * Two-phase extraction: first reads all entries into memory to detect archive-level structure,
+     * then extracts using the determined path mapping. This avoids the per-entry stripFirstDirectory
+     * bug that incorrectly flattens legitimate nested directories.
      */
     private void extractZipSafely(Path zipFile, Path targetDir) throws IOException {
+        List<ZipEntryData> entries = readZipEntries(zipFile);
+
+        Optional<String> redundantRoot = detectRedundantRootDirectory(entries);
+
+        if (log.isDebugEnabled()) {
+            redundantRoot.ifPresent(root -> log.debug(
+                "Detected redundant root directory wrapper [{}] in archive, will flatten one level",
+                root));
+        }
+
+        for (ZipEntryData entry : entries) {
+            String entryName = normalizeZipEntryName(entry.name());
+
+            validateZipEntryPath(entry.name(), targetDir);
+
+            String extractionName = redundantRoot
+                .map(root -> removeRedundantRootDirectory(entryName, root))
+                .orElse(entryName);
+
+            if (extractionName.isEmpty()) {
+                if (log.isDebugEnabled()) {
+                    log.debug(
+                        "Skipping root folder entry footprint segment during extraction path evaluation: {}",
+                        entry.name());
+                }
+                continue;
+            }
+
+            Path resolvedPath = targetDir.resolve(extractionName).normalize();
+
+            if (!resolvedPath.startsWith(targetDir)) {
+                log.error(
+                    "Security boundary violation detected! Malicious path manipulation found in file entry: {}",
+                    entry.name());
+                throw new IOException("Bad zip entry path trajectory: " + entry.name());
+            }
+
+            if (entry.directory()) {
+                Files.createDirectories(resolvedPath);
+            } else {
+                Files.createDirectories(resolvedPath.getParent());
+                Files.write(resolvedPath, entry.content(),
+                    StandardOpenOption.CREATE, StandardOpenOption.TRUNCATE_EXISTING);
+                normalizeTextFile(resolvedPath);
+            }
+        }
+    }
+
+    private List<ZipEntryData> readZipEntries(Path zipFile) throws IOException {
+        List<ZipEntryData> entries = new ArrayList<>();
         try (
             InputStream fis = Files.newInputStream(zipFile);
             BufferedInputStream bis = new BufferedInputStream(fis);
             ZipArchiveInputStream zis = new ZipArchiveInputStream(bis)
         ) {
-
             ZipArchiveEntry entry;
-
             while ((entry = zis.getNextEntry()) != null) {
-                String entryName = entry.getName();
-
-                String strippedName = stripFirstDirectory(entryName);
-                if (strippedName.isEmpty()) {
-                    if (log.isDebugEnabled()) {
-                        log.debug(
-                            "Skipping root folder entry footprint segment during extraction path evaluation: {}",
-                            entryName);
-                    }
-                    continue;
-                }
-
-                Path resolvedPath = targetDir.resolve(strippedName).normalize();
-
-                if (!resolvedPath.startsWith(targetDir)) {
-                    log.error(
-                        "Security boundary violation detected! Malicious path manipulation found in file entry: {}",
-                        entry.getName());
-                    throw new IOException("Bad zip entry path trajectory: " + entry.getName());
-                }
-
-                if (entry.isDirectory()) {
-                    Files.createDirectories(resolvedPath);
-                } else {
-                    Files.createDirectories(resolvedPath.getParent());
-                    Files.copy(zis, resolvedPath, StandardCopyOption.REPLACE_EXISTING);
-                    normalizeTextFile(resolvedPath);
-                }
+                boolean isDirectory = entry.isDirectory();
+                byte[] content = isDirectory ? new byte[0] : zis.readAllBytes();
+                entries.add(new ZipEntryData(entry.getName(), isDirectory, content));
             }
         }
+        return entries;
     }
 
-    private String stripFirstDirectory(String path) {
-        path = path.replace("\\", "/");
-        int firstSlash = path.indexOf('/');
-        if (firstSlash != -1) {
-            return path.substring(firstSlash + 1);
+    /**
+     * Detects whether the archive has a redundant root wrapper directory. A redundant root exists
+     * when there is exactly one top-level directory and all meaningful content is nested inside an
+     * identically-named child directory (e.g., xxx/xxx/aaa.txt).
+     *
+     * <p>The structural rule: flatten root/root/... only when there is exactly one meaningful
+     * top-level root and all meaningful content is contained beneath the identically named
+     * child directory.</p>
+     */
+    private Optional<String> detectRedundantRootDirectory(List<ZipEntryData> entries) {
+        Set<String> topLevelComponents = new HashSet<>();
+
+        for (ZipEntryData entry : entries) {
+            String name = normalizeZipEntryName(entry.name());
+
+            if (name.isEmpty()) {
+                continue;
+            }
+
+            int slash = name.indexOf('/');
+            if (slash < 0) {
+                // A root-level file means this is not a single directory wrapper.
+                return Optional.empty();
+            }
+            topLevelComponents.add(name.substring(0, slash));
         }
+
+        if (topLevelComponents.size() != 1) {
+            return Optional.empty();
+        }
+
+        String root = topLevelComponents.iterator().next();
+        String duplicatedRootPrefix = root + "/" + root + "/";
+
+        boolean foundNestedContent = false;
+
+        for (ZipEntryData entry : entries) {
+            String name = normalizeZipEntryName(entry.name());
+
+            if (name.isEmpty() || name.equals(root + "/") || name.equals(root)) {
+                continue;
+            }
+
+            if (!name.startsWith(duplicatedRootPrefix)) {
+                return Optional.empty();
+            }
+
+            String remainder = name.substring(duplicatedRootPrefix.length());
+            if (!remainder.isEmpty()) {
+                foundNestedContent = true;
+            }
+        }
+
+        return foundNestedContent ? Optional.of(root) : Optional.empty();
+    }
+
+    private String removeRedundantRootDirectory(String path, String redundantRoot) {
+        String prefix = redundantRoot + "/";
+
+        if (path.startsWith(prefix)) {
+            return path.substring(prefix.length());
+        }
+
         return path;
+    }
+
+    private String normalizeZipEntryName(String name) {
+        return name.replace('\\', '/')
+            .replaceAll("/+", "/")
+            .replaceFirst("^\\.?/", "");
+    }
+
+    private void validateZipEntryPath(String entryName, Path targetDir) throws IOException {
+        String rawForwardSlashed = entryName.replace('\\', '/');
+        if (rawForwardSlashed.startsWith("/") || rawForwardSlashed.matches("^[a-zA-Z]:.*")) {
+            throw new IOException("Bad zip entry path trajectory: " + entryName);
+        }
+
+        String normalized = normalizeZipEntryName(entryName);
+
+        if (normalized.isEmpty()) {
+            return;
+        }
+
+        for (String component : normalized.split("/")) {
+            if (component.equals("..")) {
+                throw new IOException("Bad zip entry path trajectory: " + entryName);
+            }
+        }
+
+        Path entryPath = Path.of(normalized).normalize();
+        Path resolved = targetDir.resolve(entryPath).normalize();
+        if (!resolved.startsWith(targetDir)) {
+            throw new IOException("Bad zip entry path trajectory: " + entryName);
+        }
     }
 
     private void normalizeTextFile(Path file) {
