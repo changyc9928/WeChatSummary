@@ -6,9 +6,61 @@ servers:
 - url: http://localhost:8080
   description: Generated server url
 tags:
+- name: bridge-log-controller
+  description: Bridge log streaming (webhook ingest + viewer)
 - name: tool-controller
   description: Distributable local tools (bridge.exe)
 paths:
+  /api/tools/bridge/logs:
+    get:
+      tags:
+      - bridge-log-controller
+      summary: Return stored bridge log lines after the given cursor
+      operationId: since
+      parameters:
+      - name: after
+        in: query
+        required: false
+        schema:
+          type: integer
+          format: int64
+          default: 0
+      responses:
+        "200":
+          description: OK
+          content:
+            '*/*':
+              schema:
+                $ref: "#/components/schemas/ApiResponseLogsResponse"
+    post:
+      tags:
+      - bridge-log-controller
+      summary: Ingest log lines POSTed by the bridge webhook
+      operationId: ingest
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/JsonNode"
+      responses:
+        "200":
+          description: OK
+          content:
+            '*/*':
+              schema:
+                $ref: "#/components/schemas/ApiResponseInteger"
+    delete:
+      tags:
+      - bridge-log-controller
+      summary: Clear the in-memory bridge log ring
+      operationId: clear
+      responses:
+        "200":
+          description: OK
+          content:
+            '*/*':
+              schema:
+                $ref: "#/components/schemas/ApiResponseVoid"
   /api/summary/{uuid}:
     post:
       tags:
@@ -114,6 +166,29 @@ paths:
             '*/*':
               schema:
                 $ref: "#/components/schemas/ApiResponseTaskAckResponse"
+  /api/preprocess/{uuid}/restart:
+    post:
+      tags:
+      - preprocess-controller
+      operationId: restartPreprocess
+      parameters:
+      - name: X-User-Id
+        in: header
+        required: true
+        schema:
+          type: string
+      - name: uuid
+        in: path
+        required: true
+        schema:
+          type: string
+      responses:
+        "200":
+          description: OK
+          content:
+            '*/*':
+              schema:
+                $ref: "#/components/schemas/ApiResponseTaskAckResponse"
   /api/preprocess/{uuid}/reprocess:
     post:
       tags:
@@ -142,29 +217,6 @@ paths:
       tags:
       - preprocess-controller
       operationId: abortTask
-      parameters:
-      - name: X-User-Id
-        in: header
-        required: true
-        schema:
-          type: string
-      - name: uuid
-        in: path
-        required: true
-        schema:
-          type: string
-      responses:
-        "200":
-          description: OK
-          content:
-            '*/*':
-              schema:
-                $ref: "#/components/schemas/ApiResponseTaskAckResponse"
-  /api/preprocess/{uuid}/restart:
-    post:
-      tags:
-      - preprocess-controller
-      operationId: restartPreprocess
       parameters:
       - name: X-User-Id
         in: header
@@ -518,6 +570,92 @@ paths:
             '*/*':
               schema:
                 $ref: "#/components/schemas/ApiResponseVoid"
+  /api/preprocess/emojis/{id}/file:
+    get:
+      tags:
+      - preprocess-controller
+      operationId: getEmojiFileById
+      parameters:
+      - name: X-User-Id
+        in: header
+        required: true
+        schema:
+          type: string
+      - name: id
+        in: path
+        required: true
+        schema:
+          type: string
+      responses:
+        "200":
+          description: OK
+          content:
+            '*/*':
+              schema:
+                type: string
+                format: binary
+  /api/preprocess/emojis/summaries:
+    get:
+      tags:
+      - preprocess-controller
+      operationId: getEmojiSummariesByUuid
+      parameters:
+      - name: X-User-Id
+        in: header
+        required: true
+        schema:
+          type: string
+      - name: uuid
+        in: query
+        required: true
+        schema:
+          type: string
+      - name: page
+        in: query
+        required: false
+        schema:
+          type: integer
+          format: int32
+          default: 0
+      - name: size
+        in: query
+        required: false
+        schema:
+          type: integer
+          format: int32
+          default: 20
+      responses:
+        "200":
+          description: OK
+          content:
+            '*/*':
+              schema:
+                $ref: "#/components/schemas/ApiResponsePageEmojiSummaryEntity"
+    delete:
+      tags:
+      - preprocess-controller
+      operationId: deleteEmojiSummariesByIds
+      parameters:
+      - name: X-User-Id
+        in: header
+        required: true
+        schema:
+          type: string
+      requestBody:
+        content:
+          application/json:
+            schema:
+              type: array
+              items:
+                type: string
+        required: true
+      responses:
+        "200":
+          description: OK
+          content:
+            '*/*':
+              schema:
+                $ref: "#/components/schemas/ApiResponseVoid"
   /api/preprocess/audios/{id}/file:
     get:
       tags:
@@ -763,92 +901,6 @@ paths:
             '*/*':
               schema:
                 $ref: "#/components/schemas/ApiResponseVoid"
-  /api/preprocess/emojis/{id}/file:
-    get:
-      tags:
-      - preprocess-controller
-      operationId: getEmojiFileById
-      parameters:
-      - name: X-User-Id
-        in: header
-        required: true
-        schema:
-          type: string
-      - name: id
-        in: path
-        required: true
-        schema:
-          type: string
-      responses:
-        "200":
-          description: OK
-          content:
-            '*/*':
-              schema:
-                type: string
-                format: binary
-  /api/preprocess/emojis/summaries:
-    get:
-      tags:
-      - preprocess-controller
-      operationId: getEmojiSummariesByUuid
-      parameters:
-      - name: X-User-Id
-        in: header
-        required: true
-        schema:
-          type: string
-      - name: uuid
-        in: query
-        required: true
-        schema:
-          type: string
-      - name: page
-        in: query
-        required: false
-        schema:
-          type: integer
-          format: int32
-          default: 0
-      - name: size
-        in: query
-        required: false
-        schema:
-          type: integer
-          format: int32
-          default: 20
-      responses:
-        "200":
-          description: OK
-          content:
-            '*/*':
-              schema:
-                $ref: "#/components/schemas/ApiResponsePageEmojiSummaryEntity"
-    delete:
-      tags:
-      - preprocess-controller
-      operationId: deleteEmojiSummariesByIds
-      parameters:
-      - name: X-User-Id
-        in: header
-        required: true
-        schema:
-          type: string
-      requestBody:
-        content:
-          application/json:
-            schema:
-              type: array
-              items:
-                type: string
-        required: true
-      responses:
-        "200":
-          description: OK
-          content:
-            '*/*':
-              schema:
-                $ref: "#/components/schemas/ApiResponseVoid"
   /api/preprocess/emojis/summaries/{id}:
     delete:
       tags:
@@ -990,8 +1042,99 @@ paths:
             '*/*':
               schema:
                 $ref: "#/components/schemas/ApiResponseVoid"
+  /api/files:
+    delete:
+      tags:
+      - upload-controller
+      operationId: deleteSession
+      parameters:
+      - name: X-User-Id
+        in: header
+        required: true
+        schema:
+          type: string
+      responses:
+        "200":
+          description: OK
+          content:
+            '*/*':
+              schema:
+                $ref: "#/components/schemas/ApiResponseBoolean"
 components:
   schemas:
+    JsonNode:
+      type: object
+      properties:
+        array:
+          type: boolean
+        empty:
+          type: boolean
+        "null":
+          type: boolean
+        float:
+          type: boolean
+        container:
+          type: boolean
+        valueNode:
+          type: boolean
+        missingNode:
+          type: boolean
+        object:
+          type: boolean
+        nodeType:
+          type: string
+          enum:
+          - ARRAY
+          - BINARY
+          - BOOLEAN
+          - MISSING
+          - "NULL"
+          - NUMBER
+          - OBJECT
+          - POJO
+          - STRING
+        string:
+          type: boolean
+        integralNumber:
+          type: boolean
+        pojo:
+          type: boolean
+        floatingPointNumber:
+          type: boolean
+        short:
+          type: boolean
+        int:
+          type: boolean
+        long:
+          type: boolean
+        double:
+          type: boolean
+        bigDecimal:
+          type: boolean
+        bigInteger:
+          type: boolean
+        textual:
+          type: boolean
+          deprecated: true
+        boolean:
+          type: boolean
+        binary:
+          type: boolean
+        number:
+          type: boolean
+        embeddedValue:
+          type: boolean
+    ApiResponseInteger:
+      type: object
+      properties:
+        code:
+          type: integer
+          format: int32
+        message:
+          type: string
+        data:
+          type: integer
+          format: int32
     SummaryRequestDTO:
       type: object
       properties:
@@ -1088,6 +1231,38 @@ components:
         downloadUrl:
           type: string
         help:
+          type: string
+    ApiResponseLogsResponse:
+      type: object
+      properties:
+        code:
+          type: integer
+          format: int32
+        message:
+          type: string
+        data:
+          $ref: "#/components/schemas/LogsResponse"
+    LogsResponse:
+      type: object
+      properties:
+        lines:
+          type: array
+          items:
+            $ref: "#/components/schemas/StoredLine"
+        next:
+          type: integer
+          format: int64
+    StoredLine:
+      type: object
+      properties:
+        seq:
+          type: integer
+          format: int64
+        ts:
+          type: string
+        level:
+          type: string
+        msg:
           type: string
     ApiResponseSummaryProgressResponse:
       type: object
@@ -1229,29 +1404,29 @@ components:
     PageableObject:
       type: object
       properties:
-        sort:
-          $ref: "#/components/schemas/SortObject"
         offset:
           type: integer
           format: int64
-        pageSize:
-          type: integer
-          format: int32
+        sort:
+          $ref: "#/components/schemas/SortObject"
+        paged:
+          type: boolean
         pageNumber:
           type: integer
           format: int32
+        pageSize:
+          type: integer
+          format: int32
         unpaged:
-          type: boolean
-        paged:
           type: boolean
     SortObject:
       type: object
       properties:
         empty:
           type: boolean
-        unsorted:
-          type: boolean
         sorted:
+          type: boolean
+        unsorted:
           type: boolean
     VideoSummary:
       type: object
@@ -1469,3 +1644,13 @@ components:
         message:
           type: string
         data: {}
+    ApiResponseBoolean:
+      type: object
+      properties:
+        code:
+          type: integer
+          format: int32
+        message:
+          type: string
+        data:
+          type: boolean

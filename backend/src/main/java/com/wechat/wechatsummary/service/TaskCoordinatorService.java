@@ -271,4 +271,16 @@ public class TaskCoordinatorService {
             return 0;
         }
     }
+
+    /**
+     * Removes all TaskCoordinator Redis keys for the given UUID.
+     * Used during session deletion to prevent orphaned task state.
+     */
+    public void cleanupTaskKeys(String uuid) {
+        log.info("Cleaning up TaskCoordinator Redis keys for UUID: {}", uuid);
+        redisTemplate.delete(COUNTER_PREFIX + uuid);
+        redisTemplate.delete(TOTAL_PREFIX + uuid);
+        redisTemplate.delete(ABORTED_PREFIX + uuid);
+        redisTemplate.delete(USER_KEY_PREFIX + uuid);
+    }
 }

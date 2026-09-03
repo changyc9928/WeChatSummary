@@ -41,6 +41,7 @@ public class WeChatSummaryCacheService {
     private final ChatSummaryTaskRepository taskRepository;
     private final StringRedisTemplate redisTemplate;
     private final CacheManager cacheManager;
+    private final StoragePaths storagePaths;
 
     // =========================================================================
     // 1. IMAGE SUMMARY LAYER (DB + Cache Abstraction)
@@ -100,6 +101,15 @@ public class WeChatSummaryCacheService {
         ImageSummaryEntity saved = imageSummaryRepository.save(entity);
         evictImageSummary(entity.getImageHash());
         return saved;
+    }
+
+    public void deleteSessionImageSummaries(String uuid) {
+        List<ImageSummaryEntity> saved = imageSummaryRepository.findByFilePathContainingUuid(uuid);
+        for (ImageSummaryEntity imageSummaryEntity : saved) {
+            cacheManager.getCache("image_summary").evict(imageSummaryEntity.getImageHash());
+            imageSummaryRepository.deleteById(imageSummaryEntity.getId());
+        }
+        cacheManager.getCache("image_summary_list").evict(uuid);
     }
 
     /**
@@ -197,6 +207,15 @@ public class WeChatSummaryCacheService {
         return saved;
     }
 
+    public void deleteSessionEmojiSummaries(String uuid) {
+        List<EmojiSummaryEntity> saved = emojiSummaryRepository.findByFilePathContainingUuid(uuid);
+        for (EmojiSummaryEntity emojiSummaryEntity : saved) {
+            cacheManager.getCache("emoji_summary").evict(emojiSummaryEntity.getEmojiHash());
+            emojiSummaryRepository.deleteById(emojiSummaryEntity.getId());
+        }
+        cacheManager.getCache("emoji_summary_list").evict(uuid);
+    }
+
     /**
      * Deletes a single emoji summary record by ID (hash) and evicts relevant caches.
      */
@@ -285,6 +304,15 @@ public class WeChatSummaryCacheService {
         AudioSummary saved = audioSummaryRepository.save(entity);
         evictAudioSummary(entity.getFileHash());
         return saved;
+    }
+
+    public void deleteSessionAudioSummaries(String uuid) {
+        List<AudioSummary> saved = audioSummaryRepository.findByFilePathContainingUuid(uuid);
+        for (AudioSummary audioSummaryEntity : saved) {
+            cacheManager.getCache("audio_summary").evict(audioSummaryEntity.getFileHash());
+            audioSummaryRepository.deleteById(audioSummaryEntity.getId());
+        }
+        cacheManager.getCache("audio_summary_list").evict(uuid);
     }
 
     /**
@@ -415,6 +443,15 @@ public class WeChatSummaryCacheService {
         VideoSummary saved = videoSummaryRepository.save(entity);
         evictVideoSummary(entity.getFileHash());
         return saved;
+    }
+
+    public void deleteSessionVideoSummaries(String uuid) {
+        List<VideoSummary> saved = videoSummaryRepository.findByFilePathContainingUuid(uuid);
+        for (VideoSummary videoSummaryEntity : saved) {
+            cacheManager.getCache("video_summary").evict(videoSummaryEntity.getFileHash());
+            videoSummaryRepository.deleteById(videoSummaryEntity.getId());
+        }
+        cacheManager.getCache("video_summary_list").evict(uuid);
     }
 
     /**
@@ -581,6 +618,44 @@ public class WeChatSummaryCacheService {
         log.info("Clearing real-time progress indicators out of Redis memory mappings for UUID: {}",
                 uuid);
         redisTemplate.delete(STATUS_KEY_PREFIX + uuid.toString());
-        redisTemplate.delete(PROGRESS_KEY_PREFIX + uuid);
+        redisTemplate.delete(PROGRESS_KEY_PREFIX + uuid.toString());
+    }
+
+    // =========================================================================
+    // 5. SESSION-SCOPED BULK CLEANUP HELPERS
+    // =========================================================================
+
+    /**
+     * Deletes the chat analysis task DB record and its associated Spring Cache + Redis state.
+     * The task UUID is the same as the session UUID.
+     */
+    public void deleteChatAnalysisTask(UUID uuid) {
+        log.info("Cleaning up chat analysis task state for UUID: {}", uuid);
+        cacheManager.getCache("chat_analysis").evict(uuid.toString());
+        clearProgress(uuid);
+        taskRepository.deleteById(uuid);
+    }
+
+    /**
+     * Deletes session output files (processed markdown, summary text, summary temp) from disk.
+     * Idempotent — missing files are silently ignored.
+     */
+    public void deleteSessionOutputs(String userId, String uuid) {
+        log.info("Cleaning up output files for user [{}] session [{}]", userId, uuid);
+        try {
+            java.nio.file.Files.deleteIfExists(storagePaths.processedMarkdown(userId, uuid));
+        } catch (Exception e) {
+            log.warn("Failed to delete processed markdown for session {}: {}", uuid, e.getMessage());
+        }
+        try {
+            java.nio.file.Files.deleteIfExists(storagePaths.summaryTxt(userId, uuid));
+        } catch (Exception e) {
+            log.warn("Failed to delete summary text for session {}: {}", uuid, e.getMessage());
+        }
+        try {
+            java.nio.file.Files.deleteIfExists(storagePaths.summaryTemp(userId, uuid));
+        } catch (Exception e) {
+            log.warn("Failed to delete summary temp for session {}: {}", uuid, e.getMessage());
+        }
     }
 }

@@ -48,8 +48,6 @@ public class ZipExtractionService {
     private final StoragePaths storagePaths;
     private final ObjectMapper objectMapper;
 
-    private record ChatMetadata(String nickname, long minTimestamp, long maxTimestamp) {}
-
     /**
      * Stashes a multipart form upload file onto a temporary location, initializes a tracking UUID
      * inside the user's UUID-specific directory subspace, extracts archive data sets safely, and
@@ -99,12 +97,10 @@ public class ZipExtractionService {
         return uuid;
     }
 
-    private record ZipEntryData(String name, boolean directory, byte[] content) {}
-
     /**
      * Two-phase extraction: first reads all entries into memory to detect archive-level structure,
-     * then extracts using the determined path mapping. This avoids the per-entry stripFirstDirectory
-     * bug that incorrectly flattens legitimate nested directories.
+     * then extracts using the determined path mapping. This avoids the per-entry
+     * stripFirstDirectory bug that incorrectly flattens legitimate nested directories.
      */
     private void extractZipSafely(Path zipFile, Path targetDir) throws IOException {
         List<ZipEntryData> entries = readZipEntries(zipFile);
@@ -178,8 +174,8 @@ public class ZipExtractionService {
      * identically-named child directory (e.g., xxx/xxx/aaa.txt).
      *
      * <p>The structural rule: flatten root/root/... only when there is exactly one meaningful
-     * top-level root and all meaningful content is contained beneath the identically named
-     * child directory.</p>
+     * top-level root and all meaningful content is contained beneath the identically named child
+     * directory.</p>
      */
     private Optional<String> detectRedundantRootDirectory(List<ZipEntryData> entries) {
         Set<String> topLevelComponents = new HashSet<>();
@@ -434,7 +430,7 @@ public class ZipExtractionService {
                                             JsonToken msgToken = parser.nextToken();
                                             if ("createTime".equals(msgField)
                                                 && (msgToken == JsonToken.VALUE_NUMBER_INT
-                                                    || msgToken == JsonToken.VALUE_NUMBER_FLOAT)) {
+                                                || msgToken == JsonToken.VALUE_NUMBER_FLOAT)) {
                                                 long ct = parser.getLongValue();
                                                 if (ct > 0) {
                                                     if (ct < minTimestamp) {
@@ -484,5 +480,13 @@ public class ZipExtractionService {
         }
 
         return new ChatMetadata(nickname, minTimestamp, maxTimestamp);
+    }
+
+    private record ChatMetadata(String nickname, long minTimestamp, long maxTimestamp) {
+
+    }
+
+    private record ZipEntryData(String name, boolean directory, byte[] content) {
+
     }
 }

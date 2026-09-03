@@ -5,6 +5,7 @@ import com.wechat.wechatsummary.dto.SessionResponseDTO;
 import com.wechat.wechatsummary.dto.UploadSessionResponse;
 import com.wechat.wechatsummary.exception.BadRequestException;
 import com.wechat.wechatsummary.exception.BusinessException;
+import com.wechat.wechatsummary.service.SessionDeletionService;
 import com.wechat.wechatsummary.service.ZipExtractionService;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.StringToClassMapItem;
@@ -17,7 +18,9 @@ import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.MediaType;
+import org.springframework.web.bind.annotation.DeleteMapping;
 import org.springframework.web.bind.annotation.GetMapping;
+import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestHeader;
 import org.springframework.web.bind.annotation.RequestMapping;
@@ -36,6 +39,7 @@ import org.springframework.web.multipart.MultipartFile;
 public class UploadController {
 
     private final ZipExtractionService zipExtractionService;
+    private final SessionDeletionService sessionDeletionService;
 
     /**
      * Marker schema so springdoc renders the multipart file field as binary.
@@ -95,6 +99,19 @@ public class UploadController {
                 originalFilename, e);
             throw new BusinessException(HttpStatus.INTERNAL_SERVER_ERROR,
                 "Upload processing failed");
+        }
+    }
+
+    @DeleteMapping
+    public ApiResponse<Boolean> deleteSession(
+        @RequestHeader("X-User-Id") String userId,
+        @PathVariable String uuid) {
+        try {
+            boolean result = sessionDeletionService.deleteSession(userId, uuid);
+            return ApiResponse.success(result);
+        } catch (IOException e) {
+            throw new BusinessException(HttpStatus.INTERNAL_SERVER_ERROR,
+                "Failed to delete session");
         }
     }
 
