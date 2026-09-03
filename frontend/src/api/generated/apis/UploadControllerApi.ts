@@ -15,15 +15,23 @@
 
 import * as runtime from '../runtime';
 import type {
+  ApiResponseBoolean,
   ApiResponseListSessionResponseDTO,
   ApiResponseUploadSessionResponse,
 } from '../models/index';
 import {
+    ApiResponseBooleanFromJSON,
+    ApiResponseBooleanToJSON,
     ApiResponseListSessionResponseDTOFromJSON,
     ApiResponseListSessionResponseDTOToJSON,
     ApiResponseUploadSessionResponseFromJSON,
     ApiResponseUploadSessionResponseToJSON,
 } from '../models/index';
+
+export interface DeleteSessionRequest {
+    xUserId: string;
+    uuid: string;
+}
 
 export interface GetAvailableSessionsRequest {
     xUserId: string;
@@ -38,6 +46,52 @@ export interface UploadRequest {
  * 
  */
 export class UploadControllerApi extends runtime.BaseAPI {
+
+    /**
+     */
+    async deleteSessionRaw(requestParameters: DeleteSessionRequest, initOverrides?: RequestInit | runtime.InitOverrideFunction): Promise<runtime.ApiResponse<ApiResponseBoolean>> {
+        if (requestParameters['xUserId'] == null) {
+            throw new runtime.RequiredError(
+                'xUserId',
+                'Required parameter "xUserId" was null or undefined when calling deleteSession().'
+            );
+        }
+
+        if (requestParameters['uuid'] == null) {
+            throw new runtime.RequiredError(
+                'uuid',
+                'Required parameter "uuid" was null or undefined when calling deleteSession().'
+            );
+        }
+
+        const queryParameters: any = {};
+
+        const headerParameters: runtime.HTTPHeaders = {};
+
+        if (requestParameters['xUserId'] != null) {
+            headerParameters['X-User-Id'] = String(requestParameters['xUserId']);
+        }
+
+
+        let urlPath = `/api/files/{uuid}`;
+        urlPath = urlPath.replace(`{${"uuid"}}`, encodeURIComponent(String(requestParameters['uuid'])));
+
+        const response = await this.request({
+            path: urlPath,
+            method: 'DELETE',
+            headers: headerParameters,
+            query: queryParameters,
+        }, initOverrides);
+
+        return new runtime.JSONApiResponse(response, (jsonValue) => ApiResponseBooleanFromJSON(jsonValue));
+    }
+
+    /**
+     */
+    async deleteSession(requestParameters: DeleteSessionRequest, initOverrides?: RequestInit | runtime.InitOverrideFunction): Promise<ApiResponseBoolean> {
+        const response = await this.deleteSessionRaw(requestParameters, initOverrides);
+        return await response.value();
+    }
 
     /**
      */

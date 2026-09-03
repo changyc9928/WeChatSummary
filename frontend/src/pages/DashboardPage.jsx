@@ -23,6 +23,7 @@ export default function DashboardPage({
   sessions,
   loadingSessions,
   fetchSessions,
+  deleteSession,
   loading,
   preprocess,
   preprocessError,
@@ -60,6 +61,7 @@ export default function DashboardPage({
       </header>
 
       <DatasetSelector
+        deleteSession={deleteSession}
         fetchSessions={fetchSessions}
         loadingSessions={loadingSessions}
         sessions={sessions}

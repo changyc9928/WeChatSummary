@@ -1042,7 +1042,7 @@ paths:
             '*/*':
               schema:
                 $ref: "#/components/schemas/ApiResponseVoid"
-  /api/files:
+  /api/files/{uuid}:
     delete:
       tags:
       - upload-controller
@@ -1050,6 +1050,11 @@ paths:
       parameters:
       - name: X-User-Id
         in: header
+        required: true
+        schema:
+          type: string
+      - name: uuid
+        in: path
         required: true
         schema:
           type: string

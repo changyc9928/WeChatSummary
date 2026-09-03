@@ -188,6 +188,7 @@ export default function App() {
     <DashboardPage
       currentUser={currentUser}
       fetchSessions={sessions.fetchSessions}
+      deleteSession={sessions.deleteSession}
       file={file}
       loading={loading}
       loadingSessions={sessions.loadingSessions}

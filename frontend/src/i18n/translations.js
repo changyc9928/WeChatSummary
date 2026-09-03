@@ -192,6 +192,8 @@ export const translations = {
     'dataset.refreshList': '🔄 Refresh List',
     'dataset.choosePlaceholder': '-- Choose an Existing Uploaded Dataset --',
     'dataset.uploadedAt': 'Uploaded: {time}',
+    'dataset.delete': 'Delete',
+    'dataset.confirmDelete': 'Are you sure you want to delete this session? This action cannot be undone.',
 
     'preprocess.title': 'Step 2: Clean & Preprocess',
     'preprocess.selectDatasetFirst': 'Select or upload a dataset first.',
@@ -481,6 +483,8 @@ export const translations = {
     'dataset.refreshList': '🔄 刷新列表',
     'dataset.choosePlaceholder': '-- 选择已上传的数据集 --',
     'dataset.uploadedAt': '上传时间：{time}',
+    'dataset.delete': '删除',
+    'dataset.confirmDelete': '确定要删除该会话吗？此操作不可撤销。',
 
     'preprocess.title': '第 2 步：清洗与预处理',
     'preprocess.selectDatasetFirst': '请先选择或上传数据集。',

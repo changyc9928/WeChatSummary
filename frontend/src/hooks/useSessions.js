@@ -22,6 +22,21 @@ export default function useSessions(currentUser) {
     }
   }, [currentUser]);
 
+  const deleteSession = useCallback(async (sessionUuid) => {
+    if (!currentUser || !sessionUuid) return;
+    try {
+      await apiClient.upload.deleteSession({
+        xUserId: currentUser.uuid,
+        uuid: sessionUuid
+      });
+      setSessions((prev) => prev.filter((s) => s.uuid !== sessionUuid));
+      setError(null);
+    } catch (err) {
+      setError(err.message);
+      throw err;
+    }
+  }, [currentUser]);
+
   useEffect(() => {
     if (currentUser) {
       fetchSessions();
@@ -30,5 +45,5 @@ export default function useSessions(currentUser) {
     }
   }, [currentUser, fetchSessions]);
 
-  return { sessions, loadingSessions, error, fetchSessions };
+  return { sessions, loadingSessions, error, fetchSessions, deleteSession };
 }

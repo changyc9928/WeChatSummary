@@ -1,4 +1,5 @@
 apis/AuthControllerApi.ts
+apis/BridgeLogControllerApi.ts
 apis/ChatSummaryControllerApi.ts
 apis/PreprocessControllerApi.ts
 apis/ToolControllerApi.ts
@@ -6,9 +7,12 @@ apis/UploadControllerApi.ts
 apis/index.ts
 index.ts
 models/ApiResponseAuthResponse.ts
+models/ApiResponseBoolean.ts
 models/ApiResponseBridgeToolMeta.ts
 models/ApiResponseChatPreviewResponse.ts
+models/ApiResponseInteger.ts
 models/ApiResponseListSessionResponseDTO.ts
+models/ApiResponseLogsResponse.ts
 models/ApiResponsePageAudioSummary.ts
 models/ApiResponsePageEmojiSummaryEntity.ts
 models/ApiResponsePageImageSummaryEntity.ts
@@ -26,6 +30,8 @@ models/ChatPreviewResponse.ts
 models/ChatPreviewRow.ts
 models/EmojiSummaryEntity.ts
 models/ImageSummaryEntity.ts
+models/JsonNode.ts
+models/LogsResponse.ts
 models/PageAudioSummary.ts
 models/PageEmojiSummaryEntity.ts
 models/PageImageSummaryEntity.ts
@@ -33,6 +39,7 @@ models/PageVideoSummary.ts
 models/PageableObject.ts
 models/SessionResponseDTO.ts
 models/SortObject.ts
+models/StoredLine.ts
 models/SummaryProgressResponse.ts
 models/SummaryRequestDTO.ts
 models/TaskAckResponse.ts

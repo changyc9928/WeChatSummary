@@ -102,7 +102,7 @@ public class UploadController {
         }
     }
 
-    @DeleteMapping
+    @DeleteMapping("/{uuid}")
     public ApiResponse<Boolean> deleteSession(
         @RequestHeader("X-User-Id") String userId,
         @PathVariable String uuid) {
