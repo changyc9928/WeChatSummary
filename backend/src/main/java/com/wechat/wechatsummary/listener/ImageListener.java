@@ -22,7 +22,7 @@ public class ImageListener {
     public void receive(Message message, Channel channel) throws java.io.IOException {
         try {
             mediaMessageHandler.handle(message, "image", imageProcessorService::processImage,
-                RabbitConfig.IMAGE_ROUTING_KEY);
+                RabbitConfig.IMAGE_RETRY_ROUTING_KEY);
         } finally {
             channel.basicAck(message.getMessageProperties().getDeliveryTag(), false);
         }

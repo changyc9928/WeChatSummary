@@ -64,9 +64,15 @@ public class AiConfig {
      * registers active class module dependencies such as JavaTime modules for smooth ISO date
      * conversions.
      *
+     * <p>Marked {@code @Primary}: the cache-event pipeline defines its own explicitly-tuned
+     * {@code cacheEventObjectMapper}, so unqualified injections (e.g.
+     * {@code MessageProcessorService}) must keep resolving to this shared instance exactly as
+     * before.
+     *
      * @return a normalized, module-aware ObjectMapper instance
      */
     @Bean
+    @Primary
     public ObjectMapper objectMapper() {
         return new ObjectMapper().findAndRegisterModules();
     }

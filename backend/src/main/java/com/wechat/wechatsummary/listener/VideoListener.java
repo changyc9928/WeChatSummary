@@ -22,7 +22,7 @@ public class VideoListener {
     public void receiveVideo(Message message, Channel channel) throws java.io.IOException {
         try {
             mediaMessageHandler.handle(message, "video", videoProcessorService::processVideoSummary,
-                RabbitConfig.VIDEO_ROUTING_KEY);
+                RabbitConfig.VIDEO_RETRY_ROUTING_KEY);
         } finally {
             channel.basicAck(message.getMessageProperties().getDeliveryTag(), false);
         }

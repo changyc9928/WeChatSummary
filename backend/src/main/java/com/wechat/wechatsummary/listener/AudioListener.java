@@ -22,7 +22,7 @@ public class AudioListener {
     public void receiveAudio(Message message, Channel channel) throws java.io.IOException {
         try {
             mediaMessageHandler.handle(message, "audio", audioProcessorService::processAudioSummary,
-                RabbitConfig.AUDIO_ROUTING_KEY);
+                RabbitConfig.AUDIO_RETRY_ROUTING_KEY);
         } finally {
             channel.basicAck(message.getMessageProperties().getDeliveryTag(), false);
         }

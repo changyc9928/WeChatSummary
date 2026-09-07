@@ -4,6 +4,7 @@ import org.springframework.amqp.core.AcknowledgeMode;
 import org.springframework.amqp.core.Binding;
 import org.springframework.amqp.core.BindingBuilder;
 import org.springframework.amqp.core.Queue;
+import org.springframework.amqp.core.QueueBuilder;
 import org.springframework.amqp.core.TopicExchange;
 import org.springframework.amqp.rabbit.config.SimpleRabbitListenerContainerFactory;
 import org.springframework.amqp.rabbit.connection.ConnectionFactory;
@@ -63,6 +64,54 @@ public class RabbitConfig {
      * Binding routing key utilized to target the animated sticker (emoji) processing infrastructure.
      */
     public static final String EMOJI_ROUTING_KEY = "media.emoji";
+
+    /**
+     * Delay (ms) between automatic media retries. Kept as a constant (not a property) on
+     * purpose: it is baked into the retry-hold queues' {@code x-message-ttl} argument at
+     * declaration time, so changing it later would require deleting those queues.
+     */
+    public static final long RETRY_DELAY_MS = 30_000L;
+
+    /**
+     * Holding queue for delayed image retries. Has no consumer; the queue TTL parks the message
+     * and dead-letters it back to the image processing queue afterwards.
+     */
+    public static final String IMAGE_RETRY_HOLD_QUEUE = "image.retry.hold";
+
+    /**
+     * Holding queue for delayed audio retries.
+     */
+    public static final String AUDIO_RETRY_HOLD_QUEUE = "audio.retry.hold";
+
+    /**
+     * Holding queue for delayed video retries.
+     */
+    public static final String VIDEO_RETRY_HOLD_QUEUE = "video.retry.hold";
+
+    /**
+     * Holding queue for delayed emoji retries.
+     */
+    public static final String EMOJI_RETRY_HOLD_QUEUE = "emoji.retry.hold";
+
+    /**
+     * Routing key parking a message in the image retry holding queue.
+     */
+    public static final String IMAGE_RETRY_ROUTING_KEY = "media.image.retry";
+
+    /**
+     * Routing key parking a message in the audio retry holding queue.
+     */
+    public static final String AUDIO_RETRY_ROUTING_KEY = "media.audio.retry";
+
+    /**
+     * Routing key parking a message in the video retry holding queue.
+     */
+    public static final String VIDEO_RETRY_ROUTING_KEY = "media.video.retry";
+
+    /**
+     * Routing key parking a message in the emoji retry holding queue.
+     */
+    public static final String EMOJI_RETRY_ROUTING_KEY = "media.emoji.retry";
 
     @Value("${rabbit.concurrent-consumers:3}")
     private int concurrentConsumers;
@@ -215,5 +264,137 @@ public class RabbitConfig {
             .bind(emojiQueue)
             .to(mediaExchange)
             .with(EMOJI_ROUTING_KEY);
+    }
+
+    // --- Retry Hold Queues (TTL + DLX delayed redelivery) ---
+    //
+    // Each media type gets a holding queue with a fixed queue-level TTL. Failed messages are
+    // parked here and dead-lettered back to their processing queue after RETRY_DELAY_MS.
+    //
+    // Why not per-message expiration on the processing queue (the previous design)? A message
+    // that expires in a queue WITHOUT a dead-letter exchange is silently discarded. Under
+    // backlog, a retry parked behind hundreds of messages waits longer than the TTL, expires,
+    // and is dropped without a trace — its task counter is never decremented and preprocessing
+    // stalls forever (observed as 1169/1170). Queue-level TTL is used (instead of per-message)
+    // because every retry shares the same fixed delay.
+
+    /**
+     * Provisions the durable holding queue for delayed image retries.
+     *
+     * @return a durable image retry hold Queue instance
+     */
+    @Bean
+    public Queue imageRetryHoldQueue() {
+        return QueueBuilder.durable(IMAGE_RETRY_HOLD_QUEUE)
+            .withArgument("x-message-ttl", (int) RETRY_DELAY_MS)
+            .withArgument("x-dead-letter-exchange", EXCHANGE)
+            .withArgument("x-dead-letter-routing-key", IMAGE_ROUTING_KEY)
+            .build();
+    }
+
+    /**
+     * Binds the image retry holding queue to the media topic exchange.
+     *
+     * @param imageRetryHoldQueue the configured image retry hold queue bean
+     * @param mediaExchange       the centralized media topic exchange bean
+     * @return a configured Binding instance
+     */
+    @Bean
+    public Binding imageRetryHoldBinding(
+        Queue imageRetryHoldQueue, TopicExchange mediaExchange) {
+        return BindingBuilder
+            .bind(imageRetryHoldQueue)
+            .to(mediaExchange)
+            .with(IMAGE_RETRY_ROUTING_KEY);
+    }
+
+    /**
+     * Provisions the durable holding queue for delayed audio retries.
+     *
+     * @return a durable audio retry hold Queue instance
+     */
+    @Bean
+    public Queue audioRetryHoldQueue() {
+        return QueueBuilder.durable(AUDIO_RETRY_HOLD_QUEUE)
+            .withArgument("x-message-ttl", (int) RETRY_DELAY_MS)
+            .withArgument("x-dead-letter-exchange", EXCHANGE)
+            .withArgument("x-dead-letter-routing-key", AUDIO_ROUTING_KEY)
+            .build();
+    }
+
+    /**
+     * Binds the audio retry holding queue to the media topic exchange.
+     *
+     * @param audioRetryHoldQueue the configured audio retry hold queue bean
+     * @param mediaExchange       the centralized media topic exchange bean
+     * @return a configured Binding instance
+     */
+    @Bean
+    public Binding audioRetryHoldBinding(
+        Queue audioRetryHoldQueue, TopicExchange mediaExchange) {
+        return BindingBuilder
+            .bind(audioRetryHoldQueue)
+            .to(mediaExchange)
+            .with(AUDIO_RETRY_ROUTING_KEY);
+    }
+
+    /**
+     * Provisions the durable holding queue for delayed video retries.
+     *
+     * @return a durable video retry hold Queue instance
+     */
+    @Bean
+    public Queue videoRetryHoldQueue() {
+        return QueueBuilder.durable(VIDEO_RETRY_HOLD_QUEUE)
+            .withArgument("x-message-ttl", (int) RETRY_DELAY_MS)
+            .withArgument("x-dead-letter-exchange", EXCHANGE)
+            .withArgument("x-dead-letter-routing-key", VIDEO_ROUTING_KEY)
+            .build();
+    }
+
+    /**
+     * Binds the video retry holding queue to the media topic exchange.
+     *
+     * @param videoRetryHoldQueue the configured video retry hold queue bean
+     * @param mediaExchange       the centralized media topic exchange bean
+     * @return a configured Binding instance
+     */
+    @Bean
+    public Binding videoRetryHoldBinding(
+        Queue videoRetryHoldQueue, TopicExchange mediaExchange) {
+        return BindingBuilder
+            .bind(videoRetryHoldQueue)
+            .to(mediaExchange)
+            .with(VIDEO_RETRY_ROUTING_KEY);
+    }
+
+    /**
+     * Provisions the durable holding queue for delayed emoji retries.
+     *
+     * @return a durable emoji retry hold Queue instance
+     */
+    @Bean
+    public Queue emojiRetryHoldQueue() {
+        return QueueBuilder.durable(EMOJI_RETRY_HOLD_QUEUE)
+            .withArgument("x-message-ttl", (int) RETRY_DELAY_MS)
+            .withArgument("x-dead-letter-exchange", EXCHANGE)
+            .withArgument("x-dead-letter-routing-key", EMOJI_ROUTING_KEY)
+            .build();
+    }
+
+    /**
+     * Binds the emoji retry holding queue to the media topic exchange.
+     *
+     * @param emojiRetryHoldQueue the configured emoji retry hold queue bean
+     * @param mediaExchange       the centralized media topic exchange bean
+     * @return a configured Binding instance
+     */
+    @Bean
+    public Binding emojiRetryHoldBinding(
+        Queue emojiRetryHoldQueue, TopicExchange mediaExchange) {
+        return BindingBuilder
+            .bind(emojiRetryHoldQueue)
+            .to(mediaExchange)
+            .with(EMOJI_RETRY_ROUTING_KEY);
     }
 }

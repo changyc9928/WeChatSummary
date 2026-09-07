@@ -1,5 +1,8 @@
 package com.wechat.wechatsummary.service;
 
+import com.wechat.wechatsummary.cache.CacheEvictionPublisher;
+import com.wechat.wechatsummary.cache.CacheNames;
+import com.wechat.wechatsummary.cache.SessionIdExtractor;
 import com.wechat.wechatsummary.entity.AudioSummary;
 import com.wechat.wechatsummary.entity.ChatSummaryStatus;
 import com.wechat.wechatsummary.entity.ChatSummaryTask;
@@ -18,13 +21,38 @@ import java.util.Optional;
 import java.util.UUID;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.cache.Cache;
 import org.springframework.cache.CacheManager;
-import org.springframework.cache.annotation.CacheEvict;
-import org.springframework.cache.annotation.CachePut;
 import org.springframework.cache.annotation.Cacheable;
 import org.springframework.data.redis.core.StringRedisTemplate;
 import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional;
+import org.springframework.transaction.support.TransactionSynchronization;
+import org.springframework.transaction.support.TransactionSynchronizationManager;
 
+/**
+ * Black-box facade for media-summary persistence with cache coherence.
+ *
+ * <p>Callers use plain business operations ({@code save/delete/find/get}); they never see
+ * RabbitMQ, delayed eviction, Redis, or cache internals. Coherence is deliberately simple:
+ * <ol>
+ *   <li>persist the business change in a transaction,</li>
+ *   <li>after that transaction commits, publish a cache eviction message (a rollback therefore
+ *   never produces a message),</li>
+ *   <li>the message waits out the configured delay in a TTL/DLX holding queue,</li>
+ *   <li>the consumer evicts the entry and acknowledges explicitly, so a failed eviction is
+ *   redelivered by the broker.</li>
+ * </ol>
+ *
+ * <p>Single-summary reads ({@code getImageSummary} etc.) are cache-aside over explicit
+ * {@link CacheManager} operations — never Spring-cache annotations on self-invoked methods, which
+ * proxy-based AOP cannot intercept. Session list reads use {@code @Cacheable}; both are
+ * invalidated through the eviction pipeline (targeted by session UUID, never
+ * {@code allEntries=true}).
+ *
+ * <p>Reads may observe a briefly stale entry between DB commit and eviction; publishing is
+ * best-effort, so on broker failure an entry can stay stale until its TTL expires.
+ */
 @Service
 @RequiredArgsConstructor
 @Slf4j
@@ -39,9 +67,109 @@ public class WeChatSummaryCacheService {
     private final VideoSummaryRepository videoSummaryRepository;
     private final EmojiSummaryRepository emojiSummaryRepository;
     private final ChatSummaryTaskRepository taskRepository;
+    private final CacheEvictionPublisher evictionPublisher;
     private final StringRedisTemplate redisTemplate;
     private final CacheManager cacheManager;
     private final StoragePaths storagePaths;
+
+    // =========================================================================
+    // Internal helpers (cache-aside + eviction publishing; never exposed)
+    // =========================================================================
+
+    /**
+     * Cache-aside read of one summary string. Only non-null summaries are cached (a null means
+     * "row exists but has no summary yet", e.g. transcript-only audio, and must keep hitting the
+     * DB until the summary is produced).
+     */
+    private Optional<String> readCachedSingle(
+            String cacheName, String key, java.util.function.Supplier<Optional<String>> dbLoad) {
+        if (key == null || key.isBlank()) {
+            return Optional.empty();
+        }
+        Cache cache = cacheManager.getCache(cacheName);
+        if (cache != null) {
+            try {
+                String hit = cache.get(key, String.class);
+                if (hit != null) {
+                    if (log.isDebugEnabled()) {
+                        log.debug("Cache hit for {}:{}", cacheName, key);
+                    }
+                    return Optional.of(hit);
+                }
+            } catch (Exception e) {
+                log.warn("Cache read failed for {}:{}; falling back to DB: {}",
+                        cacheName, key, e.toString());
+            }
+        }
+        log.info("Cache miss for {}:[{}]. Querying relational persistence layer...",
+                cacheName, key);
+        Optional<String> dbValue = dbLoad.get();
+        if (dbValue.isPresent() && cache != null) {
+            try {
+                cache.put(key, dbValue.get());
+            } catch (Exception e) {
+                log.warn("Cache write failed for {}:{}: {}", cacheName, key, e.toString());
+            }
+        }
+        return dbValue;
+    }
+
+    /**
+     * Publishes eviction for one aggregate change: always the individual entry, plus the
+     * session-scoped list entry (targeted when the session is known, whole-region clear as a
+     * correctness fallback otherwise).
+     *
+     * <p>Publishing is deferred until the surrounding DB transaction commits (see
+     * {@link #deferAfterCommit}), so a rolled-back write never emits an eviction.
+     */
+    private void publishChange(
+            String singleCache, String listCache, String key, Optional<String> sessionId) {
+        deferAfterCommit(() -> {
+            evictionPublisher.evict(singleCache, key);
+            if (sessionId.isPresent() && !sessionId.get().isBlank()) {
+                evictionPublisher.evict(listCache, sessionId.get().trim());
+            } else {
+                log.warn("Session id unavailable for {}:{}; clearing list cache {} instead",
+                        singleCache, key, listCache);
+                evictionPublisher.clear(listCache);
+            }
+        });
+    }
+
+    private void publishChange(String singleCache, String listCache, String key, String filePath) {
+        publishChange(singleCache, listCache, key,
+                SessionIdExtractor.extractSessionId(filePath));
+    }
+
+    /**
+     * Couples message production to the DB transaction: {@code publish} runs only in
+     * {@code afterCommit}, so a rolled-back business write never produces an eviction message.
+     * Without an active transaction (plain unit tests, future non-transactional callers) the
+     * publish runs immediately.
+     */
+    private void deferAfterCommit(Runnable publish) {
+        if (TransactionSynchronizationManager.isSynchronizationActive()) {
+            TransactionSynchronizationManager.registerSynchronization(
+                    new TransactionSynchronization() {
+                        @Override
+                        public void afterCommit() {
+                            publish.run();
+                        }
+                    });
+        } else {
+            publish.run();
+        }
+    }
+
+    private static String keyOrId(String hash, String id) {
+        if (hash != null && !hash.isBlank()) {
+            return hash;
+        }
+        if (id != null && !id.isBlank()) {
+            return id;
+        }
+        throw new IllegalArgumentException("Cannot derive cache key: hash and id are both blank");
+    }
 
     // =========================================================================
     // 1. IMAGE SUMMARY LAYER (DB + Cache Abstraction)
@@ -55,13 +183,12 @@ public class WeChatSummaryCacheService {
     }
 
     /**
-     * Retrieves cached summary string or loads from DB.
+     * Returns the cached summary string, loading from DB on miss.
      */
     public Optional<String> getImageSummary(String hash) {
-        log.info(
-                "Cache miss for image_summary signature target [{}]. Querying relational persistence layers...",
-                hash);
-        return imageSummaryRepository.findByImageHash(hash).map(ImageSummaryEntity::getSummary);
+        return readCachedSingle(CacheNames.IMAGE_SUMMARY, hash,
+                () -> imageSummaryRepository.findByImageHash(hash)
+                        .map(ImageSummaryEntity::getSummary));
     }
 
     /**
@@ -69,6 +196,10 @@ public class WeChatSummaryCacheService {
      * fragment. This is the primary mechanism for referenced images, whose lookup key is an md5
      * (embedded in both the reference XML and the on-disk file name) rather than a path-derived
      * hash.
+     *
+     * <p>Intentionally not cached: the md5→row mapping is a derived DB search without a stable
+     * cache-key namespace; the canonical {@code image_summary:&lt;hash&gt;} entries covering the
+     * same rows are invalidated through the eviction pipeline.
      */
     public Optional<String> getImageSummaryByMd5(String md5) {
         if (md5 == null || md5.isBlank()) {
@@ -92,48 +223,54 @@ public class WeChatSummaryCacheService {
     }
 
     /**
-     * Persists an image summary entity to DB and invalidates image summary list
-     * caches.
+     * Persists an image summary, then publishes cache eviction for it.
      */
-    @CacheEvict(cacheNames = "image_summary_list", allEntries = true)
+    @Transactional
     public ImageSummaryEntity saveImageSummary(ImageSummaryEntity entity) {
         log.info("Persisting image summary record for hash: [{}]", entity.getImageHash());
         ImageSummaryEntity saved = imageSummaryRepository.save(entity);
-        evictImageSummary(entity.getImageHash());
+        publishChange(CacheNames.IMAGE_SUMMARY, CacheNames.IMAGE_SUMMARY_LIST,
+                keyOrId(saved.getImageHash(), saved.getId()), saved.getFilePath());
         return saved;
     }
 
+    /**
+     * Deletes all image summaries of one session, publishing one eviction per removed row.
+     */
+    @Transactional
     public void deleteSessionImageSummaries(String uuid) {
         List<ImageSummaryEntity> saved = imageSummaryRepository.findByFilePathContainingUuid(uuid);
         for (ImageSummaryEntity imageSummaryEntity : saved) {
-            cacheManager.getCache("image_summary").evict(imageSummaryEntity.getImageHash());
             imageSummaryRepository.deleteById(imageSummaryEntity.getId());
+            publishChange(CacheNames.IMAGE_SUMMARY, CacheNames.IMAGE_SUMMARY_LIST,
+                    keyOrId(imageSummaryEntity.getImageHash(), imageSummaryEntity.getId()),
+                    Optional.ofNullable(uuid));
         }
-        cacheManager.getCache("image_summary_list").evict(uuid);
+        log.info("Deleted [{}] image summary record(s) for session [{}]", saved.size(), uuid);
     }
 
     /**
-     * Deletes a single image summary record by ID (hash) and evicts relevant
-     * caches.
+     * Deletes a single image summary record by ID. No-op when absent.
      */
-    @CacheEvict(cacheNames = "image_summary_list", allEntries = true)
+    @Transactional
     public void deleteImageSummaryById(String id) {
         log.info("Request to delete image summary record for ID: [{}]", id);
-        if (imageSummaryRepository.existsById(id)) {
+        Optional<ImageSummaryEntity> existing = imageSummaryRepository.findById(id);
+        if (existing.isPresent()) {
+            ImageSummaryEntity entity = existing.get();
             imageSummaryRepository.deleteById(id);
-            evictImageSummary(id);
-            log.info("Successfully deleted image summary record and evicted caches for ID: [{}]",
-                    id);
+            publishChange(CacheNames.IMAGE_SUMMARY, CacheNames.IMAGE_SUMMARY_LIST,
+                    keyOrId(entity.getImageHash(), entity.getId()), entity.getFilePath());
+            log.info("Successfully deleted image summary record for ID: [{}]", id);
         } else {
             log.warn("Deletion skipped. No record found for ID: [{}]", id);
         }
     }
 
     /**
-     * Batch deletes image summary records by IDs (hashes) and evicts relevant
-     * caches.
+     * Batch deletes image summary records by IDs (hashes). Missing IDs are skipped silently.
      */
-    @CacheEvict(cacheNames = "image_summary_list", allEntries = true)
+    @Transactional
     public void deleteImageSummariesByIds(List<String> ids) {
         if (ids == null || ids.isEmpty()) {
             log.warn("Batch deletion aborted. Provided ID list is empty or null.");
@@ -142,26 +279,15 @@ public class WeChatSummaryCacheService {
 
         log.info("Request to batch delete [{}] image summary records.", ids.size());
         for (String id : ids) {
-            if (imageSummaryRepository.existsById(id)) {
+            Optional<ImageSummaryEntity> existing = imageSummaryRepository.findById(id);
+            if (existing.isPresent()) {
+                ImageSummaryEntity entity = existing.get();
                 imageSummaryRepository.deleteById(id);
-                evictImageSummary(id);
+                publishChange(CacheNames.IMAGE_SUMMARY, CacheNames.IMAGE_SUMMARY_LIST,
+                        keyOrId(entity.getImageHash(), entity.getId()), entity.getFilePath());
             }
         }
-        log.info("Completed batch deletion and cache eviction for provided IDs.");
-    }
-
-    @CachePut(cacheNames = "image_summary", key = "#hash")
-    public Optional<String> putImageSummary(String hash, String summary) {
-        if (log.isDebugEnabled()) {
-            log.debug("Explicitly updating image cache entry mapping for hash key: {}", hash);
-        }
-        return Optional.ofNullable(summary);
-    }
-
-    @CacheEvict(cacheNames = "image_summary", key = "#hash")
-    public void evictImageSummary(String hash) {
-        log.info("Evicting and invalidating image cache address segment mapping for key hash: [{}]",
-                hash);
+        log.info("Completed batch deletion for provided IDs.");
     }
 
     // =========================================================================
@@ -176,13 +302,12 @@ public class WeChatSummaryCacheService {
     }
 
     /**
-     * Retrieves cached emoji summary string or loads from DB.
+     * Returns the cached emoji summary string, loading from DB on miss.
      */
     public Optional<String> getEmojiSummary(String hash) {
-        log.info(
-                "Cache miss for emoji_summary signature target [{}]. Querying relational persistence layers...",
-                hash);
-        return emojiSummaryRepository.findByEmojiHash(hash).map(EmojiSummaryEntity::getSummary);
+        return readCachedSingle(CacheNames.EMOJI_SUMMARY, hash,
+                () -> emojiSummaryRepository.findByEmojiHash(hash)
+                        .map(EmojiSummaryEntity::getSummary));
     }
 
     /**
@@ -197,44 +322,54 @@ public class WeChatSummaryCacheService {
     }
 
     /**
-     * Persists an emoji summary entity to DB and invalidates emoji summary list caches.
+     * Persists an emoji summary, then publishes cache eviction for it.
      */
-    @CacheEvict(cacheNames = "emoji_summary_list", allEntries = true)
+    @Transactional
     public EmojiSummaryEntity saveEmojiSummary(EmojiSummaryEntity entity) {
         log.info("Persisting emoji summary record for hash: [{}]", entity.getEmojiHash());
         EmojiSummaryEntity saved = emojiSummaryRepository.save(entity);
-        evictEmojiSummary(entity.getEmojiHash());
+        publishChange(CacheNames.EMOJI_SUMMARY, CacheNames.EMOJI_SUMMARY_LIST,
+                keyOrId(saved.getEmojiHash(), saved.getId()), saved.getFilePath());
         return saved;
     }
 
+    /**
+     * Deletes all emoji summaries of one session, publishing one eviction per removed row.
+     */
+    @Transactional
     public void deleteSessionEmojiSummaries(String uuid) {
         List<EmojiSummaryEntity> saved = emojiSummaryRepository.findByFilePathContainingUuid(uuid);
         for (EmojiSummaryEntity emojiSummaryEntity : saved) {
-            cacheManager.getCache("emoji_summary").evict(emojiSummaryEntity.getEmojiHash());
             emojiSummaryRepository.deleteById(emojiSummaryEntity.getId());
+            publishChange(CacheNames.EMOJI_SUMMARY, CacheNames.EMOJI_SUMMARY_LIST,
+                    keyOrId(emojiSummaryEntity.getEmojiHash(), emojiSummaryEntity.getId()),
+                    Optional.ofNullable(uuid));
         }
-        cacheManager.getCache("emoji_summary_list").evict(uuid);
+        log.info("Deleted [{}] emoji summary record(s) for session [{}]", saved.size(), uuid);
     }
 
     /**
-     * Deletes a single emoji summary record by ID (hash) and evicts relevant caches.
+     * Deletes a single emoji summary record by ID (hash). No-op when absent.
      */
-    @CacheEvict(cacheNames = "emoji_summary_list", allEntries = true)
+    @Transactional
     public void deleteEmojiSummaryById(String id) {
         log.info("Request to delete emoji summary record for ID: [{}]", id);
-        if (emojiSummaryRepository.existsById(id)) {
+        Optional<EmojiSummaryEntity> existing = emojiSummaryRepository.findById(id);
+        if (existing.isPresent()) {
+            EmojiSummaryEntity entity = existing.get();
             emojiSummaryRepository.deleteById(id);
-            evictEmojiSummary(id);
-            log.info("Successfully deleted emoji summary record and evicted caches for ID: [{}]", id);
+            publishChange(CacheNames.EMOJI_SUMMARY, CacheNames.EMOJI_SUMMARY_LIST,
+                    keyOrId(entity.getEmojiHash(), entity.getId()), entity.getFilePath());
+            log.info("Successfully deleted emoji summary record for ID: [{}]", id);
         } else {
             log.warn("Deletion skipped. No record found for ID: [{}]", id);
         }
     }
 
     /**
-     * Batch deletes emoji summary records by IDs (hashes) and evicts relevant caches.
+     * Batch deletes emoji summary records by IDs (hashes). Missing IDs are skipped silently.
      */
-    @CacheEvict(cacheNames = "emoji_summary_list", allEntries = true)
+    @Transactional
     public void deleteEmojiSummariesByIds(List<String> ids) {
         if (ids == null || ids.isEmpty()) {
             log.warn("Batch deletion aborted. Provided ID list is empty or null.");
@@ -243,30 +378,19 @@ public class WeChatSummaryCacheService {
 
         log.info("Request to batch delete [{}] emoji summary records.", ids.size());
         for (String id : ids) {
-            if (emojiSummaryRepository.existsById(id)) {
+            Optional<EmojiSummaryEntity> existing = emojiSummaryRepository.findById(id);
+            if (existing.isPresent()) {
+                EmojiSummaryEntity entity = existing.get();
                 emojiSummaryRepository.deleteById(id);
-                evictEmojiSummary(id);
+                publishChange(CacheNames.EMOJI_SUMMARY, CacheNames.EMOJI_SUMMARY_LIST,
+                        keyOrId(entity.getEmojiHash(), entity.getId()), entity.getFilePath());
             }
         }
-        log.info("Completed batch deletion and cache eviction for provided IDs.");
-    }
-
-    @CachePut(cacheNames = "emoji_summary", key = "#hash")
-    public Optional<String> putEmojiSummary(String hash, String summary) {
-        if (log.isDebugEnabled()) {
-            log.debug("Explicitly updating emoji cache entry mapping for hash key: {}", hash);
-        }
-        return Optional.ofNullable(summary);
-    }
-
-    @CacheEvict(cacheNames = "emoji_summary", key = "#hash")
-    public void evictEmojiSummary(String hash) {
-        log.info("Evicting and invalidating emoji cache address segment mapping for key hash: [{}]",
-                hash);
+        log.info("Completed batch deletion for provided IDs.");
     }
 
     // =========================================================================
-    // 2. AUDIO MEDIA SUMMARY CACHE (Spring Cache Driven)
+    // 2. AUDIO MEDIA SUMMARY CACHE (DB + Cache Abstraction)
     // =========================================================================
 
     /**
@@ -276,11 +400,12 @@ public class WeChatSummaryCacheService {
         return audioSummaryRepository.findByFileHash(hash);
     }
 
+    /**
+     * Returns the cached audio summary string, loading from DB on miss.
+     */
     public Optional<String> getAudioSummary(String hash) {
-        log.info(
-                "Cache miss for audio_summary signature target [{}]. Falling back to underlying persistence tables...",
-                hash);
-        return audioSummaryRepository.findByFileHash(hash).map(AudioSummary::getSummary);
+        return readCachedSingle(CacheNames.AUDIO_SUMMARY, hash,
+                () -> audioSummaryRepository.findByFileHash(hash).map(AudioSummary::getSummary));
     }
 
     /**
@@ -295,48 +420,54 @@ public class WeChatSummaryCacheService {
     }
 
     /**
-     * Persists an audio summary entity to DB and invalidates audio summary list
-     * caches.
+     * Persists an audio summary, then publishes cache eviction for it.
      */
-    @CacheEvict(cacheNames = "audio_summary_list", allEntries = true)
+    @Transactional
     public AudioSummary saveAudioSummary(AudioSummary entity) {
         log.info("Persisting audio summary record for hash: [{}]", entity.getFileHash());
         AudioSummary saved = audioSummaryRepository.save(entity);
-        evictAudioSummary(entity.getFileHash());
+        publishChange(CacheNames.AUDIO_SUMMARY, CacheNames.AUDIO_SUMMARY_LIST,
+                keyOrId(saved.getFileHash(), saved.getId()), saved.getFilePath());
         return saved;
     }
 
+    /**
+     * Deletes all audio summaries of one session, publishing one eviction per removed row.
+     */
+    @Transactional
     public void deleteSessionAudioSummaries(String uuid) {
         List<AudioSummary> saved = audioSummaryRepository.findByFilePathContainingUuid(uuid);
         for (AudioSummary audioSummaryEntity : saved) {
-            cacheManager.getCache("audio_summary").evict(audioSummaryEntity.getFileHash());
             audioSummaryRepository.deleteById(audioSummaryEntity.getId());
+            publishChange(CacheNames.AUDIO_SUMMARY, CacheNames.AUDIO_SUMMARY_LIST,
+                    keyOrId(audioSummaryEntity.getFileHash(), audioSummaryEntity.getId()),
+                    Optional.ofNullable(uuid));
         }
-        cacheManager.getCache("audio_summary_list").evict(uuid);
+        log.info("Deleted [{}] audio summary record(s) for session [{}]", saved.size(), uuid);
     }
 
     /**
-     * Deletes a single audio summary record by ID (hash) and evicts relevant
-     * caches.
+     * Deletes a single audio summary record by ID (hash). No-op when absent.
      */
-    @CacheEvict(cacheNames = "audio_summary_list", allEntries = true)
+    @Transactional
     public void deleteAudioSummaryById(String id) {
         log.info("Request to delete audio summary record for ID: [{}]", id);
-        if (audioSummaryRepository.existsById(id)) {
+        Optional<AudioSummary> existing = audioSummaryRepository.findById(id);
+        if (existing.isPresent()) {
+            AudioSummary entity = existing.get();
             audioSummaryRepository.deleteById(id);
-            evictAudioSummary(id);
-            log.info("Successfully deleted audio summary record and evicted caches for ID: [{}]",
-                    id);
+            publishChange(CacheNames.AUDIO_SUMMARY, CacheNames.AUDIO_SUMMARY_LIST,
+                    keyOrId(entity.getFileHash(), entity.getId()), entity.getFilePath());
+            log.info("Successfully deleted audio summary record for ID: [{}]", id);
         } else {
             log.warn("Deletion skipped. No record found for ID: [{}]", id);
         }
     }
 
     /**
-     * Batch deletes audio summary records by IDs (hashes) and evicts relevant
-     * caches.
+     * Batch deletes audio summary records by IDs (hashes). Missing IDs are skipped silently.
      */
-    @CacheEvict(cacheNames = "audio_summary_list", allEntries = true)
+    @Transactional
     public void deleteAudioSummariesByIds(List<String> ids) {
         if (ids == null || ids.isEmpty()) {
             log.warn("Batch deletion aborted. Provided ID list is empty or null.");
@@ -345,33 +476,41 @@ public class WeChatSummaryCacheService {
 
         log.info("Request to batch delete [{}] audio summary records.", ids.size());
         for (String id : ids) {
-            if (audioSummaryRepository.existsById(id)) {
+            Optional<AudioSummary> existing = audioSummaryRepository.findById(id);
+            if (existing.isPresent()) {
+                AudioSummary entity = existing.get();
                 audioSummaryRepository.deleteById(id);
-                evictAudioSummary(id);
+                publishChange(CacheNames.AUDIO_SUMMARY, CacheNames.AUDIO_SUMMARY_LIST,
+                        keyOrId(entity.getFileHash(), entity.getId()), entity.getFilePath());
             }
         }
-        log.info("Completed batch deletion and cache eviction for provided IDs.");
+        log.info("Completed batch deletion for provided IDs.");
     }
 
     /**
      * Clears ONLY the summary text for a single audio record by ID, keeping the
      * transcript intact.
      */
-    @CacheEvict(cacheNames = "audio_summary_list", allEntries = true)
+    @Transactional
     public void clearAudioSummaryTextById(String id) {
         log.info("Request to clear audio summary text for ID: [{}]", id);
-        audioSummaryRepository.findById(id).ifPresent(entity -> {
+        Optional<AudioSummary> existing = audioSummaryRepository.findById(id);
+        if (existing.isPresent()) {
+            AudioSummary entity = existing.get();
             entity.setSummary(null);
             audioSummaryRepository.save(entity);
-            evictAudioSummary(id);
-            log.info("Successfully cleared audio summary text and evicted cache for ID: [{}]", id);
-        });
+            publishChange(CacheNames.AUDIO_SUMMARY, CacheNames.AUDIO_SUMMARY_LIST,
+                    keyOrId(entity.getFileHash(), entity.getId()), entity.getFilePath());
+            log.info("Successfully cleared audio summary text for ID: [{}]", id);
+        } else {
+            log.warn("Summary clearing skipped. No record found for ID: [{}]", id);
+        }
     }
 
     /**
      * Batch clears ONLY the summary text for provided audio record IDs.
      */
-    @CacheEvict(cacheNames = "audio_summary_list", allEntries = true)
+    @Transactional
     public void clearAudioSummaryTextsByIds(List<String> ids) {
         if (ids == null || ids.isEmpty()) {
             log.warn("Batch summary text clearing aborted. Provided ID list is empty or null.");
@@ -380,32 +519,20 @@ public class WeChatSummaryCacheService {
 
         log.info("Request to batch clear [{}] audio summary texts.", ids.size());
         for (String id : ids) {
-            audioSummaryRepository.findById(id).ifPresent(entity -> {
+            Optional<AudioSummary> existing = audioSummaryRepository.findById(id);
+            if (existing.isPresent()) {
+                AudioSummary entity = existing.get();
                 entity.setSummary(null);
                 audioSummaryRepository.save(entity);
-                evictAudioSummary(id);
-            });
+                publishChange(CacheNames.AUDIO_SUMMARY, CacheNames.AUDIO_SUMMARY_LIST,
+                        keyOrId(entity.getFileHash(), entity.getId()), entity.getFilePath());
+            }
         }
         log.info("Completed batch clearing of audio summary texts.");
     }
 
-    @CachePut(cacheNames = "audio_summary", key = "#hash")
-    public Optional<String> putAudioSummary(String hash, String summary) {
-        if (log.isDebugEnabled()) {
-            log.debug("Explicitly updating audio cache entry mapping for hash key: {}", hash);
-        }
-        return Optional.ofNullable(summary);
-    }
-
-    @CacheEvict(cacheNames = "audio_summary", key = "#hash")
-    public void evictAudioSummary(String hash) {
-        log.info(
-                "Evicting and invalidating audio data context cache mapping segment for key hash: [{}]",
-                hash);
-    }
-
     // =========================================================================
-    // 2.5 VIDEO MEDIA SUMMARY CACHE (Spring Cache Driven)
+    // 2.5 VIDEO MEDIA SUMMARY CACHE (DB + Cache Abstraction)
     // =========================================================================
 
     /**
@@ -415,11 +542,12 @@ public class WeChatSummaryCacheService {
         return videoSummaryRepository.findByFileHash(hash);
     }
 
+    /**
+     * Returns the cached video summary string, loading from DB on miss.
+     */
     public Optional<String> getVideoSummary(String hash) {
-        log.info(
-                "Cache miss for video_summary signature target [{}]. Querying relational persistence layer...",
-                hash);
-        return videoSummaryRepository.findByFileHash(hash).map(VideoSummary::getSummary);
+        return readCachedSingle(CacheNames.VIDEO_SUMMARY, hash,
+                () -> videoSummaryRepository.findByFileHash(hash).map(VideoSummary::getSummary));
     }
 
     /**
@@ -434,47 +562,54 @@ public class WeChatSummaryCacheService {
     }
 
     /**
-     * Persists a video summary entity to DB and invalidates video summary list
-     * caches.
+     * Persists a video summary, then publishes cache eviction for it.
      */
-    @CacheEvict(cacheNames = "video_summary_list", allEntries = true)
+    @Transactional
     public VideoSummary saveVideoSummary(VideoSummary entity) {
         log.info("Persisting video summary record for hash: [{}]", entity.getFileHash());
         VideoSummary saved = videoSummaryRepository.save(entity);
-        evictVideoSummary(entity.getFileHash());
+        publishChange(CacheNames.VIDEO_SUMMARY, CacheNames.VIDEO_SUMMARY_LIST,
+                keyOrId(saved.getFileHash(), saved.getId()), saved.getFilePath());
         return saved;
     }
 
+    /**
+     * Deletes all video summaries of one session, publishing one eviction per removed row.
+     */
+    @Transactional
     public void deleteSessionVideoSummaries(String uuid) {
         List<VideoSummary> saved = videoSummaryRepository.findByFilePathContainingUuid(uuid);
         for (VideoSummary videoSummaryEntity : saved) {
-            cacheManager.getCache("video_summary").evict(videoSummaryEntity.getFileHash());
             videoSummaryRepository.deleteById(videoSummaryEntity.getId());
+            publishChange(CacheNames.VIDEO_SUMMARY, CacheNames.VIDEO_SUMMARY_LIST,
+                    keyOrId(videoSummaryEntity.getFileHash(), videoSummaryEntity.getId()),
+                    Optional.ofNullable(uuid));
         }
-        cacheManager.getCache("video_summary_list").evict(uuid);
+        log.info("Deleted [{}] video summary record(s) for session [{}]", saved.size(), uuid);
     }
 
     /**
-     * Deletes a single video summary record by ID (hash) and evicts relevant
-     * caches.
+     * Deletes a single video summary record by ID (hash). No-op when absent.
      */
-    @CacheEvict(cacheNames = "video_summary_list", allEntries = true)
+    @Transactional
     public void deleteVideoSummaryById(String id) {
         log.info("Request to delete video summary record for ID: [{}]", id);
-        if (videoSummaryRepository.existsById(id)) {
+        Optional<VideoSummary> existing = videoSummaryRepository.findById(id);
+        if (existing.isPresent()) {
+            VideoSummary entity = existing.get();
             videoSummaryRepository.deleteById(id);
-            evictVideoSummary(id);
-            log.info("Successfully deleted video summary record and evicted caches for ID: [{}]", id);
+            publishChange(CacheNames.VIDEO_SUMMARY, CacheNames.VIDEO_SUMMARY_LIST,
+                    keyOrId(entity.getFileHash(), entity.getId()), entity.getFilePath());
+            log.info("Successfully deleted video summary record for ID: [{}]", id);
         } else {
             log.warn("Deletion skipped. No record found for ID: [{}]", id);
         }
     }
 
     /**
-     * Batch deletes video summary records by IDs (hashes) and evicts relevant
-     * caches.
+     * Batch deletes video summary records by IDs (hashes). Missing IDs are skipped silently.
      */
-    @CacheEvict(cacheNames = "video_summary_list", allEntries = true)
+    @Transactional
     public void deleteVideoSummariesByIds(List<String> ids) {
         if (ids == null || ids.isEmpty()) {
             log.warn("Batch deletion aborted. Provided ID list is empty or null.");
@@ -483,33 +618,41 @@ public class WeChatSummaryCacheService {
 
         log.info("Request to batch delete [{}] video summary records.", ids.size());
         for (String id : ids) {
-            if (videoSummaryRepository.existsById(id)) {
+            Optional<VideoSummary> existing = videoSummaryRepository.findById(id);
+            if (existing.isPresent()) {
+                VideoSummary entity = existing.get();
                 videoSummaryRepository.deleteById(id);
-                evictVideoSummary(id);
+                publishChange(CacheNames.VIDEO_SUMMARY, CacheNames.VIDEO_SUMMARY_LIST,
+                        keyOrId(entity.getFileHash(), entity.getId()), entity.getFilePath());
             }
         }
-        log.info("Completed batch deletion and cache eviction for provided IDs.");
+        log.info("Completed batch deletion for provided IDs.");
     }
 
     /**
      * Clears ONLY the summary text for a single video record by ID.
      */
-    @CacheEvict(cacheNames = "video_summary_list", allEntries = true)
+    @Transactional
     public void clearVideoSummaryTextById(String id) {
         log.info("Request to clear video summary text for ID: [{}]", id);
-        videoSummaryRepository.findById(id).ifPresent(entity -> {
+        Optional<VideoSummary> existing = videoSummaryRepository.findById(id);
+        if (existing.isPresent()) {
+            VideoSummary entity = existing.get();
             entity.setSummary(null);
             entity.setTranscript(null);
             videoSummaryRepository.save(entity);
-            evictVideoSummary(id);
-            log.info("Successfully cleared video summary text and evicted cache for ID: [{}]", id);
-        });
+            publishChange(CacheNames.VIDEO_SUMMARY, CacheNames.VIDEO_SUMMARY_LIST,
+                    keyOrId(entity.getFileHash(), entity.getId()), entity.getFilePath());
+            log.info("Successfully cleared video summary text for ID: [{}]", id);
+        } else {
+            log.warn("Summary clearing skipped. No record found for ID: [{}]", id);
+        }
     }
 
     /**
      * Batch clears ONLY the summary text for provided video record IDs.
      */
-    @CacheEvict(cacheNames = "video_summary_list", allEntries = true)
+    @Transactional
     public void clearVideoSummaryTextsByIds(List<String> ids) {
         if (ids == null || ids.isEmpty()) {
             log.warn("Batch summary text clearing aborted. Provided ID list is empty or null.");
@@ -518,29 +661,17 @@ public class WeChatSummaryCacheService {
 
         log.info("Request to batch clear [{}] video summary texts.", ids.size());
         for (String id : ids) {
-            videoSummaryRepository.findById(id).ifPresent(entity -> {
+            Optional<VideoSummary> existing = videoSummaryRepository.findById(id);
+            if (existing.isPresent()) {
+                VideoSummary entity = existing.get();
                 entity.setSummary(null);
                 entity.setTranscript(null);
                 videoSummaryRepository.save(entity);
-                evictVideoSummary(id);
-            });
+                publishChange(CacheNames.VIDEO_SUMMARY, CacheNames.VIDEO_SUMMARY_LIST,
+                        keyOrId(entity.getFileHash(), entity.getId()), entity.getFilePath());
+            }
         }
         log.info("Completed batch clearing of video summary texts.");
-    }
-
-    @CachePut(cacheNames = "video_summary", key = "#hash")
-    public Optional<String> putVideoSummary(String hash, String summary) {
-        if (log.isDebugEnabled()) {
-            log.debug("Explicitly updating video cache entry mapping for hash key: {}", hash);
-        }
-        return Optional.ofNullable(summary);
-    }
-
-    @CacheEvict(cacheNames = "video_summary", key = "#hash")
-    public void evictVideoSummary(String hash) {
-        log.info(
-                "Evicting and invalidating video data context cache mapping segment for key hash: [{}]",
-                hash);
     }
 
     // =========================================================================

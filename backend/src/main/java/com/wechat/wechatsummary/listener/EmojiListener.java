@@ -22,7 +22,7 @@ public class EmojiListener {
     public void receive(Message message, Channel channel) throws java.io.IOException {
         try {
             mediaMessageHandler.handle(message, "emoji", emojiProcessorService::processImage,
-                RabbitConfig.EMOJI_ROUTING_KEY);
+                RabbitConfig.EMOJI_RETRY_ROUTING_KEY);
         } finally {
             channel.basicAck(message.getMessageProperties().getDeliveryTag(), false);
         }

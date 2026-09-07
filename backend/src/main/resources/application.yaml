@@ -17,6 +17,10 @@ spring:
     port: 45672
     username: myuser
     password: secret
+    # Correlated publisher confirms: required so the cache eviction publisher can wait for a
+    # broker ack per message (at-least-once publishing). Plain sends without CorrelationData
+    # (e.g. the media pipelines) are unaffected.
+    publisher-confirm-type: correlated
 
   datasource:
     url: jdbc:postgresql://localhost:45432/wechat
@@ -90,3 +94,13 @@ cache:
   ttl-default: 1d
   ttl-audio: 7d
   ttl-image: 3d
+  eviction:
+    # Delay between publishing a cache eviction and the consumer executing it.
+    # Plain numbers bind as milliseconds; "5s" style values also work.
+    delayed-delay: 5000
+    # At-least-once publishing: max attempts per eviction (initial try + retries), how long
+    # to wait for one broker confirm, and the exponential retry backoff.
+    publish-max-attempts: 5
+    publish-confirm-timeout: 5s
+    publish-retry-backoff: 200ms
+    publish-retry-backoff-multiplier: 2.0
