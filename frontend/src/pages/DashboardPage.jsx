@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useState } from 'react';
 import { styles } from '../styles/dashboardStyles';
 import DatasetSelector from '../components/panels/DatasetSelector';
 import StepUpload from '../components/steps/StepUpload';
@@ -41,6 +41,9 @@ export default function DashboardPage({
   setActiveModalImage
 }) {
   const { t } = useLanguage();
+  // The local export bridge is collapsed by default to keep the page clean.
+  // The dataset picker stays visible below it.
+  const [setupOpen, setSetupOpen] = useState(false);
 
   return (
     <div style={styles.container}>
@@ -60,6 +63,32 @@ export default function DashboardPage({
         </div>
       </header>
 
+      {/* Setup (collapsible, collapsed by default): local export bridge */}
+      <div style={{ ...styles.card, marginBottom: '20px' }}>
+        <button
+          type="button"
+          onClick={() => setSetupOpen(v => !v)}
+          aria-expanded={setupOpen}
+          style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '10px', flexWrap: 'wrap', background: 'none', border: 'none', padding: 0, cursor: 'pointer', textAlign: 'left', width: '100%' }}
+        >
+          <span style={{ margin: 0, fontSize: '1.1rem', fontWeight: '700', color: 'var(--text-primary)' }}>
+            {setupOpen ? '▾' : '▸'} {t('dashboard.setupTitle')}
+          </span>
+          <span style={{ fontSize: '0.75rem', fontWeight: '600', color: 'var(--text-muted)' }}>
+            {setupOpen ? t('localBridge.collapse') : t('localBridge.expand')}
+          </span>
+        </button>
+        {!setupOpen && (
+          <span style={{ fontSize: '0.75rem', color: 'var(--text-muted)' }}>{t('dashboard.setupHint')}</span>
+        )}
+
+        {setupOpen && (
+          <div style={{ width: '100%', display: 'block' }}>
+            <LocalScanPanel />
+          </div>
+        )}
+      </div>
+
       <DatasetSelector
         deleteSession={deleteSession}
         fetchSessions={fetchSessions}
@@ -68,11 +97,6 @@ export default function DashboardPage({
         setUuidInput={setUuidInput}
         uuidInput={uuidInput}
       />
-
-      {/* Row 0: Local key bridge (optional helper, drives the native sidecar) */}
-      <div style={{ width: '100%', display: 'block', marginBottom: '20px' }}>
-        <LocalScanPanel />
-      </div>
 
       {/* Row 1: Step 1 (Full Width) */}
       <div style={{ width: '100%', display: 'block', marginBottom: '20px' }}>

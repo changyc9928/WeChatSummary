@@ -186,6 +186,8 @@ export const translations = {
     'localBridge.serverLogsWebhookOff': 'The bridge is forwarding logs to a different URL than this backend; server mirror is off.',
     'localBridge.copy': 'Copy',
     'localBridge.copied': 'Copied',
+    'localBridge.expand': 'Expand',
+    'localBridge.collapse': 'Collapse',
 
     'dataset.activeTarget': 'Active Summary Target (UUID):',
     'dataset.refreshing': 'Refreshing...',
@@ -245,6 +247,8 @@ export const translations = {
     'dashboard.title': 'WeChat Summarizer',
     'dashboard.loggedInAs': 'Logged in as:',
     'dashboard.logout': 'Logout',
+    'dashboard.setupTitle': 'Setup: local chat export (optional)',
+    'dashboard.setupHint': 'Collapsed to keep the page clean — expand to export chats from WeChat.',
 
     'images.title': 'Image Summaries & Records',
     'images.panelTitle': 'Image Summaries & Records',
@@ -477,6 +481,8 @@ export const translations = {
     'localBridge.serverLogsWebhookOff': '桥接正在把日志推送到其他地址，本服务端镜像未启用。',
     'localBridge.copy': '复制',
     'localBridge.copied': '已复制',
+    'localBridge.expand': '展开',
+    'localBridge.collapse': '收起',
 
     'dataset.activeTarget': '当前摘要目标（UUID）：',
     'dataset.refreshing': '刷新中...',
@@ -536,6 +542,8 @@ export const translations = {
     'dashboard.title': '微信摘要器',
     'dashboard.loggedInAs': '登录用户：',
     'dashboard.logout': '退出登录',
+    'dashboard.setupTitle': '准备：从本地微信导出聊天（可选）',
+    'dashboard.setupHint': '已折叠以保持页面整洁——展开可从微信导出聊天。',
 
     'images.title': '图片摘要与记录',
     'images.panelTitle': '图片摘要与记录',
