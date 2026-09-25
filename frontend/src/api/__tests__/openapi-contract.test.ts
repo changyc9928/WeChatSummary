@@ -33,6 +33,7 @@ const TAG_TO_API_CLASS: Record<string, string> = {
   'bridge-log-controller': 'BridgeLogControllerApi',
   'chat-summary-controller': 'ChatSummaryControllerApi',
   'preprocess-controller': 'PreprocessControllerApi',
+  'settings-controller': 'SettingsControllerApi',
   'tool-controller': 'ToolControllerApi',
   'upload-controller': 'UploadControllerApi',
 }

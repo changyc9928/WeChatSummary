@@ -3,13 +3,15 @@ import useAiSettings from '../../hooks/useAiSettings';
 import useLanguage from '../../hooks/useLanguage';
 
 function SecretField({ name, status, draftValue, onChange, t, show, onToggleShow }) {
+  const id = `settings-${name}`;
   return (
     <div style={{ display: 'flex', flexDirection: 'column', gap: '4px' }}>
-      <label style={{ fontSize: '0.78rem', fontWeight: '600', color: 'var(--text-primary)' }}>
+      <label htmlFor={id} style={{ fontSize: '0.78rem', fontWeight: '600', color: 'var(--text-primary)' }}>
         {t(`settings.${name}Label`)}
       </label>
       <div style={{ display: 'flex', gap: '6px' }}>
         <input
+          id={id}
           type={show ? 'text' : 'password'}
           value={draftValue}
           onChange={e => onChange(name, e.target.value)}
@@ -44,12 +46,14 @@ function SecretField({ name, status, draftValue, onChange, t, show, onToggleShow
 }
 
 function TextField({ name, value, onChange, t, mono = false }) {
+  const id = `settings-${name}`;
   return (
     <div style={{ display: 'flex', flexDirection: 'column', gap: '4px' }}>
-      <label style={{ fontSize: '0.78rem', fontWeight: '600', color: 'var(--text-primary)' }}>
+      <label htmlFor={id} style={{ fontSize: '0.78rem', fontWeight: '600', color: 'var(--text-primary)' }}>
         {t(`settings.${name}Label`)}
       </label>
       <input
+        id={id}
         value={value}
         onChange={e => onChange(name, e.target.value)}
         spellCheck={false}
@@ -60,6 +64,33 @@ function TextField({ name, value, onChange, t, mono = false }) {
           fontFamily: mono ? 'monospace' : undefined
         }}
       />
+    </div>
+  );
+}
+
+function NumberField({ name, value, onChange, t, min, max }) {
+  const id = `settings-${name}`;
+  return (
+    <div style={{ display: 'flex', flexDirection: 'column', gap: '4px' }}>
+      <label htmlFor={id} style={{ fontSize: '0.78rem', fontWeight: '600', color: 'var(--text-primary)' }}>
+        {t(`settings.${name}Label`)}
+      </label>
+      <input
+        id={id}
+        type="number"
+        min={min}
+        max={max}
+        value={value}
+        onChange={e => onChange(name, e.target.value)}
+        style={{
+          width: '100%', boxSizing: 'border-box', padding: '7px 10px', borderRadius: '6px',
+          border: '1px solid var(--border-strong)', backgroundColor: 'var(--bg-card)',
+          color: 'var(--text-primary)', fontSize: '0.82rem'
+        }}
+      />
+      <span style={{ fontSize: '0.7rem', color: 'var(--text-muted)' }}>
+        {t(`settings.${name}Hint`)}
+      </span>
     </div>
   );
 }
@@ -75,6 +106,21 @@ function Section({ title, hint, children }) {
       {children}
     </div>
   );
+}
+
+// Mirrors AiSettingsService.aiPermits(): at most pct% of the worker ceiling,
+// capped by aiMaxParallel, always at least 1.
+function aiPermitsPreview(valueFor) {
+  const num = (name, fallback) => {
+    const v = Number(valueFor(name));
+    return Number.isFinite(v) && v > 0 ? Math.trunc(v) : fallback;
+  };
+  const maxWorkers = num('maxWorkers', 10);
+  const pct = num('aiThrottlePercent', 10);
+  const aiMax = num('aiMaxParallel', 10);
+  const total = Math.max(3, maxWorkers);
+  const pctLimit = Math.max(1, Math.round((total * pct) / 100));
+  return Math.max(1, Math.min(pctLimit, aiMax));
 }
 
 export default function SettingsSidebar({ open, onClose }) {
@@ -251,6 +297,17 @@ export default function SettingsSidebar({ open, onClose }) {
                 />
                 <TextField name="transcriptionBaseUrl" t={t} mono value={valueFor('transcriptionBaseUrl')} onChange={setField} />
                 <TextField name="transcriptionModel" t={t} mono value={valueFor('transcriptionModel')} onChange={setField} />
+              </Section>
+
+              <Section title={t('settings.concurrencyTitle')} hint={t('settings.concurrencyHint')}>
+                <NumberField name="workers" t={t} min={1} max={32} value={valueFor('workers')} onChange={setField} />
+                <NumberField name="maxWorkers" t={t} min={1} max={64} value={valueFor('maxWorkers')} onChange={setField} />
+                <NumberField name="prefetch" t={t} min={1} max={100} value={valueFor('prefetch')} onChange={setField} />
+                <NumberField name="aiMaxParallel" t={t} min={1} max={64} value={valueFor('aiMaxParallel')} onChange={setField} />
+                <NumberField name="aiThrottlePercent" t={t} min={1} max={100} value={valueFor('aiThrottlePercent')} onChange={setField} />
+                <span style={{ fontSize: '0.72rem', color: 'var(--text-muted)' }}>
+                  {t('settings.aiPermitsPreview', { n: aiPermitsPreview(valueFor) })}
+                </span>
               </Section>
             </>
           )}

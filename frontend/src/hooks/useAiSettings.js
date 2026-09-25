@@ -2,6 +2,7 @@ import { useCallback, useState } from 'react';
 import { aiSettingsApi } from '../api/settings';
 
 const SECRET_FIELDS = ['chatApiKey', 'imageApiKey', 'videoApiKey', 'transcriptionApiKey'];
+const INT_FIELDS = ['workers', 'maxWorkers', 'prefetch', 'aiMaxParallel', 'aiThrottlePercent'];
 
 /**
  * Loads/saves the server-wide AI provider settings.
@@ -54,6 +55,9 @@ export default function useAiSettings() {
         if (SECRET_FIELDS.includes(k)) {
           // Only send secrets the user actually typed; empty keeps the server value.
           if (s) payload[k] = s;
+        } else if (INT_FIELDS.includes(k)) {
+          // Numbers go out as JSON numbers; empty/invalid keeps the server value.
+          if (s !== '' && !Number.isNaN(Number(s))) payload[k] = Math.trunc(Number(s));
         } else if (server?.[k] === undefined || s !== String(server[k] ?? '').trim()) {
           payload[k] = s;
         }

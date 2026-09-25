@@ -2,10 +2,14 @@ apis/AuthControllerApi.ts
 apis/BridgeLogControllerApi.ts
 apis/ChatSummaryControllerApi.ts
 apis/PreprocessControllerApi.ts
+apis/SettingsControllerApi.ts
 apis/ToolControllerApi.ts
 apis/UploadControllerApi.ts
 apis/index.ts
 index.ts
+models/AiSettingsUpdateRequest.ts
+models/AiSettingsView.ts
+models/ApiResponseAiSettingsView.ts
 models/ApiResponseAuthResponse.ts
 models/ApiResponseBoolean.ts
 models/ApiResponseBridgeToolMeta.ts

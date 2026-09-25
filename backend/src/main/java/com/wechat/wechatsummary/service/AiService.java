@@ -5,11 +5,11 @@ import com.openai.errors.OpenAIIoException;
 import com.openai.errors.RateLimitException;
 import com.fasterxml.jackson.core.type.TypeReference;
 import com.fasterxml.jackson.databind.ObjectMapper;
+import com.wechat.wechatsummary.util.ResizableSemaphore;
 import java.net.URI;
 import java.util.Base64;
 import java.util.List;
 import java.util.Map;
-import java.util.concurrent.Semaphore;
 import java.util.function.Supplier;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.ai.audio.transcription.AudioTranscriptionPrompt;
@@ -18,7 +18,6 @@ import org.springframework.ai.chat.messages.UserMessage;
 import org.springframework.ai.chat.model.ChatResponse;
 import org.springframework.ai.chat.prompt.Prompt;
 import org.springframework.ai.content.Media;
-import org.springframework.beans.factory.annotation.Value;
 import org.springframework.retry.annotation.Backoff;
 import org.springframework.retry.annotation.Retryable;
 import org.springframework.stereotype.Service;
@@ -34,6 +33,7 @@ import org.springframework.web.client.HttpServerErrorException;
 public class AiService {
 
     private final AiModelFactory aiModels;
+    private final AiSettingsService settingsService;
 
     private static final ObjectMapper ALIAS_MAPPER = new ObjectMapper();
 
@@ -60,36 +60,28 @@ public class AiService {
 
     /**
      * Caps the number of concurrent outbound calls to the shared AI provider. The RabbitMQ media
-     * consumers can run many parallel workers (up to {@code rabbit.max-concurrent-consumers}) and a
-     * (re)processing run dispatches a burst of requests that easily exceeds the provider's
-     * request-rate quota, resulting in HTTP 429 (Too Many Requests) storms. Throttling here keeps
-     * parallel calls bounded so retries can recover instead of being overwhelmed. The effective
-     * permit count is derived from {@code custom-ai.multimodal.max-concurrent-percentage} of the
-     * total worker pool (always at least 1).
+     * consumers can run many parallel workers and a (re)processing run dispatches a burst of
+     * requests that easily exceeds the provider's request-rate quota, resulting in HTTP 429
+     * (Too Many Requests) storms. Throttling here keeps parallel calls bounded so retries can
+     * recover instead of being overwhelmed. The budget is re-read from the preprocessing
+     * concurrency settings on every call, so sidebar edits take effect immediately.
      */
-    private final Semaphore providerThrottle;
+    private final ResizableSemaphore providerThrottle;
 
     public AiService(
         AiModelFactory aiModels,
-        @Value("${custom-ai.multimodal.max-concurrent-requests:10}") Integer maxConcurrentRequests,
-        @Value("${custom-ai.multimodal.max-concurrent-percentage:10}") Integer maxConcurrentPercentage,
-        @Value("${rabbit.max-concurrent-consumers:10}") Integer maxConcurrentConsumers) {
+        AiSettingsService settingsService) {
 
         this.aiModels = aiModels;
+        this.settingsService = settingsService;
 
-        int totalConsumers = Math.max(3, maxConcurrentConsumers != null ? maxConcurrentConsumers : 10);
-        int percentageLimit = (int) Math.max(1,
-            Math.round(totalConsumers * (maxConcurrentPercentage != null ? maxConcurrentPercentage : 10) / 100.0));
-        int configuredLimit = (maxConcurrentRequests != null && maxConcurrentRequests > 0)
-            ? maxConcurrentRequests : percentageLimit;
-        int permits = Math.max(1, Math.min(percentageLimit, configuredLimit));
-
-        log.info("AI provider throttle initialized with {} concurrent permit(s) (percentageLimit={}, configuredLimit={}, totalConsumers={})",
-            permits, percentageLimit, configuredLimit, totalConsumers);
-        this.providerThrottle = new Semaphore(permits);
+        int permits = settingsService.aiPermits();
+        log.info("AI provider throttle initialized with {} concurrent permit(s)", permits);
+        this.providerThrottle = new ResizableSemaphore(permits);
     }
 
     private <T> T callThrottled(Supplier<T> call) {
+        providerThrottle.setPermits(settingsService.aiPermits());
         providerThrottle.acquireUninterruptibly();
         try {
             return call.get();

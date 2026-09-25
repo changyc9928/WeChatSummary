@@ -1,12 +1,12 @@
 package com.wechat.wechatsummary.dto;
 
 /**
- * AI provider settings update payload.
+ * AI provider and preprocessing settings update payload.
  *
- * <p>Every field is optional. A {@code null} or blank value keeps the current
- * server-side value; a non-blank value replaces it. There is intentionally no
- * per-field "clear": {@code DELETE /api/settings/ai} resets everything back
- * to the environment defaults.
+ * <p>Every field is optional. A {@code null} (or blank, for text) value keeps the current
+ * server-side value; a provided value replaces it after range validation. There is
+ * intentionally no per-field "clear": {@code DELETE /api/settings/ai} resets everything
+ * back to the environment defaults.
  */
 public record AiSettingsUpdateRequest(
     String chatApiKey,
@@ -20,5 +20,10 @@ public record AiSettingsUpdateRequest(
     String videoModel,
     String transcriptionApiKey,
     String transcriptionBaseUrl,
-    String transcriptionModel) {
+    String transcriptionModel,
+    Integer workers,
+    Integer maxWorkers,
+    Integer prefetch,
+    Integer aiMaxParallel,
+    Integer aiThrottlePercent) {
 }

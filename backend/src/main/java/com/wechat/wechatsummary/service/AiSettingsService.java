@@ -3,6 +3,7 @@ package com.wechat.wechatsummary.service;
 import com.wechat.wechatsummary.dto.AiSettingsUpdateRequest;
 import com.wechat.wechatsummary.dto.AiSettingsView;
 import com.wechat.wechatsummary.entity.AppSetting;
+import com.wechat.wechatsummary.exception.BadRequestException;
 import com.wechat.wechatsummary.repository.AppSettingRepository;
 import java.time.Duration;
 import java.time.Instant;
@@ -47,6 +48,12 @@ public class AiSettingsService {
     public static final String TRANSCRIPTION_BASE_URL = "transcription.base-url";
     public static final String TRANSCRIPTION_MODEL = "transcription.model";
 
+    public static final String PREPROCESS_WORKERS = "preprocess.workers";
+    public static final String PREPROCESS_MAX_WORKERS = "preprocess.max-workers";
+    public static final String PREPROCESS_PREFETCH = "preprocess.prefetch";
+    public static final String PREPROCESS_AI_MAX_PARALLEL = "preprocess.ai-max-parallel";
+    public static final String PREPROCESS_AI_THROTTLE_PERCENT = "preprocess.ai-throttle-percent";
+
     /** Effective settings snapshot; never contains nulls (blank means no-auth). */
     public record EffectiveAiSettings(
         String chatApiKey,
@@ -61,6 +68,15 @@ public class AiSettingsService {
         String transcriptionApiKey,
         String transcriptionBaseUrl,
         String transcriptionModel) {
+    }
+
+    /** Effective preprocessing concurrency snapshot; never contains nulls. */
+    public record EffectivePreprocess(
+        int workers,
+        int maxWorkers,
+        int prefetch,
+        int aiMaxParallel,
+        int aiThrottlePercent) {
     }
 
     private final AppSettingRepository repository;
@@ -86,6 +102,12 @@ public class AiSettingsService {
     private final String defaultTranscriptionModel;
     private final Duration transcriptionTimeout;
 
+    private final int defaultWorkers;
+    private final int defaultMaxWorkers;
+    private final int defaultPrefetch;
+    private final int defaultAiMaxParallel;
+    private final int defaultAiThrottlePercent;
+
     public AiSettingsService(
         AppSettingRepository repository,
         @Value("${spring.ai.openai.api-key:}") String chatApiKey,
@@ -104,7 +126,12 @@ public class AiSettingsService {
         @Value("${transcription.api-key:}") String transcriptionApiKey,
         @Value("${spring.ai.openai.audio.transcription.base-url:http://localhost:48000/v1/}") String transcriptionBaseUrl,
         @Value("${spring.ai.openai.audio.transcription.options.model:large-v3}") String transcriptionModel,
-        @Value("${spring.ai.openai.audio.transcription.timeout:300s}") Duration transcriptionTimeout) {
+        @Value("${spring.ai.openai.audio.transcription.timeout:300s}") Duration transcriptionTimeout,
+        @Value("${rabbit.concurrent-consumers:3}") int workers,
+        @Value("${rabbit.max-concurrent-consumers:10}") int maxWorkers,
+        @Value("${rabbit.prefetch-count:5}") int prefetch,
+        @Value("${custom-ai.multimodal.max-concurrent-requests:10}") int aiMaxParallel,
+        @Value("${custom-ai.multimodal.max-concurrent-percentage:10}") int aiThrottlePercent) {
         this.repository = repository;
         this.defaultChatApiKey = chatApiKey;
         this.defaultChatBaseUrl = chatBaseUrl;
@@ -123,6 +150,11 @@ public class AiSettingsService {
         this.defaultTranscriptionBaseUrl = transcriptionBaseUrl;
         this.defaultTranscriptionModel = transcriptionModel;
         this.transcriptionTimeout = transcriptionTimeout;
+        this.defaultWorkers = workers;
+        this.defaultMaxWorkers = maxWorkers;
+        this.defaultPrefetch = prefetch;
+        this.defaultAiMaxParallel = aiMaxParallel;
+        this.defaultAiThrottlePercent = aiThrottlePercent;
     }
 
     /** Resolves the currently effective value for every known key. */
@@ -148,6 +180,7 @@ public class AiSettingsService {
     @Transactional(readOnly = true)
     public AiSettingsView view() {
         EffectiveAiSettings e = effective();
+        EffectivePreprocess p = effectivePreprocess();
         return new AiSettingsView(
             mask(e.chatApiKey()),
             e.chatBaseUrl(),
@@ -160,7 +193,40 @@ public class AiSettingsService {
             e.videoModel(),
             mask(e.transcriptionApiKey()),
             e.transcriptionBaseUrl(),
-            e.transcriptionModel());
+            e.transcriptionModel(),
+            p.workers(),
+            p.maxWorkers(),
+            p.prefetch(),
+            p.aiMaxParallel(),
+            p.aiThrottlePercent());
+    }
+
+    /** Resolves the currently effective preprocessing concurrency values. */
+    @Transactional(readOnly = true)
+    public EffectivePreprocess effectivePreprocess() {
+        Map<String, String> stored = loadAll();
+        int workers = orInt(stored, PREPROCESS_WORKERS, defaultWorkers);
+        int maxWorkers = orInt(stored, PREPROCESS_MAX_WORKERS, defaultMaxWorkers);
+        return new EffectivePreprocess(
+            workers,
+            maxWorkers,
+            orInt(stored, PREPROCESS_PREFETCH, defaultPrefetch),
+            orInt(stored, PREPROCESS_AI_MAX_PARALLEL, defaultAiMaxParallel),
+            orInt(stored, PREPROCESS_AI_THROTTLE_PERCENT, defaultAiThrottlePercent));
+    }
+
+    /**
+     * Computes the effective parallel AI call budget from the concurrency settings.
+     * Mirrors the historical startup behavior: at most {@code aiThrottlePercent}% of the
+     * worker ceiling, capped by {@code aiMaxParallel}, always at least 1.
+     */
+    @Transactional(readOnly = true)
+    public int aiPermits() {
+        EffectivePreprocess p = effectivePreprocess();
+        int totalConsumers = Math.max(3, p.maxWorkers());
+        int percentageLimit = (int) Math.max(1,
+            Math.round(totalConsumers * p.aiThrottlePercent() / 100.0));
+        return Math.max(1, Math.min(percentageLimit, p.aiMaxParallel()));
     }
 
     /**
@@ -184,6 +250,15 @@ public class AiSettingsService {
         store(TRANSCRIPTION_API_KEY, request.transcriptionApiKey());
         store(TRANSCRIPTION_BASE_URL, request.transcriptionBaseUrl());
         store(TRANSCRIPTION_MODEL, request.transcriptionModel());
+        storeInt(PREPROCESS_WORKERS, request.workers(), 1, 32, "workers");
+        storeInt(PREPROCESS_MAX_WORKERS, request.maxWorkers(), 1, 64, "maxWorkers");
+        storeInt(PREPROCESS_PREFETCH, request.prefetch(), 1, 100, "prefetch");
+        storeInt(PREPROCESS_AI_MAX_PARALLEL, request.aiMaxParallel(), 1, 64, "aiMaxParallel");
+        storeInt(PREPROCESS_AI_THROTTLE_PERCENT, request.aiThrottlePercent(), 1, 100, "aiThrottlePercent");
+        EffectivePreprocess p = effectivePreprocess();
+        if (p.maxWorkers() < p.workers()) {
+            throw new BadRequestException("maxWorkers must be greater than or equal to workers");
+        }
         return view();
     }
 
@@ -226,19 +301,46 @@ public class AiSettingsService {
         return v == null ? def : v;
     }
 
+    private static int orInt(Map<String, String> stored, String key, int def) {
+        String v = stored.get(key);
+        if (v == null) {
+            return def;
+        }
+        try {
+            return Integer.parseInt(v.trim());
+        } catch (NumberFormatException e) {
+            return def;
+        }
+    }
+
     private void store(String key, String value) {
         if (value == null || value.isBlank()) {
             return;
         }
+        storeValue(key, value.trim());
+        log.info("AI provider setting updated: {}", key);
+    }
+
+    private void storeInt(String key, Integer value, int min, int max, String field) {
+        if (value == null) {
+            return;
+        }
+        if (value < min || value > max) {
+            throw new BadRequestException(field + " must be between " + min + " and " + max);
+        }
+        storeValue(key, String.valueOf(value));
+        log.info("Preprocessing setting updated: {}={}", key, value);
+    }
+
+    private void storeValue(String key, String value) {
         AppSetting setting = repository.findById(key).orElseGet(() -> {
             AppSetting created = new AppSetting();
             created.setKey(key);
             return created;
         });
-        setting.setValue(value.trim());
+        setting.setValue(value);
         setting.setUpdatedAt(Instant.now());
         repository.save(setting);
-        log.info("AI provider setting updated: {}", key);
     }
 
     /** Masks a secret for display; {@code null}/blank stays {@code null} (no key configured). */

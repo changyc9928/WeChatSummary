@@ -1144,6 +1144,21 @@ components:
           type: string
         transcriptionModel:
           type: string
+        workers:
+          type: integer
+          format: int32
+        maxWorkers:
+          type: integer
+          format: int32
+        prefetch:
+          type: integer
+          format: int32
+        aiMaxParallel:
+          type: integer
+          format: int32
+        aiThrottlePercent:
+          type: integer
+          format: int32
     AiSettingsUpdateRequest:
       type: object
       description: All fields optional; null/blank keeps the current value
@@ -1172,6 +1187,21 @@ components:
           type: string
         transcriptionModel:
           type: string
+        workers:
+          type: integer
+          format: int32
+        maxWorkers:
+          type: integer
+          format: int32
+        prefetch:
+          type: integer
+          format: int32
+        aiMaxParallel:
+          type: integer
+          format: int32
+        aiThrottlePercent:
+          type: integer
+          format: int32
     ApiResponseAiSettingsView:
       type: object
       properties:
