@@ -14,13 +14,10 @@ import java.util.function.Supplier;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.ai.audio.transcription.AudioTranscriptionPrompt;
 import org.springframework.ai.audio.transcription.AudioTranscriptionResponse;
-import org.springframework.ai.chat.client.ChatClient;
 import org.springframework.ai.chat.messages.UserMessage;
 import org.springframework.ai.chat.model.ChatResponse;
 import org.springframework.ai.chat.prompt.Prompt;
 import org.springframework.ai.content.Media;
-import org.springframework.ai.openai.OpenAiAudioTranscriptionModel;
-import org.springframework.beans.factory.annotation.Qualifier;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.retry.annotation.Backoff;
 import org.springframework.retry.annotation.Retryable;
@@ -36,10 +33,7 @@ import org.springframework.web.client.HttpServerErrorException;
 @Slf4j
 public class AiService {
 
-    private final ChatClient chatClient;
-    private final @Qualifier("multimodalChatClient") ChatClient multimodalChatClient;
-    private final @Qualifier("videoChatClient") ChatClient videoChatClient;
-    private final OpenAiAudioTranscriptionModel transcriptionModel;
+    private final AiModelFactory aiModels;
 
     private static final ObjectMapper ALIAS_MAPPER = new ObjectMapper();
 
@@ -76,18 +70,12 @@ public class AiService {
     private final Semaphore providerThrottle;
 
     public AiService(
-        ChatClient chatClient,
-        @Qualifier("multimodalChatClient") ChatClient multimodalChatClient,
-        @Qualifier("videoChatClient") ChatClient videoChatClient,
-        OpenAiAudioTranscriptionModel transcriptionModel,
+        AiModelFactory aiModels,
         @Value("${custom-ai.multimodal.max-concurrent-requests:10}") Integer maxConcurrentRequests,
         @Value("${custom-ai.multimodal.max-concurrent-percentage:10}") Integer maxConcurrentPercentage,
         @Value("${rabbit.max-concurrent-consumers:10}") Integer maxConcurrentConsumers) {
 
-        this.chatClient = chatClient;
-        this.multimodalChatClient = multimodalChatClient;
-        this.videoChatClient = videoChatClient;
-        this.transcriptionModel = transcriptionModel;
+        this.aiModels = aiModels;
 
         int totalConsumers = Math.max(3, maxConcurrentConsumers != null ? maxConcurrentConsumers : 10);
         int percentageLimit = (int) Math.max(1,
@@ -131,7 +119,7 @@ public class AiService {
     public AudioTranscriptionResponse callTranscriptionWithRetry(AudioTranscriptionPrompt prompt) {
         log.info("Initiating audio transcription request via Whisper model...");
         try {
-            AudioTranscriptionResponse response = transcriptionModel.call(prompt);
+            AudioTranscriptionResponse response = aiModels.transcriptionModel().call(prompt);
             log.info("Audio transcription successfully completed.");
             return response;
         } catch (RateLimitException e) {
@@ -221,7 +209,7 @@ public class AiService {
 
         try {
             // Correct Spring AI fluent chain:
-            return callThrottled(() -> chatClient.prompt()
+            return callThrottled(() -> aiModels.chatClient().prompt()
                 .system(systemPrompt)
                 .user(userPrompt)
                 .call().content()); // <-- Pass the target class type right here
@@ -272,7 +260,7 @@ public class AiService {
             """;
 
         try {
-            String summaryResult = callThrottled(() -> chatClient.prompt()
+            String summaryResult = callThrottled(() -> aiModels.chatClient().prompt()
                 .system(REFINE_SYSTEM_PROMPT)
                 .user(user -> user.text(userPrompt)
                     .param("historyContext", historyContext)
@@ -338,7 +326,7 @@ public class AiService {
             """.formatted(roster != null ? roster : "", chunk);
 
         try {
-            return callThrottled(() -> chatClient.prompt()
+            return callThrottled(() -> aiModels.chatClient().prompt()
                 .system(REFINE_SYSTEM_PROMPT)
                 .user(userPrompt)
                 .call()
@@ -394,7 +382,7 @@ public class AiService {
             """.formatted(roster != null ? roster : "", sb.toString());
 
         try {
-            return callThrottled(() -> chatClient.prompt()
+            return callThrottled(() -> aiModels.chatClient().prompt()
                 .system(REFINE_SYSTEM_PROMPT)
                 .user(userPrompt)
                 .call()
@@ -444,7 +432,7 @@ public class AiService {
             """.formatted(rosterText, hintBlock + sampleText);
 
         try {
-            String raw = callThrottled(() -> chatClient.prompt()
+            String raw = callThrottled(() -> aiModels.chatClient().prompt()
                 .system(REFINE_SYSTEM_PROMPT)
                 .user(userPrompt)
                 .call()
@@ -522,7 +510,7 @@ public class AiService {
 
         Prompt prompt = new Prompt(userMessage);
 
-        ChatResponse response = callThrottled(() -> multimodalChatClient.prompt(prompt)
+        ChatResponse response = callThrottled(() -> aiModels.imageChatClient().prompt(prompt)
             .call()
             .chatResponse());
 
@@ -563,7 +551,7 @@ public class AiService {
             .build();
 
         Prompt prompt = new Prompt(userMessage);
-        ChatResponse response = callThrottled(() -> videoChatClient.prompt(prompt).call().chatResponse());
+        ChatResponse response = callThrottled(() -> aiModels.videoChatClient().prompt(prompt).call().chatResponse());
 
         if (response == null || response.getResult() == null || response.getResult().getOutput() == null) {
             throw new RuntimeException("Video AI returned empty response for frame #" + frameIndex);
@@ -592,7 +580,7 @@ public class AiService {
         String systemPrompt = "你是一个专业的视频内容分析AI。我将提供从一个视频中随机/等间隔抽取的若干关键帧的视觉描述与文字转写。请将这些帧的信息进行综合归纳，生成一份连贯、准确、结构清晰的视频总结。";
         String userPrompt = "以下是抽取帧的描述内容：\n\n" + sb.toString() + "\n请结合以上所有帧的内容，总结这个视频的主要内容、场景变化与核心信息，直接输出总结文本即可：";
 
-        return callThrottled(() -> chatClient.prompt()
+        return callThrottled(() -> aiModels.chatClient().prompt()
             .system(systemPrompt)
             .user(userPrompt)
             .call()

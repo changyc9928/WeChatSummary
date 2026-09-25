@@ -8,6 +8,8 @@ servers:
 tags:
 - name: bridge-log-controller
   description: Bridge log streaming (webhook ingest + viewer)
+- name: settings-controller
+  description: Server-wide AI provider settings (keys, endpoints, models)
 - name: tool-controller
   description: Distributable local tools (bridge.exe)
 paths:
@@ -1065,8 +1067,121 @@ paths:
             '*/*':
               schema:
                 $ref: "#/components/schemas/ApiResponseBoolean"
+  /api/settings/ai:
+    get:
+      tags:
+      - settings-controller
+      summary: Return the effective AI provider settings (secrets masked)
+      operationId: getAiSettings
+      responses:
+        "200":
+          description: OK
+          content:
+            '*/*':
+              schema:
+                $ref: "#/components/schemas/ApiResponseAiSettingsView"
+    put:
+      tags:
+      - settings-controller
+      summary: Update AI provider settings (blank fields keep their current value)
+      operationId: updateAiSettings
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/AiSettingsUpdateRequest"
+        required: false
+      responses:
+        "200":
+          description: OK
+          content:
+            '*/*':
+              schema:
+                $ref: "#/components/schemas/ApiResponseAiSettingsView"
+    delete:
+      tags:
+      - settings-controller
+      summary: Reset AI provider settings to the server environment defaults
+      operationId: resetAiSettings
+      responses:
+        "200":
+          description: OK
+          content:
+            '*/*':
+              schema:
+                $ref: "#/components/schemas/ApiResponseAiSettingsView"
 components:
   schemas:
+    AiSettingsView:
+      type: object
+      description: Effective AI settings; secrets are masked, null means no key is configured
+      properties:
+        chatApiKey:
+          type: string
+          nullable: true
+        chatBaseUrl:
+          type: string
+        chatModel:
+          type: string
+        imageApiKey:
+          type: string
+          nullable: true
+        imageBaseUrl:
+          type: string
+        imageModel:
+          type: string
+        videoApiKey:
+          type: string
+          nullable: true
+        videoBaseUrl:
+          type: string
+        videoModel:
+          type: string
+        transcriptionApiKey:
+          type: string
+          nullable: true
+        transcriptionBaseUrl:
+          type: string
+        transcriptionModel:
+          type: string
+    AiSettingsUpdateRequest:
+      type: object
+      description: All fields optional; null/blank keeps the current value
+      properties:
+        chatApiKey:
+          type: string
+        chatBaseUrl:
+          type: string
+        chatModel:
+          type: string
+        imageApiKey:
+          type: string
+        imageBaseUrl:
+          type: string
+        imageModel:
+          type: string
+        videoApiKey:
+          type: string
+        videoBaseUrl:
+          type: string
+        videoModel:
+          type: string
+        transcriptionApiKey:
+          type: string
+        transcriptionBaseUrl:
+          type: string
+        transcriptionModel:
+          type: string
+    ApiResponseAiSettingsView:
+      type: object
+      properties:
+        code:
+          type: integer
+          format: int32
+        message:
+          type: string
+        data:
+          $ref: "#/components/schemas/AiSettingsView"
     JsonNode:
       type: object
       properties:

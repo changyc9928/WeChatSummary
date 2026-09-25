@@ -8,6 +8,7 @@ import ThemeToggle from '../components/common/ThemeToggle';
 import LanguageToggle from '../components/common/LanguageToggle';
 import ImageLightboxModal from '../components/common/ImageLightboxModal';
 import LocalScanPanel from '../components/panels/LocalScanPanel';
+import SettingsSidebar from '../components/settings/SettingsSidebar';
 import useLanguage from '../hooks/useLanguage';
 
 export default function DashboardPage({
@@ -44,6 +45,7 @@ export default function DashboardPage({
   // The local export bridge is collapsed by default to keep the page clean.
   // The dataset picker stays visible below it.
   const [setupOpen, setSetupOpen] = useState(false);
+  const [settingsOpen, setSettingsOpen] = useState(false);
 
   return (
     <div style={styles.container}>
@@ -56,6 +58,14 @@ export default function DashboardPage({
             </p>
           </div>
           <div style={{ display: 'flex', gap: '8px', alignItems: 'center' }}>
+            <button
+              type="button"
+              onClick={() => setSettingsOpen(true)}
+              title={t('settings.openTitle')}
+              style={{ ...styles.buttonSecondary, padding: '6px 10px', fontSize: '0.85rem' }}
+            >
+              ⚙
+            </button>
             <LanguageToggle/>
             <ThemeToggle onToggle={onToggleTheme} theme={theme}/>
             <button onClick={onLogout} style={styles.buttonDangerSmall}>{t('dashboard.logout')}</button>
@@ -153,6 +163,7 @@ export default function DashboardPage({
       </div>
 
       <ImageLightboxModal activeModalImage={activeModalImage} setActiveModalImage={setActiveModalImage} />
+      <SettingsSidebar open={settingsOpen} onClose={() => setSettingsOpen(false)} />
     </div>
   );
 }
