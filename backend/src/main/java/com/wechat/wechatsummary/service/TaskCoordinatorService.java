@@ -207,18 +207,24 @@ public class TaskCoordinatorService {
                 uuid);
 
             String userId = redisTemplate.opsForValue().get(USER_KEY_PREFIX + uuid);
-            if (userId != null) {
-                messageProcessorService.processJsonAndSave(userId, uuid);
-            } else {
-                log.error("Failed to resolve userId from Redis for completed task UUID: [{}]",
-                    uuid);
+            try {
+                if (userId != null) {
+                    messageProcessorService.processJsonAndSave(userId, uuid);
+                } else {
+                    log.error("Failed to resolve userId from Redis for completed task UUID: [{}]",
+                        uuid);
+                }
+            } catch (Exception e) {
+                log.error(
+                    "Final markdown compilation failed for task UUID: [{}]. Clearing residual counters so progress does not stick at 100% RUNNING.",
+                    uuid, e);
+            } finally {
+                redisTemplate.delete(counterKey);
+                redisTemplate.delete(TOTAL_PREFIX + uuid);
+                redisTemplate.delete(USER_KEY_PREFIX + uuid);
+                redisTemplate.delete(HEARTBEAT_PREFIX + uuid);
+                activeThreadsMap.remove(uuid);
             }
-
-            redisTemplate.delete(counterKey);
-            redisTemplate.delete(TOTAL_PREFIX + uuid);
-            redisTemplate.delete(USER_KEY_PREFIX + uuid);
-            redisTemplate.delete(HEARTBEAT_PREFIX + uuid);
-            activeThreadsMap.remove(uuid);
         }
     }
 

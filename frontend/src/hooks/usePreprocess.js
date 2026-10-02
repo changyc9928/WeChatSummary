@@ -49,7 +49,7 @@ export default function usePreprocess({ uuidInput, currentUser, onCompleted }) {
       const data = await checkProgress(uuid);
       if (!data) return;
 
-      const isFinishedNow = data.status === 'COMPLETED' || data.progressPercentage >= 100;
+      const isFinishedNow = data.status === 'COMPLETED';
       if (isFinishedNow) {
         stopPolling();
         setIsFinished(true);

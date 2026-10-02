@@ -34,8 +34,7 @@ export default function StepPreprocess({
   const isPaused = status === 'PAUSED';
 
   const isCompleted = status === 'COMPLETED'
-    || (!preprocessProgress && isPreprocessFinished)
-    || (preprocessProgress != null && preprocessProgress.progressPercentage >= 100);
+    || (!preprocessProgress && isPreprocessFinished);
 
   const progressVal = preprocessProgress && preprocessProgress.progressPercentage != null
     ? Math.round(preprocessProgress.progressPercentage)

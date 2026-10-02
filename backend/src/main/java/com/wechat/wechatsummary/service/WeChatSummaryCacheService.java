@@ -125,6 +125,20 @@ public class WeChatSummaryCacheService {
     private void publishChange(
             String singleCache, String listCache, String key, Optional<String> sessionId) {
         deferAfterCommit(() -> {
+            // Synchronously evict the local node's entries so immediate re-reads observe the
+            // change; the delayed RabbitMQ message still propagates the eviction fleet-wide.
+            Cache single = cacheManager.getCache(singleCache);
+            if (single != null) {
+                single.evict(key);
+            }
+            Cache list = cacheManager.getCache(listCache);
+            if (list != null) {
+                if (sessionId.isPresent() && !sessionId.get().isBlank()) {
+                    list.evict(sessionId.get().trim());
+                } else {
+                    list.clear();
+                }
+            }
             evictionPublisher.evict(singleCache, key);
             if (sessionId.isPresent() && !sessionId.get().isBlank()) {
                 evictionPublisher.evict(listCache, sessionId.get().trim());
