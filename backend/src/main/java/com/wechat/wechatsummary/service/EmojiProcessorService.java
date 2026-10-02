@@ -3,6 +3,7 @@ package com.wechat.wechatsummary.service;
 import com.wechat.wechatsummary.config.ProcessingConfig;
 import com.wechat.wechatsummary.entity.EmojiSummaryEntity;
 import com.wechat.wechatsummary.util.HashUtils;
+import com.wechat.wechatsummary.util.MediaContentSniffer;
 import com.wechat.wechatsummary.util.PageUtils;
 import com.wechat.wechatsummary.util.PathUtils;
 import java.nio.file.Files;
@@ -67,9 +68,17 @@ public class EmojiProcessorService {
                 return;
             }
 
-            String mimeType = Files.probeContentType(path);
+            // Sniff the bytes instead of trusting the .png name: a failed decryption yields
+            // undecodable garbage that the vision API rejects with a permanent 400. Skipping it
+            // here completes the sub-task immediately rather than retrying it MAX_RETRIES times.
+            String mimeType = MediaContentSniffer.detectImageMimeType(emojiBytes);
             if (mimeType == null) {
-                mimeType = "image/png";
+                log.warn(
+                    "Emoji analysis skipped. Content does not match any supported image format "
+                        + "(leading bytes: {}). The file is likely a failed decryption - skipping "
+                        + "locally so it cannot stall the batch. File: {}",
+                    MediaContentSniffer.describeHeader(emojiBytes), filePath);
+                return;
             }
 
             String summary = emojiAiSummaryService.generateSummary(emojiBytes, mimeType, filePath);

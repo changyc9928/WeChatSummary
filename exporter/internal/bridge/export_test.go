@@ -16,6 +16,7 @@ import (
 	"strings"
 	"testing"
 
+	"wechatsummary/exporter/internal/extract"
 	"wechatsummary/exporter/internal/sqlite"
 )
 
@@ -503,6 +504,96 @@ INSERT INTO msg_%s VALUES (2,9002,1,1750001000,'late shard2',1,0);
 	body := found.String()
 	if !strings.Contains(body, "early shard1") || !strings.Contains(body, "late shard2") {
 		t.Fatalf("merged messages missing: %s", body)
+	}
+}
+
+// TestBuildExportShardsResolvesSenderPerShard is the regression guard for
+// cross-shard sender misattribution.
+//
+// WeChat 4.1 keeps the same Msg_<md5> table in every message-N.db shard, each a
+// different time slice, and each shard numbers its own Name2Id from 1. Merging
+// the shards' Name2Id into one rowid-keyed map therefore made real_sender_id=1
+// of shard 0 resolve to whatever person shard 1 put at rowid 1, so a member's
+// messages were credited to a different participant. Observed in the wild: 28
+// messages from wxid_bitse3x57b8l22 were labelled "poke1234566", and the
+// generated summary kept asserting that poke had done things they never did.
+//
+// Each table must therefore be resolved with the Name2Id of the shard that
+// owns it.
+func TestBuildExportShardsResolvesSenderPerShard(t *testing.T) {
+	hashOf := func(s string) string {
+		h := md5.Sum([]byte(s))
+		return hex.EncodeToString(h[:])
+	}
+	p1 := hashOf("wxid_session")
+	dir := t.TempDir()
+	shard0 := filepath.Join(dir, "message_0.db")
+	shard1 := filepath.Join(dir, "message_1.db")
+
+	// Both shards use real_sender_id=1, but rowid 1 is a DIFFERENT person in
+	// each — exactly the collision that produced the wrong attribution.
+	makePlainDbAt(t, shard0, fmt.Sprintf(`
+CREATE TABLE msg_%s(
+  local_id INTEGER NOT NULL, server_id INTEGER, type INTEGER,
+  create_time INTEGER, message_content TEXT, real_sender_id INTEGER, is_send INTEGER
+);
+INSERT INTO msg_%s VALUES (1,9001,1,1750000000,'shard0 msg',1,0);
+CREATE TABLE Name2Id(rowid INTEGER PRIMARY KEY, user_name TEXT);
+INSERT INTO Name2Id VALUES (1, 'wxid_alice');
+`, p1, p1))
+	makePlainDbAt(t, shard1, fmt.Sprintf(`
+CREATE TABLE msg_%s(
+  local_id INTEGER NOT NULL, server_id INTEGER, type INTEGER,
+  create_time INTEGER, message_content TEXT, real_sender_id INTEGER, is_send INTEGER
+);
+INSERT INTO msg_%s VALUES (2,9002,1,1750001000,'shard1 msg',1,0);
+CREATE TABLE Name2Id(rowid INTEGER PRIMARY KEY, user_name TEXT);
+INSERT INTO Name2Id VALUES (1, 'wxid_bob');
+`, p1, p1))
+
+	dbs := []*sqlite.DB{openPlainAt(t, shard0), openPlainAt(t, shard1)}
+	res, err := buildExportOptsShards(dbs, shard0, nil, exportMediaOptions{}, exportSelection{})
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	zipBytes, err := base64.StdEncoding.DecodeString(res.ZipBase64)
+	if err != nil {
+		t.Fatal(err)
+	}
+	zr, err := zip.NewReader(bytes.NewReader(zipBytes), int64(len(zipBytes)))
+	if err != nil {
+		t.Fatal(err)
+	}
+	var doc extract.Export
+	for _, zf := range zr.File {
+		if !strings.HasSuffix(zf.Name, ".json") {
+			continue
+		}
+		rc, err := zf.Open()
+		if err != nil {
+			t.Fatal(err)
+		}
+		raw, _ := io.ReadAll(rc)
+		rc.Close()
+		if err := json.Unmarshal(raw, &doc); err != nil {
+			t.Fatalf("messages.json: %v", err)
+		}
+	}
+	got := doc.Messages
+	if len(got) != 2 {
+		t.Fatalf("got %d messages, want 2", len(got))
+	}
+
+	byContent := map[string]string{}
+	for _, m := range got {
+		byContent[m.Content] = m.SenderUsername
+	}
+	if got := byContent["shard0 msg"]; got != "wxid_alice" {
+		t.Errorf("shard0 sender = %q, want wxid_alice (rowid 1 of message_0.db)", got)
+	}
+	if got := byContent["shard1 msg"]; got != "wxid_bob" {
+		t.Errorf("shard1 sender = %q, want wxid_bob (rowid 1 of message_1.db)", got)
 	}
 }
 

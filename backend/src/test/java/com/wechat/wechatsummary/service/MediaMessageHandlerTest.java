@@ -8,10 +8,15 @@ import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyString;
 import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.doThrow;
+import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
+import com.openai.errors.BadRequestException;
+import com.openai.errors.InternalServerException;
+import com.openai.errors.RateLimitException;
+import com.openai.errors.UnauthorizedException;
 import com.wechat.wechatsummary.config.RabbitConfig;
 import java.nio.charset.StandardCharsets;
 import java.util.concurrent.atomic.AtomicBoolean;
@@ -26,6 +31,8 @@ import org.springframework.amqp.core.MessageDeliveryMode;
 import org.springframework.amqp.core.MessagePostProcessor;
 import org.springframework.amqp.core.MessageProperties;
 import org.springframework.amqp.rabbit.core.RabbitTemplate;
+import org.springframework.http.HttpStatus;
+import org.springframework.web.client.HttpClientErrorException;
 
 /**
  * Guards the delayed-retry contract that once stalled preprocessing at 1169/1170: failed
@@ -179,6 +186,157 @@ class MediaMessageHandlerTest {
         assertHoldWiring(config.audioRetryHoldQueue(), RabbitConfig.AUDIO_ROUTING_KEY);
         assertHoldWiring(config.videoRetryHoldQueue(), RabbitConfig.VIDEO_ROUTING_KEY);
         assertHoldWiring(config.emojiRetryHoldQueue(), RabbitConfig.EMOJI_ROUTING_KEY);
+    }
+
+    // ── Permanent vs transient failures ──────────────────────────────────
+    //
+    // Regression guard: a 400 from the vision API ("cannot identify image file") is deterministic.
+    // Retrying it MAX_RETRIES times added ~4.5 minutes per corrupt file and held the batch counter
+    // open, which is what made the UI look permanently stuck.
+    //
+    // The OpenAI error types have private constructors, so each is mocked with just the status code
+    // the classifier reads.
+
+    private static BadRequestException badRequest() {
+        BadRequestException e = mock(BadRequestException.class);
+        when(e.statusCode()).thenReturn(400);
+        return e;
+    }
+
+    private static UnauthorizedException unauthorized() {
+        UnauthorizedException e = mock(UnauthorizedException.class);
+        when(e.statusCode()).thenReturn(401);
+        return e;
+    }
+
+    private static RateLimitException rateLimit() {
+        RateLimitException e = mock(RateLimitException.class);
+        when(e.statusCode()).thenReturn(429);
+        return e;
+    }
+
+    private static InternalServerException serverError() {
+        InternalServerException e = mock(InternalServerException.class);
+        when(e.statusCode()).thenReturn(500);
+        return e;
+    }
+
+    @Test
+    void permanentClientError_completesImmediatelyWithoutRetry() {
+        handler.handle(messageWithRetryHeader(null), "emoji", path -> {
+            throw badRequest();
+        }, RabbitConfig.EMOJI_RETRY_ROUTING_KEY);
+
+        verify(rabbitTemplate, never()).convertAndSend(anyString(), anyString(), any(Object.class),
+            any(MessagePostProcessor.class));
+        verify(coordinatorService).completeTask(anyString(), any(Thread.class));
+    }
+
+    @Test
+    void permanentErrorWrappedInRuntimeException_isStillDetected() {
+        // The processors wrap the provider exception in a plain RuntimeException, so the classifier
+        // has to walk the cause chain rather than only inspecting the top-level type.
+        handler.handle(messageWithRetryHeader(null), "image", path -> {
+            throw new RuntimeException("Emoji processing failed for " + path, badRequest());
+        }, RabbitConfig.IMAGE_RETRY_ROUTING_KEY);
+
+        verify(rabbitTemplate, never()).convertAndSend(anyString(), anyString(), any(Object.class),
+            any(MessagePostProcessor.class));
+        verify(coordinatorService).completeTask(anyString(), any(Thread.class));
+    }
+
+    @Test
+    void unauthorizedIsTreatedAsPermanent_notRetriedNineTimes() {
+        handler.handle(messageWithRetryHeader(null), "image", path -> {
+            throw unauthorized();
+        }, RabbitConfig.IMAGE_RETRY_ROUTING_KEY);
+
+        verify(rabbitTemplate, never()).convertAndSend(anyString(), anyString(), any(Object.class),
+            any(MessagePostProcessor.class));
+        verify(coordinatorService).completeTask(anyString(), any(Thread.class));
+    }
+
+    @Test
+    void rateLimitIsStillRetried() {
+        // 429 is the canonical transient failure - the whole point of the retry ladder - and must
+        // keep being parked rather than being given up on immediately.
+        handler.handle(messageWithRetryHeader(null), "image", path -> {
+            throw rateLimit();
+        }, RabbitConfig.IMAGE_RETRY_ROUTING_KEY);
+
+        verify(rabbitTemplate).convertAndSend(
+            eq(RabbitConfig.EXCHANGE),
+            eq(RabbitConfig.IMAGE_RETRY_ROUTING_KEY),
+            eq(PAYLOAD),
+            any(MessagePostProcessor.class));
+        verify(coordinatorService, never()).completeTask(anyString(), any(Thread.class));
+    }
+
+    @Test
+    void serverErrorIsStillRetried() {
+        handler.handle(messageWithRetryHeader(null), "image", path -> {
+            throw serverError();
+        }, RabbitConfig.IMAGE_RETRY_ROUTING_KEY);
+
+        verify(rabbitTemplate).convertAndSend(
+            eq(RabbitConfig.EXCHANGE),
+            eq(RabbitConfig.IMAGE_RETRY_ROUTING_KEY),
+            eq(PAYLOAD),
+            any(MessagePostProcessor.class));
+        verify(coordinatorService, never()).completeTask(anyString(), any(Thread.class));
+    }
+
+    @Test
+    void requestTimeoutIsStillRetried() {
+        // 408 is a client code but is genuinely transient, so it must not be treated as permanent.
+        BadRequestException timeout = mock(BadRequestException.class);
+        when(timeout.statusCode()).thenReturn(408);
+
+        handler.handle(messageWithRetryHeader(null), "image", path -> {
+            throw timeout;
+        }, RabbitConfig.IMAGE_RETRY_ROUTING_KEY);
+
+        verify(rabbitTemplate).convertAndSend(
+            eq(RabbitConfig.EXCHANGE),
+            eq(RabbitConfig.IMAGE_RETRY_ROUTING_KEY),
+            eq(PAYLOAD),
+            any(MessagePostProcessor.class));
+        verify(coordinatorService, never()).completeTask(anyString(), any(Thread.class));
+    }
+
+    @Test
+    void springHttp4xxIsTreatedAsPermanent() {
+        handler.handle(messageWithRetryHeader(null), "video", path -> {
+            throw new HttpClientErrorException(HttpStatus.PAYLOAD_TOO_LARGE);
+        }, RabbitConfig.VIDEO_RETRY_ROUTING_KEY);
+
+        verify(rabbitTemplate, never()).convertAndSend(anyString(), anyString(), any(Object.class),
+            any(MessagePostProcessor.class));
+        verify(coordinatorService).completeTask(anyString(), any(Thread.class));
+    }
+
+    @Test
+    void permanentErrorWinsOverRetryBudget() {
+        // Even on the final attempt a permanent failure must complete, not re-publish.
+        handler.handle(messageWithRetryHeader(8), "emoji", path -> {
+            throw badRequest();
+        }, RabbitConfig.EMOJI_RETRY_ROUTING_KEY);
+
+        verify(rabbitTemplate, never()).convertAndSend(anyString(), anyString(), any(Object.class),
+            any(MessagePostProcessor.class));
+        verify(coordinatorService).completeTask(anyString(), any(Thread.class));
+    }
+
+    @Test
+    void cyclicCauseChain_doesNotHang() {
+        // A pathological cause cycle must terminate the classifier walk instead of spinning.
+        RuntimeException a = new RuntimeException("a");
+        RuntimeException b = new RuntimeException("b", a);
+        a.initCause(b);
+
+        assertDoesNotThrow(() -> handler.handle(messageWithRetryHeader(null), "image", path -> {
+            throw b;
+        }, RabbitConfig.IMAGE_RETRY_ROUTING_KEY));
     }
 
     private static void assertHoldWiring(org.springframework.amqp.core.Queue holdQueue,

@@ -41,6 +41,21 @@ export default function StepPreprocess({
     ? Math.round(preprocessProgress.progressPercentage)
     : 0;
 
+  // Once a run has clearly plateaued, tell the user that waiting is safe: the server skips
+  // unreadable media and force-finalizes a stalled batch on its own, so there is no need to assume
+  // the page has frozen and go refresh or restart it.
+  const [plateaued, setPlateaued] = useState(false);
+  useEffect(() => {
+    if (!isRunning) {
+      setPlateaued(false);
+      return undefined;
+    }
+    // Restart the timer whenever the reported progress moves; if it has not moved for two minutes
+    // the run is grinding on a single stubborn item.
+    const timer = setTimeout(() => setPlateaued(true), 120000);
+    return () => clearTimeout(timer);
+  }, [isRunning, progressVal]);
+
   // Chat Preview States specific to Step 2
   const [previewData, setPreviewData] = useState({ metadata: {}, rows: [] });
   const [loadingPreview, setLoadingPreview] = useState(false);
@@ -195,6 +210,11 @@ export default function StepPreprocess({
               {preprocessProgress.totalTasks != null && (
                 <div style={{ fontSize: '0.8rem', color: 'var(--text-muted)', marginTop: '4px' }}>
                   {t('preprocess.tasksProcessed', { done: preprocessProgress.completedTasks || 0, total: preprocessProgress.totalTasks, remaining: preprocessProgress.remainingTasks || 0 })}
+                </div>
+              )}
+              {plateaued && (
+                <div style={{ fontSize: '0.8rem', color: 'var(--text-muted)', marginTop: '8px', lineHeight: '1.4' }}>
+                  {t('preprocess.stalledHint')}
                 </div>
               )}
               <button

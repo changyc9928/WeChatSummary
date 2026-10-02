@@ -1,5 +1,6 @@
 package com.wechat.wechatsummary.service;
 
+import com.openai.errors.OpenAIServiceException;
 import com.wechat.wechatsummary.config.RabbitConfig;
 import java.nio.charset.StandardCharsets;
 import java.util.function.Consumer;
@@ -10,6 +11,7 @@ import org.springframework.amqp.core.MessageDeliveryMode;
 import org.springframework.amqp.core.MessagePostProcessor;
 import org.springframework.amqp.rabbit.core.RabbitTemplate;
 import org.springframework.stereotype.Component;
+import org.springframework.web.client.HttpStatusCodeException;
 
 /**
  * Handles the shared AMQP consumer lifecycle for media queue messages: payload parsing, abort
@@ -26,6 +28,9 @@ public class MediaMessageHandler {
      * as completed so the overall task can finish).
      */
     private static final int MAX_RETRIES = 8;
+
+    /** Upper bound on cause-chain traversal when classifying a failure. */
+    private static final int MAX_CAUSE_DEPTH = 32;
 
     private static final String RETRY_HEADER = "x-retry-count";
 
@@ -67,10 +72,22 @@ public class MediaMessageHandler {
             processor.accept(filePath);
             coordinatorService.completeTask(uuid, Thread.currentThread());
         } catch (Exception e) {
-            log.error("Failed to process {} file, path: {}. Attempt {}/{}.",
-                mediaType, filePath, retryCount + 1, MAX_RETRIES + 1, e);
+            // A permanent failure (e.g. a 400 from the vision API for undecodable bytes) produces
+            // the identical response on every attempt, so retrying it only delays the batch by
+            // MAX_RETRIES * RETRY_DELAY_MS. Complete it immediately instead of parking it.
+            boolean permanent = isPermanentFailure(e);
 
-            if (retryCount < MAX_RETRIES) {
+            log.error("Failed to process {} file, path: {}. Attempt {}/{}.{}",
+                mediaType, filePath, retryCount + 1, MAX_RETRIES + 1,
+                permanent ? " Permanent failure - not retryable." : "", e);
+
+            if (permanent) {
+                log.warn(
+                    "Skipping retries for {} file (permanent failure). Recording as completed so "
+                        + "the batch can finish. File: {}",
+                    mediaType, filePath);
+                coordinatorService.completeTask(uuid, Thread.currentThread());
+            } else if (retryCount < MAX_RETRIES) {
                 requeueWithDelay(message, retryRoutingKey, retryCount + 1);
             } else {
                 log.error(
@@ -81,6 +98,37 @@ public class MediaMessageHandler {
         } finally {
             coordinatorService.unregisterThread(uuid, Thread.currentThread());
         }
+    }
+
+    /**
+     * Distinguishes failures that cannot succeed on a later attempt from transient ones.
+     *
+     * <p>Client errors carrying a specific meaning (400 malformed/unsupported payload, 401/403
+     * auth, 404 unknown model, 413/415 size or type limits) are deterministic: the same bytes will
+     * be rejected identically forever, so the retry ladder is pure latency. 408 and 429 are
+     * deliberately treated as transient, as are 5xx and I/O faults.
+     *
+     * @param e the failure raised by the processor
+     * @return true when the failure is permanent and must not be retried
+     */
+    private static boolean isPermanentFailure(Throwable e) {
+        // Bounded walk: a malformed cause chain must never spin, however pathological.
+        int guard = 0;
+        for (Throwable t = e; t != null && guard < MAX_CAUSE_DEPTH; t = t.getCause(), guard++) {
+            if (t instanceof OpenAIServiceException oai) {
+                int status = oai.statusCode();
+                if (status >= 400 && status < 500 && status != 408 && status != 429) {
+                    return true;
+                }
+            }
+            if (t instanceof HttpStatusCodeException http) {
+                int status = http.getStatusCode().value();
+                if (status >= 400 && status < 500 && status != 408 && status != 429) {
+                    return true;
+                }
+            }
+        }
+        return false;
     }
 
     private int readRetryCount(Message amqpMessage) {

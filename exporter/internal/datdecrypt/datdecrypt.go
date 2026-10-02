@@ -27,6 +27,7 @@ import (
 	"encoding/hex"
 	"errors"
 	"fmt"
+	"strings"
 )
 
 // DefaultV1AESKey is CipherTalk's constant key for V1 files: the first 16
@@ -275,6 +276,24 @@ func DetectExt(data []byte) string {
 		return ""
 	}
 	return detectAt(data)
+}
+
+// DescribeHeader renders the first bytes of a payload as uppercase hex so a
+// failed decrypt can be identified from the log alone (e.g. "611F4FFC" for the
+// garbage a bad decryption produces, versus "FFD8FF" for a real JPEG).
+func DescribeHeader(data []byte) string {
+	if len(data) == 0 {
+		return "<empty>"
+	}
+	n := len(data)
+	if n > 8 {
+		n = 8
+	}
+	var sb strings.Builder
+	for _, b := range data[:n] {
+		sb.WriteString(hex.EncodeToString([]byte{b}))
+	}
+	return strings.ToUpper(sb.String())
 }
 
 func detectAt(b []byte) string {

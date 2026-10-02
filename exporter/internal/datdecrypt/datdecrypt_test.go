@@ -183,3 +183,36 @@ func TestDetectExtSniffs(t *testing.T) {
 		}
 	}
 }
+
+// TestDescribeHeader pins the diagnostic used when a .dat decrypts to something
+// that is not an image. Those files used to be dropped with no log line at all,
+// leaving the "failed=N" summary impossible to reconcile; the header is what
+// makes the cause identifiable from the log alone.
+func TestDescribeHeader(t *testing.T) {
+	cases := []struct {
+		name string
+		in   []byte
+		want string
+	}{
+		{"nil", nil, "<empty>"},
+		{"empty", []byte{}, "<empty>"},
+		{"short", []byte{0x61, 0x1f}, "611F"},
+		// The real garbage a failed decryption produced, which DetectExt rejects.
+		{"garbage", []byte{0x61, 0x1f, 0x4f, 0xfc, 0x41, 0xab, 0xf1, 0x6f, 0xd3}, "611F4FFC41ABF16F"},
+		// Truncated to 8 bytes so a long payload cannot overflow the output.
+		{"long", []byte{0xff, 0xd8, 0xff, 0xe0, 1, 2, 3, 4, 5, 6, 7, 8}, "FFD8FFE001020304"},
+	}
+	for _, c := range cases {
+		if got := DescribeHeader(c.in); got != c.want {
+			t.Errorf("DescribeHeader(%s) = %q, want %q", c.name, got, c.want)
+		}
+	}
+	// Whatever DescribeHeader reports must line up with DetectExt's verdict.
+	garbage := []byte{0x61, 0x1f, 0x4f, 0xfc, 0x41, 0xab, 0xf1, 0x6f, 0xd3, 0x5d, 0xad, 0x4a}
+	if DetectExt(garbage) != "" {
+		t.Fatal("garbage fixture should not be detected as an image")
+	}
+	if DescribeHeader(garbage) != "611F4FFC41ABF16F" {
+		t.Fatal("header for unrecognised payload should identify it in the log")
+	}
+}

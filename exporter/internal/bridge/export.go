@@ -223,6 +223,10 @@ func buildExportOptsShards(dbs []*sqlite.DB, dbPath string, secret []byte, opts 
 	var colsFor []string
 
 	// Collect tables per shard, filter by selection (union across shards).
+	// Each table keeps a reference to ITS OWN shard's Name2Id: rowids are only
+	// unique within a shard, so a merged rowid-keyed map would resolve some
+	// shards' real_sender_id values to another shard's member and misattribute
+	// messages (observed: 28 messages credited to the wrong participant).
 	var all []extract.MessageTable
 	tableNamesSet := map[string]bool{}
 	for _, db := range dbs {
@@ -230,7 +234,9 @@ func buildExportOptsShards(dbs []*sqlite.DB, dbPath string, secret []byte, opts 
 		if err != nil {
 			return exportResult{}, err
 		}
+		shardName2Id := extract.LoadName2Id(db)
 		for _, mt := range tables {
+			mt.Name2Id = shardName2Id
 			all = append(all, mt)
 			tableNamesSet[mt.Table.Name()] = true
 			if len(colsFor) == 0 {
@@ -264,8 +270,6 @@ func buildExportOptsShards(dbs []*sqlite.DB, dbPath string, secret []byte, opts 
 		bridgeLog.Add("info", "export: %d of %d requested table(s) found across shards", len(kept), len(sel.Tables))
 		all = kept
 	}
-	name2id := mergeName2Id(dbs)
-
 	// Extract per (shard, table) so the media loop can process each table's
 	// own rows (the previous all-tables x all-messages loop was O(T*M)), then
 	// merge into one slice with per-table index ranges so media mutation lands
@@ -273,7 +277,7 @@ func buildExportOptsShards(dbs []*sqlite.DB, dbPath string, secret []byte, opts 
 	var msgs []extract.Message
 	var ranges []tableRange
 	for _, mt := range all {
-		part, err := extract.ExtractMessagesRange(mt.Table, mt.Columns, 0, name2id, sel.From, sel.To)
+		part, err := extract.ExtractMessagesRange(mt.Table, mt.Columns, 0, mt.Name2Id, sel.From, sel.To)
 		if err != nil {
 			return exportResult{}, fmt.Errorf("table %s: %v", mt.Table.Name(), err)
 		}

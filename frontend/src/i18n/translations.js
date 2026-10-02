@@ -229,6 +229,7 @@ export const translations = {
     'preprocess.reprocessing': 'Regenerating...',
     'preprocess.startOver': 'Start Over',
     'preprocess.startingOver': 'Starting Over...',
+    'preprocess.stalledHint': 'Taking longer than expected. Unreadable files are skipped automatically — if no progress is made the server finalizes the document on its own, so no restart is needed.',
 
     'summary.title': 'Step 3: AI Summary',
     'summary.selectDatasetFirst': 'Select a dataset first.',
@@ -575,6 +576,7 @@ export const translations = {
     'preprocess.reprocessing': '正在重新生成...',
     'preprocess.startOver': '从头开始',
     'preprocess.startingOver': '正在从头开始...',
+    'preprocess.stalledHint': '处理时间比预期长。无法读取的文件会被自动跳过——若长时间没有进展，服务端会自动完成文档生成，无需手动重启。',
 
     'summary.title': '第 3 步：AI 摘要',
     'summary.selectDatasetFirst': '请先选择数据集。',

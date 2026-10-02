@@ -57,6 +57,16 @@ var messageTableCandidates = []string{"MSG", "message", "msg", "ChatMessage", "c
 type MessageTable struct {
 	Table   *sqlite.Table
 	Columns []string
+
+	// Name2Id is the rowid -> user_name map of the shard that owns Table.
+	//
+	// It MUST stay bound to the owning database: Name2Id.rowid is only unique
+	// within one shard, and WeChat 4.1 keeps the same Msg_<md5> table in every
+	// message_*.db shard (each a different time slice) with its own Name2Id
+	// numbered from 1. Merging shards into one rowid-keyed map makes rowid N of
+	// shard A resolve to shard B's person, silently attributing messages to the
+	// wrong member.
+	Name2Id map[int64]string
 }
 
 // WeChat 4.1.x names the per-session tables Msg_<md5> (capital M — observed

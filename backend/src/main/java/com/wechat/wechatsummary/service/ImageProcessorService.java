@@ -3,6 +3,7 @@ package com.wechat.wechatsummary.service;
 import com.wechat.wechatsummary.config.ProcessingConfig;
 import com.wechat.wechatsummary.entity.ImageSummaryEntity;
 import com.wechat.wechatsummary.util.HashUtils;
+import com.wechat.wechatsummary.util.MediaContentSniffer;
 import com.wechat.wechatsummary.util.PageUtils;
 import com.wechat.wechatsummary.util.PathUtils;
 import java.nio.file.Files;
@@ -69,9 +70,17 @@ public class ImageProcessorService {
                 return;
             }
 
-            String mimeType = Files.probeContentType(path);
+            // Sniff the bytes instead of trusting the file name: undecodable content is rejected
+            // by the vision API with a permanent 400, so skipping locally completes the sub-task
+            // immediately rather than retrying it MAX_RETRIES times and stalling the batch.
+            String mimeType = MediaContentSniffer.detectImageMimeType(imageBytes);
             if (mimeType == null) {
-                mimeType = "image/jpeg";
+                log.warn(
+                    "Image analysis skipped. Content does not match any supported image format "
+                        + "(leading bytes: {}). The file is likely a failed decryption - skipping "
+                        + "locally so it cannot stall the batch. File: {}",
+                    MediaContentSniffer.describeHeader(imageBytes), filePath);
+                return;
             }
 
             String summary = imageAiSummaryService.generateSummary(imageBytes, mimeType, filePath);

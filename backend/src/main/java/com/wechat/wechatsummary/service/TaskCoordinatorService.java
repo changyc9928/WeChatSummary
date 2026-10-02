@@ -27,6 +27,7 @@ public class TaskCoordinatorService {
     private static final String TOTAL_PREFIX = "task:total:";
     private static final String ABORTED_PREFIX = "task:aborted:";
     private static final String USER_KEY_PREFIX = "task:user:";
+    private static final String HEARTBEAT_PREFIX = "task:heartbeat:";
 
     // Thread-safe map tracking active JVM threads for each UUID batch
     private final Map<String, Set<Thread>> activeThreadsMap = new ConcurrentHashMap<>();
@@ -39,6 +40,7 @@ public class TaskCoordinatorService {
     public void initTaskContext(String userId, String uuid, int totalTasks, String inputJsonPath,
         String outputFilePath) {
         redisTemplate.delete(ABORTED_PREFIX + uuid);
+        redisTemplate.delete(HEARTBEAT_PREFIX + uuid);
 
         if (totalTasks <= 0) {
             log.info(
@@ -55,6 +57,22 @@ public class TaskCoordinatorService {
             .set(COUNTER_PREFIX + uuid, String.valueOf(totalTasks), redisTtl, TimeUnit.DAYS);
         redisTemplate.opsForValue()
             .set(TOTAL_PREFIX + uuid, String.valueOf(totalTasks), redisTtl, TimeUnit.DAYS);
+        touchHeartbeat(uuid);
+    }
+
+    /**
+     * Records that this batch is still making progress, so the stall watchdog can tell a genuinely
+     * slow run apart from one whose remaining messages were lost.
+     */
+    private void touchHeartbeat(String uuid) {
+        try {
+            redisTemplate.opsForValue()
+                .set(HEARTBEAT_PREFIX + uuid, String.valueOf(System.currentTimeMillis()),
+                    taskConfig.getRedisTtl().toDays(), TimeUnit.DAYS);
+        } catch (Exception e) {
+            // The heartbeat is advisory only; never let it break message processing.
+            log.debug("Failed to record task heartbeat for UUID: [{}]", uuid, e);
+        }
     }
 
     /**
@@ -71,6 +89,7 @@ public class TaskCoordinatorService {
         activeThreadsMap
             .computeIfAbsent(uuid, k -> Collections.newSetFromMap(new ConcurrentHashMap<>()))
             .add(thread);
+        touchHeartbeat(uuid);
 
         log.info("Registered thread [{}] for batch UUID: [{}]", thread.getName(), uuid);
     }
@@ -109,6 +128,7 @@ public class TaskCoordinatorService {
         // Delete active counter keys in Redis
         redisTemplate.delete(COUNTER_PREFIX + uuid);
         redisTemplate.delete(TOTAL_PREFIX + uuid);
+        redisTemplate.delete(HEARTBEAT_PREFIX + uuid);
 
         if (threads != null && !threads.isEmpty()) {
             for (Thread thread : threads) {
@@ -173,6 +193,7 @@ public class TaskCoordinatorService {
             }
             return;
         }
+        touchHeartbeat(uuid);
 
         if (log.isDebugEnabled()) {
             log.debug(
@@ -196,6 +217,7 @@ public class TaskCoordinatorService {
             redisTemplate.delete(counterKey);
             redisTemplate.delete(TOTAL_PREFIX + uuid);
             redisTemplate.delete(USER_KEY_PREFIX + uuid);
+            redisTemplate.delete(HEARTBEAT_PREFIX + uuid);
             activeThreadsMap.remove(uuid);
         }
     }
@@ -282,5 +304,135 @@ public class TaskCoordinatorService {
         redisTemplate.delete(TOTAL_PREFIX + uuid);
         redisTemplate.delete(ABORTED_PREFIX + uuid);
         redisTemplate.delete(USER_KEY_PREFIX + uuid);
+        redisTemplate.delete(HEARTBEAT_PREFIX + uuid);
+    }
+
+    // ── Stall watchdog ────────────────────────────────────────────────────
+    //
+    // The batch counter only reaches zero when every dispatched message reports back. If any
+    // message is lost (broker restart between publish and ack, container eviction, an unhandled
+    // error path) the counter stays above zero forever and the UI spins indefinitely, because the
+    // final markdown compile is gated on that counter. The watchdog below detects a batch that has
+    // stopped making progress with no work in flight and force-closes it, so a session can never
+    // be left permanently stuck.
+
+    /**
+     * Returns the batch UUIDs that currently have a live task context in Redis (i.e. an unfinished
+     * counter). Used by the watchdog to decide what to inspect.
+     *
+     * @return set of UUIDs with an outstanding counter, never {@code null}
+     */
+    public Set<String> findUnfinishedTaskIds() {
+        Set<String> keys = redisTemplate.keys(COUNTER_PREFIX + "*");
+        if (keys == null || keys.isEmpty()) {
+            return Set.of();
+        }
+        Set<String> uuids = new java.util.HashSet<>();
+        for (String key : keys) {
+            uuids.add(key.substring(COUNTER_PREFIX.length()));
+        }
+        return uuids;
+    }
+
+    /**
+     * Decides whether a batch is genuinely stuck. A batch is considered stalled only when every
+     * one of these holds:
+     * <ol>
+     *   <li>it has not been explicitly aborted (an abort is a user action, not a fault),</li>
+     *   <li>no local worker thread is registered for it,</li>
+     *   <li>the media broker has no queued or unacknowledged message left to deliver, and</li>
+     *   <li>its heartbeat has not advanced within the configured grace period.</li>
+     * </ol>
+     * The queue check is what makes this safe: while any message is still pending the batch is
+     * legitimately in flight and must be left alone.
+     *
+     * @param uuid               the batch to inspect
+     * @param pendingBrokerWork  total messages still queued/unacked across the media queues
+     * @param gracePeriodMillis  how long the heartbeat may stay stale before we intervene
+     * @return true when the batch can no longer progress on its own
+     */
+    public boolean isStalled(String uuid, long pendingBrokerWork, long gracePeriodMillis) {
+        if (isAborted(uuid)) {
+            return false;
+        }
+        Set<Thread> threads = activeThreadsMap.get(uuid);
+        if (threads != null && !threads.isEmpty()) {
+            return false;
+        }
+        if (pendingBrokerWork > 0) {
+            return false;
+        }
+        String heartbeat = redisTemplate.opsForValue().get(HEARTBEAT_PREFIX + uuid);
+        if (heartbeat == null) {
+            // No heartbeat at all: only treat as stalled if the context is older than the grace
+            // period, which we approximate from the counter key's own TTL.
+            Long ttl = redisTemplate.getExpire(COUNTER_PREFIX + uuid);
+            return ttl != null && ttl > 0 && ttl < (gracePeriodMillis / 1000);
+        }
+        try {
+            long lastBeat = Long.parseLong(heartbeat);
+            return System.currentTimeMillis() - lastBeat > gracePeriodMillis;
+        } catch (NumberFormatException e) {
+            return true;
+        }
+    }
+
+    /**
+     * Force-closes a stalled batch: clears the counter so the task reports as finished instead of
+     * spinning forever, and compiles the markdown from whatever media did complete. The result is
+     * a document that may omit a few assets, which is strictly better than an endless spinner and a
+     * user having to guess whether to restart.
+     *
+     * @param uuid   the stalled batch to close out
+     * @param reason human-readable cause recorded in the log
+     * @return true when the batch was closed out by this call
+     */
+    public boolean forceCompleteStalledTask(String uuid, String reason) {
+        if (isAborted(uuid)) {
+            return false;
+        }
+        String userId = redisTemplate.opsForValue().get(USER_KEY_PREFIX + uuid);
+        if (userId == null) {
+            log.warn(
+                "Cannot force-complete stalled UUID [{}]: no userId in Redis. Clearing counter only. Reason: {}",
+                uuid, reason);
+            redisTemplate.delete(COUNTER_PREFIX + uuid);
+            redisTemplate.delete(TOTAL_PREFIX + uuid);
+            return true;
+        }
+
+        log.error(
+            "Preprocessing for UUID [{}] stalled with no work in flight ({}). Force-completing with "
+                + "the media that did finish so the session is not stuck forever; some assets may be "
+                + "missing from the compiled markdown.",
+            uuid, reason);
+
+        redisTemplate.delete(COUNTER_PREFIX + uuid);
+        redisTemplate.delete(TOTAL_PREFIX + uuid);
+        redisTemplate.delete(USER_KEY_PREFIX + uuid);
+        redisTemplate.delete(HEARTBEAT_PREFIX + uuid);
+        activeThreadsMap.remove(uuid);
+
+        try {
+            messageProcessorService.processJsonAndSave(userId, uuid);
+            return true;
+        } catch (Exception e) {
+            log.error("Failed to compile markdown while force-completing stalled UUID: [{}]", uuid, e);
+            return false;
+        }
+    }
+
+    /**
+     * Number of sub-tasks still outstanding for the given batch. Exposed for the watchdog's logging.
+     */
+    public int remainingTasks(String uuid) {
+        return safeParse(redisTemplate.opsForValue().get(COUNTER_PREFIX + uuid));
+    }
+
+    /**
+     * The configured window a batch may go without progress before the watchdog intervenes.
+     */
+    public java.time.Duration stallGracePeriod() {
+        return taskConfig.getStallGracePeriod();
     }
 }

@@ -34,6 +34,10 @@ export default function usePreprocess({ uuidInput, currentUser, onCompleted }) {
         return data.data;
       }
     } catch (err) {
+      // A single failed poll (laptop sleep, brief network blip) must not end the session: the
+      // interval keeps running and the next tick re-establishes the true state. Surfacing the
+      // error here used to be indistinguishable from a finished task and left the UI frozen
+      // until the user manually refreshed the page.
       console.error(err);
     }
     return null;
@@ -51,9 +55,10 @@ export default function usePreprocess({ uuidInput, currentUser, onCompleted }) {
         setIsFinished(true);
         setProgress(data);
         onCompletedRef.current?.(uuid);
-      } else if (data.status === 'PAUSED') {
-        stopPolling();
       }
+      // NOTE: deliberately no longer stop on PAUSED. An aborted run is still observable, and the
+      // watchdog may close a stalled run out on its own, so polling must continue to observe the
+      // transition to COMPLETED instead of requiring a page refresh.
     };
     check();
     pollRef.current = setInterval(check, 1500);
@@ -124,16 +129,19 @@ export default function usePreprocess({ uuidInput, currentUser, onCompleted }) {
 
       const initializeSessionStatus = async () => {
         const progressData = await checkProgress(uuidInput);
-        if (progressData) {
-          if (progressData.status === 'RUNNING') {
-            startPolling(uuidInput);
-          } else if (progressData.status === 'COMPLETED') {
-            setIsFinished(true);
-            setProgress(progressData);
-            onCompletedRef.current?.(uuidInput);
-          } else if (progressData.status === 'PAUSED') {
-            setProgress(progressData);
-          }
+        if (!progressData) return;
+        if (progressData.status === 'COMPLETED') {
+          setIsFinished(true);
+          setProgress(progressData);
+          onCompletedRef.current?.(uuidInput);
+          return;
+        }
+        // RUNNING and PAUSED both keep polling. This is what lets the page recover on its own after
+        // a reload: the watchdog can close a stalled run out server-side, and the open poll picks up
+        // the transition to COMPLETED instead of the user having to refresh again. IDLING is
+        // deliberately not polled - there is no task to watch and it would poll forever.
+        if (progressData.status === 'RUNNING' || progressData.status === 'PAUSED') {
+          startPolling(uuidInput);
         }
       };
       initializeSessionStatus();

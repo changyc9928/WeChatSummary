@@ -181,6 +181,14 @@ func exportMediaPerTable(zw *zip.Writer, accountDir string, msgs []extract.Messa
 				ext := datdecrypt.DetectExt(dec)
 				if ext == "" {
 					failed++
+					// Decryption reported success but the plaintext is not any image
+					// container we recognise, i.e. the .dat was corrupt or decrypted to
+					// garbage. Previously silent, which made the summary line
+					// ("failed=N") impossible to reconcile against the log: the other
+					// media branches all log here, so these files were invisible.
+					bridgeLog.Add("info", "export media: image %s (rowid=%d) decrypted but is not a recognised image "+
+						"(%d bytes, leading bytes: %s) - the .dat is corrupt or decrypted to garbage; skipped",
+						md5Key, m.RowID, len(dec), datdecrypt.DescribeHeader(dec))
 					continue
 				}
 				df := time.Unix(m.CreateTime, 0).Format("20060102")
@@ -188,6 +196,8 @@ func exportMediaPerTable(zw *zip.Writer, accountDir string, msgs []extract.Messa
 				rel := "images/" + df + "/" + fileName
 				if werr := writeZipEntry(zw, rel, dec); werr != nil {
 					failed++
+					bridgeLog.Add("info", "export media: image %s (rowid=%d) zip write failed for %s: %v",
+						md5Key, m.RowID, rel, werr)
 					continue
 				}
 				m.Content = "[图片] " + rel
