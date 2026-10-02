@@ -75,7 +75,7 @@ processing:
   log-progress-every: 500
 
 summary:
-  chunk-size-chars: 15000
+  chunk-size-chars: 8000
   combine-batch: 2
   progress-cap: 99.9
 

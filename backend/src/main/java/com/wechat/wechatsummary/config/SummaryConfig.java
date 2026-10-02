@@ -9,7 +9,7 @@ import org.springframework.stereotype.Component;
 @Data
 public class SummaryConfig {
 
-    private int chunkSizeChars = 15000;
+    private int chunkSizeChars = 8000;
     private int combineBatch = 2;
     private double progressCap = 99.9;
 }
