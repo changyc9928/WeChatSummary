@@ -12,6 +12,7 @@ export default function useSummaryStatus({ uuidInput, currentUser }) {
 
   const pollRef = useRef(null);
   const stateRef = useRef(summaryState);
+  const pendingStartRef = useRef(false);
   useEffect(() => {
     stateRef.current = summaryState;
   }, [summaryState]);
@@ -38,17 +39,27 @@ export default function useSummaryStatus({ uuidInput, currentUser }) {
 
       const result = payload.result || stateRef.current.result || null;
 
-      setSummaryState(prevState => ({
-        ...prevState,
-        status: status,
-        progress: progress,
-        result: result,
-        errorMessage: payload.errorMessage || prevState.errorMessage || null
-      }));
+      if (!(pendingStartRef.current && status === 'INITIAL_STATE')) {
+        setSummaryState(prevState => ({
+          ...prevState,
+          status: status,
+          progress: progress,
+          result: result,
+          errorMessage: payload.errorMessage || prevState.errorMessage || null
+        }));
+      }
 
-      if (status === 'RUNNING' && !pollRef.current) {
-        pollRef.current = setInterval(() => fetchStatus(uuid), 2000);
-      } else if (status !== 'RUNNING') {
+      if (status === 'RUNNING') {
+        pendingStartRef.current = false;
+        if (!pollRef.current) {
+          pollRef.current = setInterval(() => fetchStatus(uuid), 2000);
+        }
+      } else if (pendingStartRef.current && status === 'INITIAL_STATE') {
+        if (!pollRef.current) {
+          pollRef.current = setInterval(() => fetchStatus(uuid), 2000);
+        }
+      } else {
+        pendingStartRef.current = false;
         stopPolling();
       }
     } catch (err) {
@@ -60,6 +71,8 @@ export default function useSummaryStatus({ uuidInput, currentUser }) {
     if (!uuidInput) return;
     setLoading(true);
     setError(null);
+    pendingStartRef.current = true;
+    setSummaryState({ status: 'RUNNING', progress: 0, result: null, errorMessage: null });
     try {
       await apiClient.chatSummary.startSummary({
         xUserId: currentUser?.uuid,
@@ -69,14 +82,19 @@ export default function useSummaryStatus({ uuidInput, currentUser }) {
       fetchStatus(uuidInput);
     } catch (err) {
       setError(err.message);
+      pendingStartRef.current = false;
+      stopPolling();
+      setSummaryState(INITIAL_STATE);
     } finally {
       setLoading(false);
     }
-  }, [uuidInput, currentUser, fetchStatus]);
+  }, [uuidInput, currentUser, fetchStatus, stopPolling]);
 
   const restartSummary = useCallback(async (payload = {}) => {
     if (!uuidInput) return;
     setRestarting(true);
+    pendingStartRef.current = true;
+    setSummaryState({ status: 'RUNNING', progress: 0, result: null, errorMessage: null });
     try {
       await apiClient.chatSummary.restartSummary({
         xUserId: currentUser?.uuid,
@@ -86,10 +104,13 @@ export default function useSummaryStatus({ uuidInput, currentUser }) {
       fetchStatus(uuidInput);
     } catch (err) {
       console.error(err);
+      pendingStartRef.current = false;
+      stopPolling();
+      setSummaryState(INITIAL_STATE);
     } finally {
       setRestarting(false);
     }
-  }, [uuidInput, currentUser, fetchStatus]);
+  }, [uuidInput, currentUser, fetchStatus, stopPolling]);
 
   const pauseSummary = useCallback(async () => {
     if (!uuidInput) return;
@@ -109,6 +130,7 @@ export default function useSummaryStatus({ uuidInput, currentUser }) {
 
   useEffect(() => {
     setSummaryState(INITIAL_STATE);
+    pendingStartRef.current = false;
     stopPolling();
   }, [uuidInput, stopPolling]);
 
