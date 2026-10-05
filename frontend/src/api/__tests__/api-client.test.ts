@@ -1,4 +1,5 @@
-import { describe, it, expect } from 'vitest'
+// @vitest-environment jsdom
+import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest'
 import {
   AuthControllerApi,
   BridgeLogControllerApi,
@@ -224,6 +225,62 @@ describe('Generated API Client Smoke Tests', () => {
     it('apiClient should not have a bridgeLog property (not wired in client.js)', async () => {
       const { apiClient } = await import('../../api/client')
       expect((apiClient as any).bridgeLog).toBeUndefined()
+    })
+
+    describe('Bearer token handling', () => {
+      beforeEach(() => {
+        localStorage.clear()
+      })
+
+      afterEach(() => {
+        vi.unstubAllGlobals()
+        localStorage.clear()
+      })
+
+      function okJson(data: unknown) {
+        return new Response(JSON.stringify({ code: 0, message: 'success', data }), {
+          status: 200,
+          headers: { 'Content-Type': 'application/json' },
+        })
+      }
+
+      function headerValue(init: RequestInit | undefined, name: string) {
+        return new Headers(init?.headers).get(name)
+      }
+
+      it('attaches the stored Bearer token to secured requests', async () => {
+        const { apiClient } = await import('../../api/client')
+        const { setAuthToken } = await import('../authToken')
+        const fetchMock = vi.fn().mockResolvedValue(okJson([]))
+        vi.stubGlobal('fetch', fetchMock)
+        setAuthToken('unit-token')
+
+        await apiClient.upload.getAvailableSessions()
+
+        expect(headerValue(fetchMock.mock.calls[0][1], 'Authorization')).toBe('Bearer unit-token')
+      })
+
+      it('does not attach an Authorization header without a stored token', async () => {
+        const { apiClient } = await import('../../api/client')
+        const fetchMock = vi.fn().mockResolvedValue(okJson([]))
+        vi.stubGlobal('fetch', fetchMock)
+
+        await apiClient.upload.getAvailableSessions()
+
+        expect(headerValue(fetchMock.mock.calls[0][1], 'Authorization')).toBeNull()
+      })
+
+      it('does not attach Authorization to login', async () => {
+        const { apiClient } = await import('../../api/client')
+        const { setAuthToken } = await import('../authToken')
+        const fetchMock = vi.fn().mockResolvedValue(okJson({ token: 'fresh-token' }))
+        vi.stubGlobal('fetch', fetchMock)
+        setAuthToken('stale-token')
+
+        await apiClient.auth.login({ authRequest: { username: 'alice', password: 'secret' } })
+
+        expect(headerValue(fetchMock.mock.calls[0][1], 'Authorization')).toBeNull()
+      })
     })
   })
 })

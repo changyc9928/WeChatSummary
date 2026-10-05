@@ -29,7 +29,7 @@ export default function LoginPage({ onLoginSuccess, theme, onToggleTheme }) {
         ? await apiClient.auth.login({ authRequest: credentials })
         : await apiClient.auth.register({ authRequest: credentials });
 
-      onLoginSuccess({ uuid: data?.data?.uuid, username });
+      onLoginSuccess({ token: data?.data?.token, username });
     } catch (err) {
       setPassword('');
       setAuthError(err.message);

@@ -41,155 +41,126 @@ import {
 } from '../models/index';
 
 export interface AbortTaskRequest {
-    xUserId: string;
     uuid: string;
 }
 
 export interface ClearAudioSummaryTextByIdRequest {
-    xUserId: string;
     id: string;
 }
 
 export interface ClearAudioSummaryTextsByIdsRequest {
-    xUserId: string;
     requestBody: Array<string>;
 }
 
 export interface ClearVideoSummaryTextByIdRequest {
-    xUserId: string;
     id: string;
 }
 
 export interface ClearVideoSummaryTextsByIdsRequest {
-    xUserId: string;
     requestBody: Array<string>;
 }
 
 export interface DeleteAllAudioSummariesByUuidRequest {
-    xUserId: string;
     uuid: string;
 }
 
 export interface DeleteAllEmojiSummariesByUuidRequest {
-    xUserId: string;
     uuid: string;
 }
 
 export interface DeleteAllImageSummariesByUuidRequest {
-    xUserId: string;
     uuid: string;
 }
 
 export interface DeleteAllVideoSummariesByUuidRequest {
-    xUserId: string;
     uuid: string;
 }
 
 export interface DeleteAudioSummariesByIdsRequest {
-    xUserId: string;
     requestBody: Array<string>;
 }
 
 export interface DeleteAudioSummaryByIdRequest {
-    xUserId: string;
     id: string;
 }
 
 export interface DeleteEmojiSummariesByIdsRequest {
-    xUserId: string;
     requestBody: Array<string>;
 }
 
 export interface DeleteEmojiSummaryByIdRequest {
-    xUserId: string;
     id: string;
 }
 
 export interface DeleteImageSummariesByIdsRequest {
-    xUserId: string;
     requestBody: Array<string>;
 }
 
 export interface DeleteImageSummaryByIdRequest {
-    xUserId: string;
     id: string;
 }
 
 export interface DeleteVideoSummariesByIdsRequest {
-    xUserId: string;
     requestBody: Array<string>;
 }
 
 export interface DeleteVideoSummaryByIdRequest {
-    xUserId: string;
     id: string;
 }
 
 export interface GetAudioFileByIdRequest {
-    xUserId: string;
     id: string;
 }
 
 export interface GetAudioSummariesByUuidRequest {
-    xUserId: string;
     uuid: string;
     page?: number;
     size?: number;
 }
 
 export interface GetEmojiFileByIdRequest {
-    xUserId: string;
     id: string;
 }
 
 export interface GetEmojiSummariesByUuidRequest {
-    xUserId: string;
     uuid: string;
     page?: number;
     size?: number;
 }
 
 export interface GetImageFileByIdRequest {
-    xUserId: string;
     id: string;
 }
 
 export interface GetImageSummariesByUuidRequest {
-    xUserId: string;
     uuid: string;
     page?: number;
     size?: number;
 }
 
 export interface GetProgressRequest {
-    xUserId: string;
     uuid: string;
 }
 
 export interface GetVideoFileByIdRequest {
-    xUserId: string;
     id: string;
 }
 
 export interface GetVideoSummariesByUuidRequest {
-    xUserId: string;
     uuid: string;
     page?: number;
     size?: number;
 }
 
 export interface PreprocessRequest {
-    xUserId: string;
     uuid: string;
 }
 
 export interface ReprocessRequest {
-    xUserId: string;
     uuid: string;
 }
 
 export interface RestartPreprocessRequest {
-    xUserId: string;
     uuid: string;
 }
 
@@ -201,13 +172,6 @@ export class PreprocessControllerApi extends runtime.BaseAPI {
     /**
      */
     async abortTaskRaw(requestParameters: AbortTaskRequest, initOverrides?: RequestInit | runtime.InitOverrideFunction): Promise<runtime.ApiResponse<ApiResponseTaskAckResponse>> {
-        if (requestParameters['xUserId'] == null) {
-            throw new runtime.RequiredError(
-                'xUserId',
-                'Required parameter "xUserId" was null or undefined when calling abortTask().'
-            );
-        }
-
         if (requestParameters['uuid'] == null) {
             throw new runtime.RequiredError(
                 'uuid',
@@ -219,10 +183,14 @@ export class PreprocessControllerApi extends runtime.BaseAPI {
 
         const headerParameters: runtime.HTTPHeaders = {};
 
-        if (requestParameters['xUserId'] != null) {
-            headerParameters['X-User-Id'] = String(requestParameters['xUserId']);
-        }
+        if (this.configuration && this.configuration.accessToken) {
+            const token = this.configuration.accessToken;
+            const tokenString = await token("bearerAuth", []);
 
+            if (tokenString) {
+                headerParameters["Authorization"] = `Bearer ${tokenString}`;
+            }
+        }
 
         let urlPath = `/api/preprocess/{uuid}/abort`;
         urlPath = urlPath.replace(`{${"uuid"}}`, encodeURIComponent(String(requestParameters['uuid'])));
@@ -247,13 +215,6 @@ export class PreprocessControllerApi extends runtime.BaseAPI {
     /**
      */
     async clearAudioSummaryTextByIdRaw(requestParameters: ClearAudioSummaryTextByIdRequest, initOverrides?: RequestInit | runtime.InitOverrideFunction): Promise<runtime.ApiResponse<ApiResponseVoid>> {
-        if (requestParameters['xUserId'] == null) {
-            throw new runtime.RequiredError(
-                'xUserId',
-                'Required parameter "xUserId" was null or undefined when calling clearAudioSummaryTextById().'
-            );
-        }
-
         if (requestParameters['id'] == null) {
             throw new runtime.RequiredError(
                 'id',
@@ -265,10 +226,14 @@ export class PreprocessControllerApi extends runtime.BaseAPI {
 
         const headerParameters: runtime.HTTPHeaders = {};
 
-        if (requestParameters['xUserId'] != null) {
-            headerParameters['X-User-Id'] = String(requestParameters['xUserId']);
-        }
+        if (this.configuration && this.configuration.accessToken) {
+            const token = this.configuration.accessToken;
+            const tokenString = await token("bearerAuth", []);
 
+            if (tokenString) {
+                headerParameters["Authorization"] = `Bearer ${tokenString}`;
+            }
+        }
 
         let urlPath = `/api/preprocess/audios/summaries/{id}/text`;
         urlPath = urlPath.replace(`{${"id"}}`, encodeURIComponent(String(requestParameters['id'])));
@@ -293,13 +258,6 @@ export class PreprocessControllerApi extends runtime.BaseAPI {
     /**
      */
     async clearAudioSummaryTextsByIdsRaw(requestParameters: ClearAudioSummaryTextsByIdsRequest, initOverrides?: RequestInit | runtime.InitOverrideFunction): Promise<runtime.ApiResponse<ApiResponseVoid>> {
-        if (requestParameters['xUserId'] == null) {
-            throw new runtime.RequiredError(
-                'xUserId',
-                'Required parameter "xUserId" was null or undefined when calling clearAudioSummaryTextsByIds().'
-            );
-        }
-
         if (requestParameters['requestBody'] == null) {
             throw new runtime.RequiredError(
                 'requestBody',
@@ -313,10 +271,14 @@ export class PreprocessControllerApi extends runtime.BaseAPI {
 
         headerParameters['Content-Type'] = 'application/json';
 
-        if (requestParameters['xUserId'] != null) {
-            headerParameters['X-User-Id'] = String(requestParameters['xUserId']);
-        }
+        if (this.configuration && this.configuration.accessToken) {
+            const token = this.configuration.accessToken;
+            const tokenString = await token("bearerAuth", []);
 
+            if (tokenString) {
+                headerParameters["Authorization"] = `Bearer ${tokenString}`;
+            }
+        }
 
         let urlPath = `/api/preprocess/audios/summaries/text`;
 
@@ -341,13 +303,6 @@ export class PreprocessControllerApi extends runtime.BaseAPI {
     /**
      */
     async clearVideoSummaryTextByIdRaw(requestParameters: ClearVideoSummaryTextByIdRequest, initOverrides?: RequestInit | runtime.InitOverrideFunction): Promise<runtime.ApiResponse<ApiResponseVoid>> {
-        if (requestParameters['xUserId'] == null) {
-            throw new runtime.RequiredError(
-                'xUserId',
-                'Required parameter "xUserId" was null or undefined when calling clearVideoSummaryTextById().'
-            );
-        }
-
         if (requestParameters['id'] == null) {
             throw new runtime.RequiredError(
                 'id',
@@ -359,10 +314,14 @@ export class PreprocessControllerApi extends runtime.BaseAPI {
 
         const headerParameters: runtime.HTTPHeaders = {};
 
-        if (requestParameters['xUserId'] != null) {
-            headerParameters['X-User-Id'] = String(requestParameters['xUserId']);
-        }
+        if (this.configuration && this.configuration.accessToken) {
+            const token = this.configuration.accessToken;
+            const tokenString = await token("bearerAuth", []);
 
+            if (tokenString) {
+                headerParameters["Authorization"] = `Bearer ${tokenString}`;
+            }
+        }
 
         let urlPath = `/api/preprocess/videos/summaries/{id}/text`;
         urlPath = urlPath.replace(`{${"id"}}`, encodeURIComponent(String(requestParameters['id'])));
@@ -387,13 +346,6 @@ export class PreprocessControllerApi extends runtime.BaseAPI {
     /**
      */
     async clearVideoSummaryTextsByIdsRaw(requestParameters: ClearVideoSummaryTextsByIdsRequest, initOverrides?: RequestInit | runtime.InitOverrideFunction): Promise<runtime.ApiResponse<ApiResponseVoid>> {
-        if (requestParameters['xUserId'] == null) {
-            throw new runtime.RequiredError(
-                'xUserId',
-                'Required parameter "xUserId" was null or undefined when calling clearVideoSummaryTextsByIds().'
-            );
-        }
-
         if (requestParameters['requestBody'] == null) {
             throw new runtime.RequiredError(
                 'requestBody',
@@ -407,10 +359,14 @@ export class PreprocessControllerApi extends runtime.BaseAPI {
 
         headerParameters['Content-Type'] = 'application/json';
 
-        if (requestParameters['xUserId'] != null) {
-            headerParameters['X-User-Id'] = String(requestParameters['xUserId']);
-        }
+        if (this.configuration && this.configuration.accessToken) {
+            const token = this.configuration.accessToken;
+            const tokenString = await token("bearerAuth", []);
 
+            if (tokenString) {
+                headerParameters["Authorization"] = `Bearer ${tokenString}`;
+            }
+        }
 
         let urlPath = `/api/preprocess/videos/summaries/text`;
 
@@ -435,13 +391,6 @@ export class PreprocessControllerApi extends runtime.BaseAPI {
     /**
      */
     async deleteAllAudioSummariesByUuidRaw(requestParameters: DeleteAllAudioSummariesByUuidRequest, initOverrides?: RequestInit | runtime.InitOverrideFunction): Promise<runtime.ApiResponse<ApiResponseVoid>> {
-        if (requestParameters['xUserId'] == null) {
-            throw new runtime.RequiredError(
-                'xUserId',
-                'Required parameter "xUserId" was null or undefined when calling deleteAllAudioSummariesByUuid().'
-            );
-        }
-
         if (requestParameters['uuid'] == null) {
             throw new runtime.RequiredError(
                 'uuid',
@@ -457,10 +406,14 @@ export class PreprocessControllerApi extends runtime.BaseAPI {
 
         const headerParameters: runtime.HTTPHeaders = {};
 
-        if (requestParameters['xUserId'] != null) {
-            headerParameters['X-User-Id'] = String(requestParameters['xUserId']);
-        }
+        if (this.configuration && this.configuration.accessToken) {
+            const token = this.configuration.accessToken;
+            const tokenString = await token("bearerAuth", []);
 
+            if (tokenString) {
+                headerParameters["Authorization"] = `Bearer ${tokenString}`;
+            }
+        }
 
         let urlPath = `/api/preprocess/audios/summaries/all`;
 
@@ -484,13 +437,6 @@ export class PreprocessControllerApi extends runtime.BaseAPI {
     /**
      */
     async deleteAllEmojiSummariesByUuidRaw(requestParameters: DeleteAllEmojiSummariesByUuidRequest, initOverrides?: RequestInit | runtime.InitOverrideFunction): Promise<runtime.ApiResponse<ApiResponseVoid>> {
-        if (requestParameters['xUserId'] == null) {
-            throw new runtime.RequiredError(
-                'xUserId',
-                'Required parameter "xUserId" was null or undefined when calling deleteAllEmojiSummariesByUuid().'
-            );
-        }
-
         if (requestParameters['uuid'] == null) {
             throw new runtime.RequiredError(
                 'uuid',
@@ -506,10 +452,14 @@ export class PreprocessControllerApi extends runtime.BaseAPI {
 
         const headerParameters: runtime.HTTPHeaders = {};
 
-        if (requestParameters['xUserId'] != null) {
-            headerParameters['X-User-Id'] = String(requestParameters['xUserId']);
-        }
+        if (this.configuration && this.configuration.accessToken) {
+            const token = this.configuration.accessToken;
+            const tokenString = await token("bearerAuth", []);
 
+            if (tokenString) {
+                headerParameters["Authorization"] = `Bearer ${tokenString}`;
+            }
+        }
 
         let urlPath = `/api/preprocess/emojis/summaries/all`;
 
@@ -533,13 +483,6 @@ export class PreprocessControllerApi extends runtime.BaseAPI {
     /**
      */
     async deleteAllImageSummariesByUuidRaw(requestParameters: DeleteAllImageSummariesByUuidRequest, initOverrides?: RequestInit | runtime.InitOverrideFunction): Promise<runtime.ApiResponse<ApiResponseVoid>> {
-        if (requestParameters['xUserId'] == null) {
-            throw new runtime.RequiredError(
-                'xUserId',
-                'Required parameter "xUserId" was null or undefined when calling deleteAllImageSummariesByUuid().'
-            );
-        }
-
         if (requestParameters['uuid'] == null) {
             throw new runtime.RequiredError(
                 'uuid',
@@ -555,10 +498,14 @@ export class PreprocessControllerApi extends runtime.BaseAPI {
 
         const headerParameters: runtime.HTTPHeaders = {};
 
-        if (requestParameters['xUserId'] != null) {
-            headerParameters['X-User-Id'] = String(requestParameters['xUserId']);
-        }
+        if (this.configuration && this.configuration.accessToken) {
+            const token = this.configuration.accessToken;
+            const tokenString = await token("bearerAuth", []);
 
+            if (tokenString) {
+                headerParameters["Authorization"] = `Bearer ${tokenString}`;
+            }
+        }
 
         let urlPath = `/api/preprocess/images/summaries/all`;
 
@@ -582,13 +529,6 @@ export class PreprocessControllerApi extends runtime.BaseAPI {
     /**
      */
     async deleteAllVideoSummariesByUuidRaw(requestParameters: DeleteAllVideoSummariesByUuidRequest, initOverrides?: RequestInit | runtime.InitOverrideFunction): Promise<runtime.ApiResponse<ApiResponseVoid>> {
-        if (requestParameters['xUserId'] == null) {
-            throw new runtime.RequiredError(
-                'xUserId',
-                'Required parameter "xUserId" was null or undefined when calling deleteAllVideoSummariesByUuid().'
-            );
-        }
-
         if (requestParameters['uuid'] == null) {
             throw new runtime.RequiredError(
                 'uuid',
@@ -604,10 +544,14 @@ export class PreprocessControllerApi extends runtime.BaseAPI {
 
         const headerParameters: runtime.HTTPHeaders = {};
 
-        if (requestParameters['xUserId'] != null) {
-            headerParameters['X-User-Id'] = String(requestParameters['xUserId']);
-        }
+        if (this.configuration && this.configuration.accessToken) {
+            const token = this.configuration.accessToken;
+            const tokenString = await token("bearerAuth", []);
 
+            if (tokenString) {
+                headerParameters["Authorization"] = `Bearer ${tokenString}`;
+            }
+        }
 
         let urlPath = `/api/preprocess/videos/summaries/all`;
 
@@ -631,13 +575,6 @@ export class PreprocessControllerApi extends runtime.BaseAPI {
     /**
      */
     async deleteAudioSummariesByIdsRaw(requestParameters: DeleteAudioSummariesByIdsRequest, initOverrides?: RequestInit | runtime.InitOverrideFunction): Promise<runtime.ApiResponse<ApiResponseVoid>> {
-        if (requestParameters['xUserId'] == null) {
-            throw new runtime.RequiredError(
-                'xUserId',
-                'Required parameter "xUserId" was null or undefined when calling deleteAudioSummariesByIds().'
-            );
-        }
-
         if (requestParameters['requestBody'] == null) {
             throw new runtime.RequiredError(
                 'requestBody',
@@ -651,10 +588,14 @@ export class PreprocessControllerApi extends runtime.BaseAPI {
 
         headerParameters['Content-Type'] = 'application/json';
 
-        if (requestParameters['xUserId'] != null) {
-            headerParameters['X-User-Id'] = String(requestParameters['xUserId']);
-        }
+        if (this.configuration && this.configuration.accessToken) {
+            const token = this.configuration.accessToken;
+            const tokenString = await token("bearerAuth", []);
 
+            if (tokenString) {
+                headerParameters["Authorization"] = `Bearer ${tokenString}`;
+            }
+        }
 
         let urlPath = `/api/preprocess/audios/summaries`;
 
@@ -679,13 +620,6 @@ export class PreprocessControllerApi extends runtime.BaseAPI {
     /**
      */
     async deleteAudioSummaryByIdRaw(requestParameters: DeleteAudioSummaryByIdRequest, initOverrides?: RequestInit | runtime.InitOverrideFunction): Promise<runtime.ApiResponse<ApiResponseVoid>> {
-        if (requestParameters['xUserId'] == null) {
-            throw new runtime.RequiredError(
-                'xUserId',
-                'Required parameter "xUserId" was null or undefined when calling deleteAudioSummaryById().'
-            );
-        }
-
         if (requestParameters['id'] == null) {
             throw new runtime.RequiredError(
                 'id',
@@ -697,10 +631,14 @@ export class PreprocessControllerApi extends runtime.BaseAPI {
 
         const headerParameters: runtime.HTTPHeaders = {};
 
-        if (requestParameters['xUserId'] != null) {
-            headerParameters['X-User-Id'] = String(requestParameters['xUserId']);
-        }
+        if (this.configuration && this.configuration.accessToken) {
+            const token = this.configuration.accessToken;
+            const tokenString = await token("bearerAuth", []);
 
+            if (tokenString) {
+                headerParameters["Authorization"] = `Bearer ${tokenString}`;
+            }
+        }
 
         let urlPath = `/api/preprocess/audios/summaries/{id}`;
         urlPath = urlPath.replace(`{${"id"}}`, encodeURIComponent(String(requestParameters['id'])));
@@ -725,13 +663,6 @@ export class PreprocessControllerApi extends runtime.BaseAPI {
     /**
      */
     async deleteEmojiSummariesByIdsRaw(requestParameters: DeleteEmojiSummariesByIdsRequest, initOverrides?: RequestInit | runtime.InitOverrideFunction): Promise<runtime.ApiResponse<ApiResponseVoid>> {
-        if (requestParameters['xUserId'] == null) {
-            throw new runtime.RequiredError(
-                'xUserId',
-                'Required parameter "xUserId" was null or undefined when calling deleteEmojiSummariesByIds().'
-            );
-        }
-
         if (requestParameters['requestBody'] == null) {
             throw new runtime.RequiredError(
                 'requestBody',
@@ -745,10 +676,14 @@ export class PreprocessControllerApi extends runtime.BaseAPI {
 
         headerParameters['Content-Type'] = 'application/json';
 
-        if (requestParameters['xUserId'] != null) {
-            headerParameters['X-User-Id'] = String(requestParameters['xUserId']);
-        }
+        if (this.configuration && this.configuration.accessToken) {
+            const token = this.configuration.accessToken;
+            const tokenString = await token("bearerAuth", []);
 
+            if (tokenString) {
+                headerParameters["Authorization"] = `Bearer ${tokenString}`;
+            }
+        }
 
         let urlPath = `/api/preprocess/emojis/summaries`;
 
@@ -773,13 +708,6 @@ export class PreprocessControllerApi extends runtime.BaseAPI {
     /**
      */
     async deleteEmojiSummaryByIdRaw(requestParameters: DeleteEmojiSummaryByIdRequest, initOverrides?: RequestInit | runtime.InitOverrideFunction): Promise<runtime.ApiResponse<ApiResponseVoid>> {
-        if (requestParameters['xUserId'] == null) {
-            throw new runtime.RequiredError(
-                'xUserId',
-                'Required parameter "xUserId" was null or undefined when calling deleteEmojiSummaryById().'
-            );
-        }
-
         if (requestParameters['id'] == null) {
             throw new runtime.RequiredError(
                 'id',
@@ -791,10 +719,14 @@ export class PreprocessControllerApi extends runtime.BaseAPI {
 
         const headerParameters: runtime.HTTPHeaders = {};
 
-        if (requestParameters['xUserId'] != null) {
-            headerParameters['X-User-Id'] = String(requestParameters['xUserId']);
-        }
+        if (this.configuration && this.configuration.accessToken) {
+            const token = this.configuration.accessToken;
+            const tokenString = await token("bearerAuth", []);
 
+            if (tokenString) {
+                headerParameters["Authorization"] = `Bearer ${tokenString}`;
+            }
+        }
 
         let urlPath = `/api/preprocess/emojis/summaries/{id}`;
         urlPath = urlPath.replace(`{${"id"}}`, encodeURIComponent(String(requestParameters['id'])));
@@ -819,13 +751,6 @@ export class PreprocessControllerApi extends runtime.BaseAPI {
     /**
      */
     async deleteImageSummariesByIdsRaw(requestParameters: DeleteImageSummariesByIdsRequest, initOverrides?: RequestInit | runtime.InitOverrideFunction): Promise<runtime.ApiResponse<ApiResponseVoid>> {
-        if (requestParameters['xUserId'] == null) {
-            throw new runtime.RequiredError(
-                'xUserId',
-                'Required parameter "xUserId" was null or undefined when calling deleteImageSummariesByIds().'
-            );
-        }
-
         if (requestParameters['requestBody'] == null) {
             throw new runtime.RequiredError(
                 'requestBody',
@@ -839,10 +764,14 @@ export class PreprocessControllerApi extends runtime.BaseAPI {
 
         headerParameters['Content-Type'] = 'application/json';
 
-        if (requestParameters['xUserId'] != null) {
-            headerParameters['X-User-Id'] = String(requestParameters['xUserId']);
-        }
+        if (this.configuration && this.configuration.accessToken) {
+            const token = this.configuration.accessToken;
+            const tokenString = await token("bearerAuth", []);
 
+            if (tokenString) {
+                headerParameters["Authorization"] = `Bearer ${tokenString}`;
+            }
+        }
 
         let urlPath = `/api/preprocess/images/summaries`;
 
@@ -867,13 +796,6 @@ export class PreprocessControllerApi extends runtime.BaseAPI {
     /**
      */
     async deleteImageSummaryByIdRaw(requestParameters: DeleteImageSummaryByIdRequest, initOverrides?: RequestInit | runtime.InitOverrideFunction): Promise<runtime.ApiResponse<ApiResponseVoid>> {
-        if (requestParameters['xUserId'] == null) {
-            throw new runtime.RequiredError(
-                'xUserId',
-                'Required parameter "xUserId" was null or undefined when calling deleteImageSummaryById().'
-            );
-        }
-
         if (requestParameters['id'] == null) {
             throw new runtime.RequiredError(
                 'id',
@@ -885,10 +807,14 @@ export class PreprocessControllerApi extends runtime.BaseAPI {
 
         const headerParameters: runtime.HTTPHeaders = {};
 
-        if (requestParameters['xUserId'] != null) {
-            headerParameters['X-User-Id'] = String(requestParameters['xUserId']);
-        }
+        if (this.configuration && this.configuration.accessToken) {
+            const token = this.configuration.accessToken;
+            const tokenString = await token("bearerAuth", []);
 
+            if (tokenString) {
+                headerParameters["Authorization"] = `Bearer ${tokenString}`;
+            }
+        }
 
         let urlPath = `/api/preprocess/images/summaries/{id}`;
         urlPath = urlPath.replace(`{${"id"}}`, encodeURIComponent(String(requestParameters['id'])));
@@ -913,13 +839,6 @@ export class PreprocessControllerApi extends runtime.BaseAPI {
     /**
      */
     async deleteVideoSummariesByIdsRaw(requestParameters: DeleteVideoSummariesByIdsRequest, initOverrides?: RequestInit | runtime.InitOverrideFunction): Promise<runtime.ApiResponse<ApiResponseVoid>> {
-        if (requestParameters['xUserId'] == null) {
-            throw new runtime.RequiredError(
-                'xUserId',
-                'Required parameter "xUserId" was null or undefined when calling deleteVideoSummariesByIds().'
-            );
-        }
-
         if (requestParameters['requestBody'] == null) {
             throw new runtime.RequiredError(
                 'requestBody',
@@ -933,10 +852,14 @@ export class PreprocessControllerApi extends runtime.BaseAPI {
 
         headerParameters['Content-Type'] = 'application/json';
 
-        if (requestParameters['xUserId'] != null) {
-            headerParameters['X-User-Id'] = String(requestParameters['xUserId']);
-        }
+        if (this.configuration && this.configuration.accessToken) {
+            const token = this.configuration.accessToken;
+            const tokenString = await token("bearerAuth", []);
 
+            if (tokenString) {
+                headerParameters["Authorization"] = `Bearer ${tokenString}`;
+            }
+        }
 
         let urlPath = `/api/preprocess/videos/summaries`;
 
@@ -961,13 +884,6 @@ export class PreprocessControllerApi extends runtime.BaseAPI {
     /**
      */
     async deleteVideoSummaryByIdRaw(requestParameters: DeleteVideoSummaryByIdRequest, initOverrides?: RequestInit | runtime.InitOverrideFunction): Promise<runtime.ApiResponse<ApiResponseVoid>> {
-        if (requestParameters['xUserId'] == null) {
-            throw new runtime.RequiredError(
-                'xUserId',
-                'Required parameter "xUserId" was null or undefined when calling deleteVideoSummaryById().'
-            );
-        }
-
         if (requestParameters['id'] == null) {
             throw new runtime.RequiredError(
                 'id',
@@ -979,10 +895,14 @@ export class PreprocessControllerApi extends runtime.BaseAPI {
 
         const headerParameters: runtime.HTTPHeaders = {};
 
-        if (requestParameters['xUserId'] != null) {
-            headerParameters['X-User-Id'] = String(requestParameters['xUserId']);
-        }
+        if (this.configuration && this.configuration.accessToken) {
+            const token = this.configuration.accessToken;
+            const tokenString = await token("bearerAuth", []);
 
+            if (tokenString) {
+                headerParameters["Authorization"] = `Bearer ${tokenString}`;
+            }
+        }
 
         let urlPath = `/api/preprocess/videos/summaries/{id}`;
         urlPath = urlPath.replace(`{${"id"}}`, encodeURIComponent(String(requestParameters['id'])));
@@ -1007,13 +927,6 @@ export class PreprocessControllerApi extends runtime.BaseAPI {
     /**
      */
     async getAudioFileByIdRaw(requestParameters: GetAudioFileByIdRequest, initOverrides?: RequestInit | runtime.InitOverrideFunction): Promise<runtime.ApiResponse<Blob>> {
-        if (requestParameters['xUserId'] == null) {
-            throw new runtime.RequiredError(
-                'xUserId',
-                'Required parameter "xUserId" was null or undefined when calling getAudioFileById().'
-            );
-        }
-
         if (requestParameters['id'] == null) {
             throw new runtime.RequiredError(
                 'id',
@@ -1025,10 +938,14 @@ export class PreprocessControllerApi extends runtime.BaseAPI {
 
         const headerParameters: runtime.HTTPHeaders = {};
 
-        if (requestParameters['xUserId'] != null) {
-            headerParameters['X-User-Id'] = String(requestParameters['xUserId']);
-        }
+        if (this.configuration && this.configuration.accessToken) {
+            const token = this.configuration.accessToken;
+            const tokenString = await token("bearerAuth", []);
 
+            if (tokenString) {
+                headerParameters["Authorization"] = `Bearer ${tokenString}`;
+            }
+        }
 
         let urlPath = `/api/preprocess/audios/{id}/file`;
         urlPath = urlPath.replace(`{${"id"}}`, encodeURIComponent(String(requestParameters['id'])));
@@ -1053,13 +970,6 @@ export class PreprocessControllerApi extends runtime.BaseAPI {
     /**
      */
     async getAudioSummariesByUuidRaw(requestParameters: GetAudioSummariesByUuidRequest, initOverrides?: RequestInit | runtime.InitOverrideFunction): Promise<runtime.ApiResponse<ApiResponsePageAudioSummary>> {
-        if (requestParameters['xUserId'] == null) {
-            throw new runtime.RequiredError(
-                'xUserId',
-                'Required parameter "xUserId" was null or undefined when calling getAudioSummariesByUuid().'
-            );
-        }
-
         if (requestParameters['uuid'] == null) {
             throw new runtime.RequiredError(
                 'uuid',
@@ -1083,10 +993,14 @@ export class PreprocessControllerApi extends runtime.BaseAPI {
 
         const headerParameters: runtime.HTTPHeaders = {};
 
-        if (requestParameters['xUserId'] != null) {
-            headerParameters['X-User-Id'] = String(requestParameters['xUserId']);
-        }
+        if (this.configuration && this.configuration.accessToken) {
+            const token = this.configuration.accessToken;
+            const tokenString = await token("bearerAuth", []);
 
+            if (tokenString) {
+                headerParameters["Authorization"] = `Bearer ${tokenString}`;
+            }
+        }
 
         let urlPath = `/api/preprocess/audios/summaries`;
 
@@ -1110,13 +1024,6 @@ export class PreprocessControllerApi extends runtime.BaseAPI {
     /**
      */
     async getEmojiFileByIdRaw(requestParameters: GetEmojiFileByIdRequest, initOverrides?: RequestInit | runtime.InitOverrideFunction): Promise<runtime.ApiResponse<Blob>> {
-        if (requestParameters['xUserId'] == null) {
-            throw new runtime.RequiredError(
-                'xUserId',
-                'Required parameter "xUserId" was null or undefined when calling getEmojiFileById().'
-            );
-        }
-
         if (requestParameters['id'] == null) {
             throw new runtime.RequiredError(
                 'id',
@@ -1128,10 +1035,14 @@ export class PreprocessControllerApi extends runtime.BaseAPI {
 
         const headerParameters: runtime.HTTPHeaders = {};
 
-        if (requestParameters['xUserId'] != null) {
-            headerParameters['X-User-Id'] = String(requestParameters['xUserId']);
-        }
+        if (this.configuration && this.configuration.accessToken) {
+            const token = this.configuration.accessToken;
+            const tokenString = await token("bearerAuth", []);
 
+            if (tokenString) {
+                headerParameters["Authorization"] = `Bearer ${tokenString}`;
+            }
+        }
 
         let urlPath = `/api/preprocess/emojis/{id}/file`;
         urlPath = urlPath.replace(`{${"id"}}`, encodeURIComponent(String(requestParameters['id'])));
@@ -1156,13 +1067,6 @@ export class PreprocessControllerApi extends runtime.BaseAPI {
     /**
      */
     async getEmojiSummariesByUuidRaw(requestParameters: GetEmojiSummariesByUuidRequest, initOverrides?: RequestInit | runtime.InitOverrideFunction): Promise<runtime.ApiResponse<ApiResponsePageEmojiSummaryEntity>> {
-        if (requestParameters['xUserId'] == null) {
-            throw new runtime.RequiredError(
-                'xUserId',
-                'Required parameter "xUserId" was null or undefined when calling getEmojiSummariesByUuid().'
-            );
-        }
-
         if (requestParameters['uuid'] == null) {
             throw new runtime.RequiredError(
                 'uuid',
@@ -1186,10 +1090,14 @@ export class PreprocessControllerApi extends runtime.BaseAPI {
 
         const headerParameters: runtime.HTTPHeaders = {};
 
-        if (requestParameters['xUserId'] != null) {
-            headerParameters['X-User-Id'] = String(requestParameters['xUserId']);
-        }
+        if (this.configuration && this.configuration.accessToken) {
+            const token = this.configuration.accessToken;
+            const tokenString = await token("bearerAuth", []);
 
+            if (tokenString) {
+                headerParameters["Authorization"] = `Bearer ${tokenString}`;
+            }
+        }
 
         let urlPath = `/api/preprocess/emojis/summaries`;
 
@@ -1213,13 +1121,6 @@ export class PreprocessControllerApi extends runtime.BaseAPI {
     /**
      */
     async getImageFileByIdRaw(requestParameters: GetImageFileByIdRequest, initOverrides?: RequestInit | runtime.InitOverrideFunction): Promise<runtime.ApiResponse<Blob>> {
-        if (requestParameters['xUserId'] == null) {
-            throw new runtime.RequiredError(
-                'xUserId',
-                'Required parameter "xUserId" was null or undefined when calling getImageFileById().'
-            );
-        }
-
         if (requestParameters['id'] == null) {
             throw new runtime.RequiredError(
                 'id',
@@ -1231,10 +1132,14 @@ export class PreprocessControllerApi extends runtime.BaseAPI {
 
         const headerParameters: runtime.HTTPHeaders = {};
 
-        if (requestParameters['xUserId'] != null) {
-            headerParameters['X-User-Id'] = String(requestParameters['xUserId']);
-        }
+        if (this.configuration && this.configuration.accessToken) {
+            const token = this.configuration.accessToken;
+            const tokenString = await token("bearerAuth", []);
 
+            if (tokenString) {
+                headerParameters["Authorization"] = `Bearer ${tokenString}`;
+            }
+        }
 
         let urlPath = `/api/preprocess/images/{id}/file`;
         urlPath = urlPath.replace(`{${"id"}}`, encodeURIComponent(String(requestParameters['id'])));
@@ -1259,13 +1164,6 @@ export class PreprocessControllerApi extends runtime.BaseAPI {
     /**
      */
     async getImageSummariesByUuidRaw(requestParameters: GetImageSummariesByUuidRequest, initOverrides?: RequestInit | runtime.InitOverrideFunction): Promise<runtime.ApiResponse<ApiResponsePageImageSummaryEntity>> {
-        if (requestParameters['xUserId'] == null) {
-            throw new runtime.RequiredError(
-                'xUserId',
-                'Required parameter "xUserId" was null or undefined when calling getImageSummariesByUuid().'
-            );
-        }
-
         if (requestParameters['uuid'] == null) {
             throw new runtime.RequiredError(
                 'uuid',
@@ -1289,10 +1187,14 @@ export class PreprocessControllerApi extends runtime.BaseAPI {
 
         const headerParameters: runtime.HTTPHeaders = {};
 
-        if (requestParameters['xUserId'] != null) {
-            headerParameters['X-User-Id'] = String(requestParameters['xUserId']);
-        }
+        if (this.configuration && this.configuration.accessToken) {
+            const token = this.configuration.accessToken;
+            const tokenString = await token("bearerAuth", []);
 
+            if (tokenString) {
+                headerParameters["Authorization"] = `Bearer ${tokenString}`;
+            }
+        }
 
         let urlPath = `/api/preprocess/images/summaries`;
 
@@ -1316,13 +1218,6 @@ export class PreprocessControllerApi extends runtime.BaseAPI {
     /**
      */
     async getProgressRaw(requestParameters: GetProgressRequest, initOverrides?: RequestInit | runtime.InitOverrideFunction): Promise<runtime.ApiResponse<ApiResponseTaskProgress>> {
-        if (requestParameters['xUserId'] == null) {
-            throw new runtime.RequiredError(
-                'xUserId',
-                'Required parameter "xUserId" was null or undefined when calling getProgress().'
-            );
-        }
-
         if (requestParameters['uuid'] == null) {
             throw new runtime.RequiredError(
                 'uuid',
@@ -1334,10 +1229,14 @@ export class PreprocessControllerApi extends runtime.BaseAPI {
 
         const headerParameters: runtime.HTTPHeaders = {};
 
-        if (requestParameters['xUserId'] != null) {
-            headerParameters['X-User-Id'] = String(requestParameters['xUserId']);
-        }
+        if (this.configuration && this.configuration.accessToken) {
+            const token = this.configuration.accessToken;
+            const tokenString = await token("bearerAuth", []);
 
+            if (tokenString) {
+                headerParameters["Authorization"] = `Bearer ${tokenString}`;
+            }
+        }
 
         let urlPath = `/api/preprocess/{uuid}/progress`;
         urlPath = urlPath.replace(`{${"uuid"}}`, encodeURIComponent(String(requestParameters['uuid'])));
@@ -1362,13 +1261,6 @@ export class PreprocessControllerApi extends runtime.BaseAPI {
     /**
      */
     async getVideoFileByIdRaw(requestParameters: GetVideoFileByIdRequest, initOverrides?: RequestInit | runtime.InitOverrideFunction): Promise<runtime.ApiResponse<Blob>> {
-        if (requestParameters['xUserId'] == null) {
-            throw new runtime.RequiredError(
-                'xUserId',
-                'Required parameter "xUserId" was null or undefined when calling getVideoFileById().'
-            );
-        }
-
         if (requestParameters['id'] == null) {
             throw new runtime.RequiredError(
                 'id',
@@ -1380,10 +1272,14 @@ export class PreprocessControllerApi extends runtime.BaseAPI {
 
         const headerParameters: runtime.HTTPHeaders = {};
 
-        if (requestParameters['xUserId'] != null) {
-            headerParameters['X-User-Id'] = String(requestParameters['xUserId']);
-        }
+        if (this.configuration && this.configuration.accessToken) {
+            const token = this.configuration.accessToken;
+            const tokenString = await token("bearerAuth", []);
 
+            if (tokenString) {
+                headerParameters["Authorization"] = `Bearer ${tokenString}`;
+            }
+        }
 
         let urlPath = `/api/preprocess/videos/{id}/file`;
         urlPath = urlPath.replace(`{${"id"}}`, encodeURIComponent(String(requestParameters['id'])));
@@ -1408,13 +1304,6 @@ export class PreprocessControllerApi extends runtime.BaseAPI {
     /**
      */
     async getVideoSummariesByUuidRaw(requestParameters: GetVideoSummariesByUuidRequest, initOverrides?: RequestInit | runtime.InitOverrideFunction): Promise<runtime.ApiResponse<ApiResponsePageVideoSummary>> {
-        if (requestParameters['xUserId'] == null) {
-            throw new runtime.RequiredError(
-                'xUserId',
-                'Required parameter "xUserId" was null or undefined when calling getVideoSummariesByUuid().'
-            );
-        }
-
         if (requestParameters['uuid'] == null) {
             throw new runtime.RequiredError(
                 'uuid',
@@ -1438,10 +1327,14 @@ export class PreprocessControllerApi extends runtime.BaseAPI {
 
         const headerParameters: runtime.HTTPHeaders = {};
 
-        if (requestParameters['xUserId'] != null) {
-            headerParameters['X-User-Id'] = String(requestParameters['xUserId']);
-        }
+        if (this.configuration && this.configuration.accessToken) {
+            const token = this.configuration.accessToken;
+            const tokenString = await token("bearerAuth", []);
 
+            if (tokenString) {
+                headerParameters["Authorization"] = `Bearer ${tokenString}`;
+            }
+        }
 
         let urlPath = `/api/preprocess/videos/summaries`;
 
@@ -1465,13 +1358,6 @@ export class PreprocessControllerApi extends runtime.BaseAPI {
     /**
      */
     async preprocessRaw(requestParameters: PreprocessRequest, initOverrides?: RequestInit | runtime.InitOverrideFunction): Promise<runtime.ApiResponse<ApiResponseTaskAckResponse>> {
-        if (requestParameters['xUserId'] == null) {
-            throw new runtime.RequiredError(
-                'xUserId',
-                'Required parameter "xUserId" was null or undefined when calling preprocess().'
-            );
-        }
-
         if (requestParameters['uuid'] == null) {
             throw new runtime.RequiredError(
                 'uuid',
@@ -1483,10 +1369,14 @@ export class PreprocessControllerApi extends runtime.BaseAPI {
 
         const headerParameters: runtime.HTTPHeaders = {};
 
-        if (requestParameters['xUserId'] != null) {
-            headerParameters['X-User-Id'] = String(requestParameters['xUserId']);
-        }
+        if (this.configuration && this.configuration.accessToken) {
+            const token = this.configuration.accessToken;
+            const tokenString = await token("bearerAuth", []);
 
+            if (tokenString) {
+                headerParameters["Authorization"] = `Bearer ${tokenString}`;
+            }
+        }
 
         let urlPath = `/api/preprocess/{uuid}`;
         urlPath = urlPath.replace(`{${"uuid"}}`, encodeURIComponent(String(requestParameters['uuid'])));
@@ -1511,13 +1401,6 @@ export class PreprocessControllerApi extends runtime.BaseAPI {
     /**
      */
     async reprocessRaw(requestParameters: ReprocessRequest, initOverrides?: RequestInit | runtime.InitOverrideFunction): Promise<runtime.ApiResponse<ApiResponseTaskAckResponse>> {
-        if (requestParameters['xUserId'] == null) {
-            throw new runtime.RequiredError(
-                'xUserId',
-                'Required parameter "xUserId" was null or undefined when calling reprocess().'
-            );
-        }
-
         if (requestParameters['uuid'] == null) {
             throw new runtime.RequiredError(
                 'uuid',
@@ -1529,10 +1412,14 @@ export class PreprocessControllerApi extends runtime.BaseAPI {
 
         const headerParameters: runtime.HTTPHeaders = {};
 
-        if (requestParameters['xUserId'] != null) {
-            headerParameters['X-User-Id'] = String(requestParameters['xUserId']);
-        }
+        if (this.configuration && this.configuration.accessToken) {
+            const token = this.configuration.accessToken;
+            const tokenString = await token("bearerAuth", []);
 
+            if (tokenString) {
+                headerParameters["Authorization"] = `Bearer ${tokenString}`;
+            }
+        }
 
         let urlPath = `/api/preprocess/{uuid}/reprocess`;
         urlPath = urlPath.replace(`{${"uuid"}}`, encodeURIComponent(String(requestParameters['uuid'])));
@@ -1557,13 +1444,6 @@ export class PreprocessControllerApi extends runtime.BaseAPI {
     /**
      */
     async restartPreprocessRaw(requestParameters: RestartPreprocessRequest, initOverrides?: RequestInit | runtime.InitOverrideFunction): Promise<runtime.ApiResponse<ApiResponseTaskAckResponse>> {
-        if (requestParameters['xUserId'] == null) {
-            throw new runtime.RequiredError(
-                'xUserId',
-                'Required parameter "xUserId" was null or undefined when calling restartPreprocess().'
-            );
-        }
-
         if (requestParameters['uuid'] == null) {
             throw new runtime.RequiredError(
                 'uuid',
@@ -1575,10 +1455,14 @@ export class PreprocessControllerApi extends runtime.BaseAPI {
 
         const headerParameters: runtime.HTTPHeaders = {};
 
-        if (requestParameters['xUserId'] != null) {
-            headerParameters['X-User-Id'] = String(requestParameters['xUserId']);
-        }
+        if (this.configuration && this.configuration.accessToken) {
+            const token = this.configuration.accessToken;
+            const tokenString = await token("bearerAuth", []);
 
+            if (tokenString) {
+                headerParameters["Authorization"] = `Bearer ${tokenString}`;
+            }
+        }
 
         let urlPath = `/api/preprocess/{uuid}/restart`;
         urlPath = urlPath.replace(`{${"uuid"}}`, encodeURIComponent(String(requestParameters['uuid'])));

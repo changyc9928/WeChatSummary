@@ -21,7 +21,6 @@ export default function useAudioSummaries({ uuidInput, currentUser }) {
     setLoadingAudios(true);
     try {
       const data = await apiClient.preprocess.getAudioSummariesByUuid({
-        xUserId: currentUser.uuid,
         uuid: sessionUuid,
         page,
         size
@@ -58,7 +57,6 @@ export default function useAudioSummaries({ uuidInput, currentUser }) {
     setDeleting(true);
     try {
       await apiClient.preprocess.deleteAudioSummaryById({
-        xUserId: currentUser.uuid,
         id
       });
       setSelectedAudioIds(prev => prev.filter(item => item !== id));
@@ -75,7 +73,6 @@ export default function useAudioSummaries({ uuidInput, currentUser }) {
     setClearingText(true);
     try {
       await apiClient.preprocess.clearAudioSummaryTextById({
-        xUserId: currentUser.uuid,
         id
       });
       await fetchAudioSummaries(uuidInput, audioPagination.page, audioPagination.size);
@@ -91,7 +88,6 @@ export default function useAudioSummaries({ uuidInput, currentUser }) {
     setBatchDeleting(true);
     try {
       await apiClient.preprocess.deleteAudioSummariesByIds({
-        xUserId: currentUser.uuid,
         requestBody: ids
       });
       setSelectedAudioIds([]);
@@ -108,7 +104,6 @@ export default function useAudioSummaries({ uuidInput, currentUser }) {
     setBatchClearingText(true);
     try {
       await apiClient.preprocess.clearAudioSummaryTextsByIds({
-        xUserId: currentUser.uuid,
         requestBody: ids
       });
       setSelectedAudioIds([]);

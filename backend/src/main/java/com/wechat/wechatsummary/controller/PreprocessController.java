@@ -36,7 +36,7 @@ import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestBody;
-import org.springframework.web.bind.annotation.RequestHeader;
+import org.springframework.web.bind.annotation.RequestAttribute;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
@@ -64,7 +64,7 @@ public class PreprocessController {
 
     @PostMapping("/{uuid}")
     public ApiResponse<TaskAckResponse> preprocess(
-        @RequestHeader("X-User-Id") String userId,
+        @RequestAttribute("userId") String userId,
         @PathVariable String uuid) {
         log.info(
             "REST endpoint invoked to initiate resource preprocessing tracking for user UUID: [{}] and session UUID: [{}]",
@@ -93,7 +93,7 @@ public class PreprocessController {
      */
     @PostMapping("/{uuid}/reprocess")
     public ApiResponse<TaskAckResponse> reprocess(
-        @RequestHeader("X-User-Id") String userId,
+        @RequestAttribute("userId") String userId,
         @PathVariable String uuid) {
         log.info(
             "REST endpoint invoked to REPROCESS (regenerate markdown) for user UUID: [{}] and session UUID: [{}]",
@@ -105,7 +105,7 @@ public class PreprocessController {
 
     @PostMapping("/{uuid}/abort")
     public ApiResponse<TaskAckResponse> abortTask(
-        @RequestHeader("X-User-Id") String userId,
+        @RequestAttribute("userId") String userId,
         @PathVariable String uuid) {
         log.info(
             "REST endpoint invoked to ABORT processing for user UUID: [{}] and batch UUID: [{}]",
@@ -127,7 +127,7 @@ public class PreprocessController {
      */
     @PostMapping("/{uuid}/restart")
     public ApiResponse<TaskAckResponse> restartPreprocess(
-        @RequestHeader("X-User-Id") String userId,
+        @RequestAttribute("userId") String userId,
         @PathVariable String uuid) {
         log.info(
             "REST endpoint invoked to RESTART preprocessing for user UUID: [{}] and session UUID: [{}]",
@@ -165,7 +165,7 @@ public class PreprocessController {
 
     @GetMapping("/{uuid}/progress")
     public ApiResponse<TaskProgress> getProgress(
-        @RequestHeader("X-User-Id") String userId,
+        @RequestAttribute("userId") String userId,
         @PathVariable String uuid) {
         log.debug(
             "Fetching preprocessing progress state metrics for user UUID: [{}] and batch UUID: [{}]",
@@ -180,7 +180,7 @@ public class PreprocessController {
 
     @GetMapping("/images/summaries")
     public ApiResponse<Page<ImageSummaryEntity>> getImageSummariesByUuid(
-        @RequestHeader("X-User-Id") String userId,
+        @RequestAttribute("userId") String userId,
         @RequestParam("uuid") String uuid,
         @RequestParam(defaultValue = "0") int page,
         @RequestParam(defaultValue = "20") int size) {
@@ -197,7 +197,7 @@ public class PreprocessController {
 
     @DeleteMapping("/images/summaries/{id}")
     public ApiResponse<Void> deleteImageSummaryById(
-        @RequestHeader("X-User-Id") String userId,
+        @RequestAttribute("userId") String userId,
         @PathVariable String id) {
         log.info(
             "REST endpoint invoked to delete image summary record with ID: [{}] for user UUID: [{}]",
@@ -208,7 +208,7 @@ public class PreprocessController {
 
     @DeleteMapping("/images/summaries")
     public ApiResponse<Void> deleteImageSummariesByIds(
-        @RequestHeader("X-User-Id") String userId,
+        @RequestAttribute("userId") String userId,
         @RequestBody List<String> ids) {
         log.info(
             "REST endpoint invoked to batch delete [{}] image summary records for user UUID: [{}]",
@@ -219,7 +219,7 @@ public class PreprocessController {
 
     @DeleteMapping("/images/summaries/all")
     public ApiResponse<Void> deleteAllImageSummariesByUuid(
-        @RequestHeader("X-User-Id") String userId,
+        @RequestAttribute("userId") String userId,
         @RequestParam("uuid") String uuid) {
         log.info(
             "REST endpoint invoked to delete ALL image summary records for user UUID: [{}] and session UUID: [{}]",
@@ -230,7 +230,7 @@ public class PreprocessController {
 
     @GetMapping("/images/{id}/file")
     public ResponseEntity<Resource> getImageFileById(
-        @RequestHeader("X-User-Id") String userId,
+        @RequestAttribute("userId") String userId,
         @PathVariable String id) {
         log.info("REST endpoint invoked to fetch image file for ID: [{}] and user UUID: [{}]", id,
             userId);
@@ -249,7 +249,7 @@ public class PreprocessController {
 
     @GetMapping("/audios/summaries")
     public ApiResponse<Page<AudioSummary>> getAudioSummariesByUuid(
-        @RequestHeader("X-User-Id") String userId,
+        @RequestAttribute("userId") String userId,
         @RequestParam("uuid") String uuid,
         @RequestParam(defaultValue = "0") int page,
         @RequestParam(defaultValue = "20") int size) {
@@ -274,7 +274,7 @@ public class PreprocessController {
      */
     @DeleteMapping("/audios/summaries/{id}/text")
     public ApiResponse<Void> clearAudioSummaryTextById(
-        @RequestHeader("X-User-Id") String userId,
+        @RequestAttribute("userId") String userId,
         @PathVariable String id) {
         log.info(
             "REST endpoint invoked to clear audio summary text for ID: [{}] and user UUID: [{}]",
@@ -292,7 +292,7 @@ public class PreprocessController {
      */
     @DeleteMapping("/audios/summaries/text")
     public ApiResponse<Void> clearAudioSummaryTextsByIds(
-        @RequestHeader("X-User-Id") String userId,
+        @RequestAttribute("userId") String userId,
         @RequestBody List<String> ids) {
         log.info(
             "REST endpoint invoked to batch clear [{}] audio summary texts for user UUID: [{}]",
@@ -303,7 +303,7 @@ public class PreprocessController {
 
     @DeleteMapping("/audios/summaries/{id}")
     public ApiResponse<Void> deleteAudioSummaryById(
-        @RequestHeader("X-User-Id") String userId,
+        @RequestAttribute("userId") String userId,
         @PathVariable String id) {
         log.info(
             "REST endpoint invoked to delete full audio record with ID: [{}] for user UUID: [{}]",
@@ -314,7 +314,7 @@ public class PreprocessController {
 
     @DeleteMapping("/audios/summaries")
     public ApiResponse<Void> deleteAudioSummariesByIds(
-        @RequestHeader("X-User-Id") String userId,
+        @RequestAttribute("userId") String userId,
         @RequestBody List<String> ids) {
         log.info(
             "REST endpoint invoked to batch delete [{}] full audio records for user UUID: [{}]",
@@ -325,7 +325,7 @@ public class PreprocessController {
 
     @DeleteMapping("/audios/summaries/all")
     public ApiResponse<Void> deleteAllAudioSummariesByUuid(
-        @RequestHeader("X-User-Id") String userId,
+        @RequestAttribute("userId") String userId,
         @RequestParam("uuid") String uuid) {
         log.info(
             "REST endpoint invoked to delete ALL full audio records for user UUID: [{}] and session UUID: [{}]",
@@ -336,7 +336,7 @@ public class PreprocessController {
 
     @GetMapping("/audios/{id}/file")
     public ResponseEntity<Resource> getAudioFileById(
-        @RequestHeader("X-User-Id") String userId,
+        @RequestAttribute("userId") String userId,
         @PathVariable String id) {
         log.info("REST endpoint invoked to fetch audio file for ID: [{}] and user UUID: [{}]", id,
             userId);
@@ -355,7 +355,7 @@ public class PreprocessController {
 
     @GetMapping("/videos/summaries")
     public ApiResponse<Page<VideoSummary>> getVideoSummariesByUuid(
-        @RequestHeader("X-User-Id") String userId,
+        @RequestAttribute("userId") String userId,
         @RequestParam("uuid") String uuid,
         @RequestParam(defaultValue = "0") int page,
         @RequestParam(defaultValue = "20") int size) {
@@ -372,7 +372,7 @@ public class PreprocessController {
 
     @DeleteMapping("/videos/summaries/{id}/text")
     public ApiResponse<Void> clearVideoSummaryTextById(
-        @RequestHeader("X-User-Id") String userId,
+        @RequestAttribute("userId") String userId,
         @PathVariable String id) {
         log.info(
             "REST endpoint invoked to clear video summary text for ID: [{}] and user UUID: [{}]",
@@ -383,7 +383,7 @@ public class PreprocessController {
 
     @DeleteMapping("/videos/summaries/text")
     public ApiResponse<Void> clearVideoSummaryTextsByIds(
-        @RequestHeader("X-User-Id") String userId,
+        @RequestAttribute("userId") String userId,
         @RequestBody List<String> ids) {
         log.info(
             "REST endpoint invoked to batch clear [{}] video summary texts for user UUID: [{}]",
@@ -394,7 +394,7 @@ public class PreprocessController {
 
     @DeleteMapping("/videos/summaries/{id}")
     public ApiResponse<Void> deleteVideoSummaryById(
-        @RequestHeader("X-User-Id") String userId,
+        @RequestAttribute("userId") String userId,
         @PathVariable String id) {
         log.info(
             "REST endpoint invoked to delete full video record with ID: [{}] for user UUID: [{}]",
@@ -405,7 +405,7 @@ public class PreprocessController {
 
     @DeleteMapping("/videos/summaries")
     public ApiResponse<Void> deleteVideoSummariesByIds(
-        @RequestHeader("X-User-Id") String userId,
+        @RequestAttribute("userId") String userId,
         @RequestBody List<String> ids) {
         log.info(
             "REST endpoint invoked to batch delete [{}] full video records for user UUID: [{}]",
@@ -416,7 +416,7 @@ public class PreprocessController {
 
     @DeleteMapping("/videos/summaries/all")
     public ApiResponse<Void> deleteAllVideoSummariesByUuid(
-        @RequestHeader("X-User-Id") String userId,
+        @RequestAttribute("userId") String userId,
         @RequestParam("uuid") String uuid) {
         log.info(
             "REST endpoint invoked to delete ALL full video records for user UUID: [{}] and session UUID: [{}]",
@@ -427,7 +427,7 @@ public class PreprocessController {
 
     @GetMapping("/videos/{id}/file")
     public ResponseEntity<Resource> getVideoFileById(
-        @RequestHeader("X-User-Id") String userId,
+        @RequestAttribute("userId") String userId,
         @PathVariable String id) {
         log.info("REST endpoint invoked to fetch video file for ID: [{}] and user UUID: [{}]", id,
             userId);
@@ -446,7 +446,7 @@ public class PreprocessController {
 
     @GetMapping("/emojis/summaries")
     public ApiResponse<Page<EmojiSummaryEntity>> getEmojiSummariesByUuid(
-        @RequestHeader("X-User-Id") String userId,
+        @RequestAttribute("userId") String userId,
         @RequestParam("uuid") String uuid,
         @RequestParam(defaultValue = "0") int page,
         @RequestParam(defaultValue = "20") int size) {
@@ -463,7 +463,7 @@ public class PreprocessController {
 
     @DeleteMapping("/emojis/summaries/{id}")
     public ApiResponse<Void> deleteEmojiSummaryById(
-        @RequestHeader("X-User-Id") String userId,
+        @RequestAttribute("userId") String userId,
         @PathVariable String id) {
         log.info(
             "REST endpoint invoked to delete emoji summary record with ID: [{}] for user UUID: [{}]",
@@ -474,7 +474,7 @@ public class PreprocessController {
 
     @DeleteMapping("/emojis/summaries")
     public ApiResponse<Void> deleteEmojiSummariesByIds(
-        @RequestHeader("X-User-Id") String userId,
+        @RequestAttribute("userId") String userId,
         @RequestBody List<String> ids) {
         log.info(
             "REST endpoint invoked to batch delete [{}] emoji summary records for user UUID: [{}]",
@@ -485,7 +485,7 @@ public class PreprocessController {
 
     @DeleteMapping("/emojis/summaries/all")
     public ApiResponse<Void> deleteAllEmojiSummariesByUuid(
-        @RequestHeader("X-User-Id") String userId,
+        @RequestAttribute("userId") String userId,
         @RequestParam("uuid") String uuid) {
         log.info(
             "REST endpoint invoked to delete ALL emoji summary records for user UUID: [{}] and session UUID: [{}]",
@@ -496,7 +496,7 @@ public class PreprocessController {
 
     @GetMapping("/emojis/{id}/file")
     public ResponseEntity<Resource> getEmojiFileById(
-        @RequestHeader("X-User-Id") String userId,
+        @RequestAttribute("userId") String userId,
         @PathVariable String id) {
         log.info("REST endpoint invoked to fetch emoji file for ID: [{}] and user UUID: [{}]", id,
             userId);

@@ -24,7 +24,7 @@ export interface AuthResponse {
      * @type {string}
      * @memberof AuthResponse
      */
-    uuid?: string;
+    token?: string;
 }
 
 /**
@@ -44,7 +44,7 @@ export function AuthResponseFromJSONTyped(json: any, ignoreDiscriminator: boolea
     }
     return {
         
-        'uuid': json['uuid'] == null ? undefined : json['uuid'],
+        'token': json['token'] == null ? undefined : json['token'],
     };
 }
 
@@ -59,7 +59,7 @@ export function AuthResponseToJSONTyped(value?: AuthResponse | null, ignoreDiscr
 
     return {
         
-        'uuid': value['uuid'],
+        'token': value['token'],
     };
 }
 

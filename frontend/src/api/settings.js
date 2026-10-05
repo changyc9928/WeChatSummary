@@ -1,4 +1,5 @@
 import { API_BASE_URL } from '../config';
+import { withAuthHeaders } from './authToken';
 
 /**
  * Server-wide AI provider settings (keys, endpoints, models).
@@ -14,7 +15,7 @@ async function settingsRequest({ method = 'GET', body } = {}) {
   try {
     res = await fetch(`${base()}/api/settings/ai`, {
       method,
-      headers: body ? { 'Content-Type': 'application/json' } : {},
+      headers: withAuthHeaders(body ? { 'Content-Type': 'application/json' } : {}),
       body: body ? JSON.stringify(body) : undefined
     });
   } catch (err) {

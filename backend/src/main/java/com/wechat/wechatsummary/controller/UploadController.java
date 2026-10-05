@@ -22,7 +22,7 @@ import org.springframework.web.bind.annotation.DeleteMapping;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.PostMapping;
-import org.springframework.web.bind.annotation.RequestHeader;
+import org.springframework.web.bind.annotation.RequestAttribute;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RequestPart;
 import org.springframework.web.bind.annotation.RestController;
@@ -63,7 +63,7 @@ public class UploadController {
     )
     @PostMapping("/upload")
     public ApiResponse<UploadSessionResponse> upload(
-        @RequestHeader("X-User-Id") String userId,
+        @RequestAttribute("userId") String userId,
         @RequestPart("file") MultipartFile file) {
         log.info("Received HTTP multi-part upload file request payload for user UUID: [{}]",
             userId);
@@ -104,7 +104,7 @@ public class UploadController {
 
     @DeleteMapping("/{uuid}")
     public ApiResponse<Boolean> deleteSession(
-        @RequestHeader("X-User-Id") String userId,
+        @RequestAttribute("userId") String userId,
         @PathVariable String uuid) {
         try {
             boolean result = sessionDeletionService.deleteSession(userId, uuid);
@@ -119,12 +119,12 @@ public class UploadController {
      * Fetches all available processed storage session paths scoped strictly to the calling user
      * UUID.
      *
-     * @param userId the user's UUID primary key passed via authorization headers
+     * @param userId the authenticated user's UUID resolved from the Bearer token
      * @return unified envelope containing list of session meta configurations
      */
     @GetMapping("/sessions")
     public ApiResponse<List<SessionResponseDTO>> getAvailableSessions(
-        @RequestHeader("X-User-Id") String userId) {
+        @RequestAttribute("userId") String userId) {
         log.info(
             "Received request to look up historical or active background pipeline sessions for user UUID: [{}]",
             userId);

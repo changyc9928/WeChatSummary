@@ -29,7 +29,7 @@ export default function App() {
 
   const sessions = useSessions(currentUser);
   const timeWindow = useTimeWindow(uuidInput);
-  const summary = useSummaryStatus({ uuidInput, currentUser });
+  const summary = useSummaryStatus({ uuidInput });
   const preprocess = usePreprocess({
     uuidInput,
     currentUser,

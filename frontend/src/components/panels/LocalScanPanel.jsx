@@ -3,6 +3,7 @@ import { styles } from '../../styles/dashboardStyles';
 import useLanguage from '../../hooks/useLanguage';
 import { localBridge } from '../../api/localBridge';
 import { apiClient } from '../../api/client';
+import { withAuthHeaders } from '../../api/authToken';
 import { LOCAL_BRIDGE_URL, API_BASE_URL } from '../../config';
 
 const TOKEN_KEY = 'wechat_bridge_token';
@@ -104,7 +105,7 @@ export default function LocalScanPanel() {
     const tick = async () => {
       try {
         const res = await fetch(`${API_BASE_URL.replace(/\/+$/, '')}/api/tools/bridge/logs?after=${serverLogCursor}`, {
-          headers: { Accept: 'application/json' }
+          headers: withAuthHeaders({ Accept: 'application/json' })
         });
         if (!res.ok) throw new Error(`HTTP ${res.status}`);
         const env = await res.json();

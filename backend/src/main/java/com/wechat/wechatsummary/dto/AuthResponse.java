@@ -9,5 +9,6 @@ import lombok.NoArgsConstructor;
 @AllArgsConstructor
 public class AuthResponse {
 
-    private String uuid;
+    /** Opaque Bearer token; the user UUID stays server-side in Redis. */
+    private String token;
 }

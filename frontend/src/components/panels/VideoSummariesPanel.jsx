@@ -13,7 +13,7 @@ function VideoPlayer({ id, currentUser }) {
     let objectUrl;
     let active = true;
     setLoading(true);
-    apiClient.preprocess.getVideoFileById({ xUserId: currentUser.uuid, id })
+    apiClient.preprocess.getVideoFileById({ id })
       .then((blob) => {
         if (!active) return;
         objectUrl = URL.createObjectURL(blob);

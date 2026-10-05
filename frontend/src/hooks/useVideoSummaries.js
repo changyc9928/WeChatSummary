@@ -21,7 +21,6 @@ export default function useVideoSummaries({ uuidInput, currentUser }) {
     setLoadingVideos(true);
     try {
       const data = await apiClient.preprocess.getVideoSummariesByUuid({
-        xUserId: currentUser.uuid,
         uuid: sessionUuid,
         page,
         size
@@ -58,7 +57,6 @@ export default function useVideoSummaries({ uuidInput, currentUser }) {
     setDeleting(true);
     try {
       await apiClient.preprocess.deleteVideoSummaryById({
-        xUserId: currentUser.uuid,
         id
       });
       setSelectedVideoIds(prev => prev.filter(item => item !== id));
@@ -75,7 +73,6 @@ export default function useVideoSummaries({ uuidInput, currentUser }) {
     setClearingText(true);
     try {
       await apiClient.preprocess.clearVideoSummaryTextById({
-        xUserId: currentUser.uuid,
         id
       });
       await fetchVideoSummaries(uuidInput, videoPagination.page, videoPagination.size);
@@ -91,7 +88,6 @@ export default function useVideoSummaries({ uuidInput, currentUser }) {
     setBatchDeleting(true);
     try {
       await apiClient.preprocess.deleteVideoSummariesByIds({
-        xUserId: currentUser.uuid,
         requestBody: ids
       });
       setSelectedVideoIds([]);
@@ -108,7 +104,6 @@ export default function useVideoSummaries({ uuidInput, currentUser }) {
     setBatchClearingText(true);
     try {
       await apiClient.preprocess.clearVideoSummaryTextsByIds({
-        xUserId: currentUser.uuid,
         requestBody: ids
       });
       setSelectedVideoIds([]);

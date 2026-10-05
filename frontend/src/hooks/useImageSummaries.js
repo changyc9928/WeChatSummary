@@ -27,7 +27,6 @@ export default function useImageSummaries({ uuidInput, currentUser }) {
     setLoadingImages(true);
     try {
       const data = await apiClient.preprocess.getImageSummariesByUuid({
-        xUserId: currentUser.uuid,
         uuid: sessionUuid,
         page,
         size
@@ -64,7 +63,6 @@ export default function useImageSummaries({ uuidInput, currentUser }) {
     setDeleting(true);
     try {
       await apiClient.preprocess.deleteImageSummaryById({
-        xUserId: currentUser.uuid,
         id
       });
       setSelectedImageIds(prev => prev.filter(item => item !== id));
@@ -81,7 +79,6 @@ export default function useImageSummaries({ uuidInput, currentUser }) {
     setBatchDeleting(true);
     try {
       await apiClient.preprocess.deleteImageSummariesByIds({
-        xUserId: currentUser.uuid,
         requestBody: ids
       });
       setSelectedImageIds([]);

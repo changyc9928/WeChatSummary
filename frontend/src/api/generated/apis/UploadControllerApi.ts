@@ -29,17 +29,11 @@ import {
 } from '../models/index';
 
 export interface DeleteSessionRequest {
-    xUserId: string;
     uuid: string;
 }
 
-export interface GetAvailableSessionsRequest {
-    xUserId: string;
-}
-
 export interface UploadRequest {
-    xUserId: string;
-    file?: Blob;
+    file: Blob;
 }
 
 /**
@@ -50,13 +44,6 @@ export class UploadControllerApi extends runtime.BaseAPI {
     /**
      */
     async deleteSessionRaw(requestParameters: DeleteSessionRequest, initOverrides?: RequestInit | runtime.InitOverrideFunction): Promise<runtime.ApiResponse<ApiResponseBoolean>> {
-        if (requestParameters['xUserId'] == null) {
-            throw new runtime.RequiredError(
-                'xUserId',
-                'Required parameter "xUserId" was null or undefined when calling deleteSession().'
-            );
-        }
-
         if (requestParameters['uuid'] == null) {
             throw new runtime.RequiredError(
                 'uuid',
@@ -68,10 +55,14 @@ export class UploadControllerApi extends runtime.BaseAPI {
 
         const headerParameters: runtime.HTTPHeaders = {};
 
-        if (requestParameters['xUserId'] != null) {
-            headerParameters['X-User-Id'] = String(requestParameters['xUserId']);
-        }
+        if (this.configuration && this.configuration.accessToken) {
+            const token = this.configuration.accessToken;
+            const tokenString = await token("bearerAuth", []);
 
+            if (tokenString) {
+                headerParameters["Authorization"] = `Bearer ${tokenString}`;
+            }
+        }
 
         let urlPath = `/api/files/{uuid}`;
         urlPath = urlPath.replace(`{${"uuid"}}`, encodeURIComponent(String(requestParameters['uuid'])));
@@ -95,22 +86,19 @@ export class UploadControllerApi extends runtime.BaseAPI {
 
     /**
      */
-    async getAvailableSessionsRaw(requestParameters: GetAvailableSessionsRequest, initOverrides?: RequestInit | runtime.InitOverrideFunction): Promise<runtime.ApiResponse<ApiResponseListSessionResponseDTO>> {
-        if (requestParameters['xUserId'] == null) {
-            throw new runtime.RequiredError(
-                'xUserId',
-                'Required parameter "xUserId" was null or undefined when calling getAvailableSessions().'
-            );
-        }
-
+    async getAvailableSessionsRaw(initOverrides?: RequestInit | runtime.InitOverrideFunction): Promise<runtime.ApiResponse<ApiResponseListSessionResponseDTO>> {
         const queryParameters: any = {};
 
         const headerParameters: runtime.HTTPHeaders = {};
 
-        if (requestParameters['xUserId'] != null) {
-            headerParameters['X-User-Id'] = String(requestParameters['xUserId']);
-        }
+        if (this.configuration && this.configuration.accessToken) {
+            const token = this.configuration.accessToken;
+            const tokenString = await token("bearerAuth", []);
 
+            if (tokenString) {
+                headerParameters["Authorization"] = `Bearer ${tokenString}`;
+            }
+        }
 
         let urlPath = `/api/files/sessions`;
 
@@ -126,18 +114,18 @@ export class UploadControllerApi extends runtime.BaseAPI {
 
     /**
      */
-    async getAvailableSessions(requestParameters: GetAvailableSessionsRequest, initOverrides?: RequestInit | runtime.InitOverrideFunction): Promise<ApiResponseListSessionResponseDTO> {
-        const response = await this.getAvailableSessionsRaw(requestParameters, initOverrides);
+    async getAvailableSessions(initOverrides?: RequestInit | runtime.InitOverrideFunction): Promise<ApiResponseListSessionResponseDTO> {
+        const response = await this.getAvailableSessionsRaw(initOverrides);
         return await response.value();
     }
 
     /**
      */
     async uploadRaw(requestParameters: UploadRequest, initOverrides?: RequestInit | runtime.InitOverrideFunction): Promise<runtime.ApiResponse<ApiResponseUploadSessionResponse>> {
-        if (requestParameters['xUserId'] == null) {
+        if (requestParameters['file'] == null) {
             throw new runtime.RequiredError(
-                'xUserId',
-                'Required parameter "xUserId" was null or undefined when calling upload().'
+                'file',
+                'Required parameter "file" was null or undefined when calling upload().'
             );
         }
 
@@ -145,10 +133,14 @@ export class UploadControllerApi extends runtime.BaseAPI {
 
         const headerParameters: runtime.HTTPHeaders = {};
 
-        if (requestParameters['xUserId'] != null) {
-            headerParameters['X-User-Id'] = String(requestParameters['xUserId']);
-        }
+        if (this.configuration && this.configuration.accessToken) {
+            const token = this.configuration.accessToken;
+            const tokenString = await token("bearerAuth", []);
 
+            if (tokenString) {
+                headerParameters["Authorization"] = `Bearer ${tokenString}`;
+            }
+        }
         const consumes: runtime.Consume[] = [
             { contentType: 'multipart/form-data' },
         ];

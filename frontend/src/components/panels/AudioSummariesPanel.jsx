@@ -12,7 +12,7 @@ function AudioPlayer({ id, currentUser }) {
     let objectUrl;
     let active = true;
     setLoading(true);
-    apiClient.preprocess.getAudioFileById({ xUserId: currentUser.uuid, id })
+    apiClient.preprocess.getAudioFileById({ id })
       .then((blob) => {
         if (!active) return;
         objectUrl = URL.createObjectURL(blob);

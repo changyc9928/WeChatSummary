@@ -27,7 +27,6 @@ export default function useEmojiSummaries({ uuidInput, currentUser }) {
     setLoadingEmojis(true);
     try {
       const data = await apiClient.preprocess.getEmojiSummariesByUuid({
-        xUserId: currentUser.uuid,
         uuid: sessionUuid,
         page,
         size
@@ -64,7 +63,6 @@ export default function useEmojiSummaries({ uuidInput, currentUser }) {
     setDeleting(true);
     try {
       await apiClient.preprocess.deleteEmojiSummaryById({
-        xUserId: currentUser.uuid,
         id
       });
       setSelectedEmojiIds(prev => prev.filter(item => item !== id));
@@ -81,7 +79,6 @@ export default function useEmojiSummaries({ uuidInput, currentUser }) {
     setBatchDeleting(true);
     try {
       await apiClient.preprocess.deleteEmojiSummariesByIds({
-        xUserId: currentUser.uuid,
         requestBody: ids
       });
       setSelectedEmojiIds([]);

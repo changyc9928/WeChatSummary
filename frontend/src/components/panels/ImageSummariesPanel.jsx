@@ -21,7 +21,7 @@ export default function ImageSummariesPanel({
   const { t } = useLanguage();
   const [imageObjectUrls, setImageObjectUrls] = useState({});
 
-  // Fetch image bytes with X-User-Id header and create local Object URLs
+  // Fetch image bytes (Bearer token attached by the API client) and create local Object URLs
   useEffect(() => {
     const objectUrls = {};
     let isMounted = true;
@@ -32,7 +32,6 @@ export default function ImageSummariesPanel({
       for (const item of imageSummaries) {
         try {
           const blob = await apiClient.preprocess.getImageFileById({
-            xUserId: currentUser.uuid,
             id: item.id
           });
           if (isMounted) {

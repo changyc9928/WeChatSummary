@@ -67,7 +67,6 @@ export default function StepPreprocess({
         setLoadingPreview(true);
         try {
           const data = await apiClient.chatSummary.getChatPreview({
-            xUserId: currentUser.uuid,
             uuid: uuidInput
           });
           setPreviewData(data?.data || { metadata: {}, rows: [] });

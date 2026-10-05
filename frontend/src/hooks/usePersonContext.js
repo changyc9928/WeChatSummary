@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useState } from 'react';
 import { API_BASE_URL } from '../config';
+import { withAuthHeaders } from '../api/authToken';
 import { fromLocalInputValue } from '../utils/time';
 
 const EMPTY_CONTEXT = { people: [], relationships: [] };
@@ -19,13 +20,10 @@ function normalizeContext(raw) {
   return { people, relationships };
 }
 
-async function requestJson(url, { method = 'GET', userId, body } = {}) {
+async function requestJson(url, { method = 'GET', body } = {}) {
   const res = await fetch(url, {
     method,
-    headers: {
-      'X-User-Id': userId,
-      ...(body !== undefined ? { 'Content-Type': 'application/json' } : {})
-    },
+    headers: withAuthHeaders(body !== undefined ? { 'Content-Type': 'application/json' } : {}),
     body: body !== undefined ? JSON.stringify(body) : undefined
   });
   if (!res.ok) {
@@ -49,7 +47,7 @@ export default function usePersonContext({ uuidInput, currentUser, selectedStart
   const [error, setError] = useState(null);
   const [confirmed, setConfirmed] = useState(false);
 
-  const userId = currentUser?.uuid;
+  const authenticated = Boolean(currentUser);
 
   const buildWindowPayload = useCallback(() => {
     const payload = {};
@@ -59,11 +57,11 @@ export default function usePersonContext({ uuidInput, currentUser, selectedStart
   }, [selectedStartTime, selectedEndTime]);
 
   const fetchContext = useCallback(async () => {
-    if (!uuidInput || !userId) return;
+    if (!uuidInput || !authenticated) return;
     setLoading(true);
     setError(null);
     try {
-      const data = await requestJson(`${API_BASE_URL}/api/summary/person-context/${uuidInput}`, { userId });
+      const data = await requestJson(`${API_BASE_URL}/api/summary/person-context/${uuidInput}`);
       setContext(normalizeContext(data));
       setConfirmed(false);
     } catch (err) {
@@ -71,16 +69,15 @@ export default function usePersonContext({ uuidInput, currentUser, selectedStart
     } finally {
       setLoading(false);
     }
-  }, [uuidInput, userId]);
+  }, [uuidInput, authenticated]);
 
   const extractContext = useCallback(async () => {
-    if (!uuidInput || !userId) return null;
+    if (!uuidInput || !authenticated) return null;
     setExtracting(true);
     setError(null);
     try {
       const data = await requestJson(`${API_BASE_URL}/api/summary/person-context/${uuidInput}`, {
         method: 'POST',
-        userId,
         body: buildWindowPayload()
       });
       const normalized = normalizeContext(data);
@@ -94,10 +91,10 @@ export default function usePersonContext({ uuidInput, currentUser, selectedStart
     } finally {
       setExtracting(false);
     }
-  }, [uuidInput, userId, buildWindowPayload]);
+  }, [uuidInput, authenticated, buildWindowPayload]);
 
   const saveContext = useCallback(async (next) => {
-    if (!uuidInput || !userId) return null;
+    if (!uuidInput || !authenticated) return null;
     const normalized = normalizeContext(next ?? context);
     // Attach the current window so the backend can scope the sidecar to this
     // summary task; a different date range will then regenerate instead of
@@ -108,7 +105,6 @@ export default function usePersonContext({ uuidInput, currentUser, selectedStart
     try {
       const data = await requestJson(`${API_BASE_URL}/api/summary/person-context/${uuidInput}`, {
         method: 'PUT',
-        userId,
         body
       });
       const saved = normalizeContext(data);
@@ -121,7 +117,7 @@ export default function usePersonContext({ uuidInput, currentUser, selectedStart
     } finally {
       setSaving(false);
     }
-  }, [uuidInput, userId, context]);
+  }, [uuidInput, authenticated, context]);
 
   useEffect(() => {
     setContext(EMPTY_CONTEXT);

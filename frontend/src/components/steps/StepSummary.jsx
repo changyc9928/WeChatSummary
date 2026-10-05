@@ -32,11 +32,11 @@ export default function StepSummary({
   // Load already-saved context (e.g. page refresh after a run) so the panel
   // is visible even when the summary already finished.
   useEffect(() => {
-    if (uuidInput && currentUser?.uuid && isPreprocessFinished) {
+    if (uuidInput && currentUser && isPreprocessFinished) {
       person.fetchContext();
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [uuidInput, currentUser?.uuid, isPreprocessFinished]);
+  }, [uuidInput, currentUser, isPreprocessFinished]);
 
   const hasContext = (person.context?.people || []).length > 0;
 

@@ -16,7 +16,6 @@ export default function useUpload({ currentUser, onUploaded }) {
     setError(null);
     try {
       const response = await apiClient.upload.upload({
-        xUserId: currentUser.uuid,
         file
       });
       const assignedUuid = response?.data?.sessionId;

@@ -10,9 +10,7 @@ export default function useSessions(currentUser) {
     if (!currentUser) return;
     setLoadingSessions(true);
     try {
-      const data = await apiClient.upload.getAvailableSessions({
-        xUserId: currentUser.uuid
-      });
+      const data = await apiClient.upload.getAvailableSessions();
       setSessions(data?.data || []);
       setError(null);
     } catch (err) {
@@ -26,7 +24,6 @@ export default function useSessions(currentUser) {
     if (!currentUser || !sessionUuid) return;
     try {
       await apiClient.upload.deleteSession({
-        xUserId: currentUser.uuid,
         uuid: sessionUuid
       });
       setSessions((prev) => prev.filter((s) => s.uuid !== sessionUuid));

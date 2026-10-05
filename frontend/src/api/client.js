@@ -7,6 +7,7 @@ import {
   UploadControllerApi
 } from './generated/apis';
 import { API_BASE_URL } from '../config';
+import { getAuthToken } from './authToken';
 
 const GENERIC_SERVER_ERROR = 'The server encountered an error. Please try again later.';
 const GENERIC_NETWORK_ERROR = 'Unable to reach the server. Please check your network connection and try again.';
@@ -76,6 +77,9 @@ const configuration = new Configuration({
   basePath: API_BASE_URL,
   fetchApi,
   middleware: [rethrowErrorMiddleware],
+  // The generated client attaches `Authorization: Bearer <token>` on secured
+  // endpoints from this provider, so no caller passes user identity anymore.
+  accessToken: () => getAuthToken(),
 });
 
 export const apiClient = {

@@ -16,11 +16,14 @@
 import * as runtime from '../runtime';
 import type {
   ApiResponseAuthResponse,
+  ApiResponseVoid,
   AuthRequest,
 } from '../models/index';
 import {
     ApiResponseAuthResponseFromJSON,
     ApiResponseAuthResponseToJSON,
+    ApiResponseVoidFromJSON,
+    ApiResponseVoidToJSON,
     AuthRequestFromJSON,
     AuthRequestToJSON,
 } from '../models/index';
@@ -72,6 +75,41 @@ export class AuthControllerApi extends runtime.BaseAPI {
      */
     async login(requestParameters: LoginRequest, initOverrides?: RequestInit | runtime.InitOverrideFunction): Promise<ApiResponseAuthResponse> {
         const response = await this.loginRaw(requestParameters, initOverrides);
+        return await response.value();
+    }
+
+    /**
+     */
+    async logoutRaw(initOverrides?: RequestInit | runtime.InitOverrideFunction): Promise<runtime.ApiResponse<ApiResponseVoid>> {
+        const queryParameters: any = {};
+
+        const headerParameters: runtime.HTTPHeaders = {};
+
+        if (this.configuration && this.configuration.accessToken) {
+            const token = this.configuration.accessToken;
+            const tokenString = await token("bearerAuth", []);
+
+            if (tokenString) {
+                headerParameters["Authorization"] = `Bearer ${tokenString}`;
+            }
+        }
+
+        let urlPath = `/api/auth/logout`;
+
+        const response = await this.request({
+            path: urlPath,
+            method: 'POST',
+            headers: headerParameters,
+            query: queryParameters,
+        }, initOverrides);
+
+        return new runtime.JSONApiResponse(response, (jsonValue) => ApiResponseVoidFromJSON(jsonValue));
+    }
+
+    /**
+     */
+    async logout(initOverrides?: RequestInit | runtime.InitOverrideFunction): Promise<ApiResponseVoid> {
+        const response = await this.logoutRaw(initOverrides);
         return await response.value();
     }
 

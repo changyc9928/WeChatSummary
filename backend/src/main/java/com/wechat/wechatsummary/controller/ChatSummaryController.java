@@ -18,7 +18,7 @@ import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.PutMapping;
 import org.springframework.web.bind.annotation.RequestBody;
-import org.springframework.web.bind.annotation.RequestHeader;
+import org.springframework.web.bind.annotation.RequestAttribute;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RestController;
 
@@ -33,7 +33,7 @@ public class ChatSummaryController {
 
     @GetMapping("/preview/{uuid}")
     public ApiResponse<ChatPreviewResponse> getChatPreview(
-        @RequestHeader("X-User-Id") String userId,
+        @RequestAttribute("userId") String userId,
         @PathVariable UUID uuid) {
         log.info(
             "Request received to fetch chat preview table for user UUID: [{}] and task UUID: [{}]",
@@ -43,7 +43,7 @@ public class ChatSummaryController {
 
     @PostMapping("/{uuid}")
     public ApiResponse<TaskAckResponse> startSummary(
-        @RequestHeader("X-User-Id") String userId,
+        @RequestAttribute("userId") String userId,
         @PathVariable UUID uuid,
         @RequestBody(required = false) SummaryRequestDTO requestDTO) {
 
@@ -68,7 +68,7 @@ public class ChatSummaryController {
      */
     @PostMapping("/person-context/{uuid}")
     public ApiResponse<PersonContextDto> extractPersonContext(
-        @RequestHeader("X-User-Id") String userId,
+        @RequestAttribute("userId") String userId,
         @PathVariable UUID uuid,
         @RequestBody(required = false) SummaryRequestDTO requestDTO) {
         LocalDateTime startTime = requestDTO != null ? requestDTO.getStartTime() : null;
@@ -83,7 +83,7 @@ public class ChatSummaryController {
     /** Returns the stored per-task person context, or an empty one when absent. */
     @GetMapping("/person-context/{uuid}")
     public ApiResponse<PersonContextDto> getPersonContext(
-        @RequestHeader("X-User-Id") String userId,
+        @RequestAttribute("userId") String userId,
         @PathVariable UUID uuid) {
         PersonContextDto dto = personContextService.load(userId, uuid);
         return ApiResponse.success(dto != null ? dto : new PersonContextDto());
@@ -92,7 +92,7 @@ public class ChatSummaryController {
     /** Saves the user-confirmed person context; it overrides LLM speculation. */
     @PutMapping("/person-context/{uuid}")
     public ApiResponse<PersonContextDto> savePersonContext(
-        @RequestHeader("X-User-Id") String userId,
+        @RequestAttribute("userId") String userId,
         @PathVariable UUID uuid,
         @RequestBody(required = false) PersonContextDto dto) {
         log.info("Saving user-confirmed person context for user UUID: [{}] and task UUID: [{}]",
@@ -102,14 +102,14 @@ public class ChatSummaryController {
 
     @GetMapping("/status-pool/{uuid}")
     public ApiResponse<SummaryProgressResponse> getStatusAndProgress(
-        @RequestHeader("X-User-Id") String userId,
+        @RequestAttribute("userId") String userId,
         @PathVariable UUID uuid) {
         return ApiResponse.success(chatSummaryService.getStatusAndProgress(userId, uuid));
     }
 
     @PostMapping("/pause/{uuid}")
     public ApiResponse<TaskAckResponse> pauseSummary(
-        @RequestHeader("X-User-Id") String userId,
+        @RequestAttribute("userId") String userId,
         @PathVariable UUID uuid) {
         log.info("Request received to pause pipeline for user UUID: [{}] and task UUID: [{}]",
             userId, uuid);
@@ -121,7 +121,7 @@ public class ChatSummaryController {
 
     @PostMapping("/restart/{uuid}")
     public ApiResponse<TaskAckResponse> restartSummary(
-        @RequestHeader("X-User-Id") String userId,
+        @RequestAttribute("userId") String userId,
         @PathVariable UUID uuid,
         @RequestBody(required = false) SummaryRequestDTO requestDTO) {
 

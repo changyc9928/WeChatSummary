@@ -18,6 +18,9 @@ import com.wechat.wechatsummary.dto.AiSettingsView;
 import com.wechat.wechatsummary.exception.BadRequestException;
 import com.wechat.wechatsummary.service.AiSettingsService;
 import com.wechat.wechatsummary.service.PreprocessConcurrencyService;
+import com.wechat.wechatsummary.service.UserTokenService;
+import java.util.Optional;
+import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.TestConfiguration;
@@ -25,6 +28,7 @@ import org.springframework.boot.webmvc.test.autoconfigure.WebMvcTest;
 import org.springframework.cache.CacheManager;
 import org.springframework.cache.concurrent.ConcurrentMapCacheManager;
 import org.springframework.context.annotation.Bean;
+import org.springframework.http.HttpHeaders;
 import org.springframework.http.MediaType;
 import org.springframework.test.web.servlet.MockMvc;
 
@@ -45,12 +49,22 @@ class SettingsControllerTest {
             return mock(PreprocessConcurrencyService.class);
         }
 
+        // The slice does not start Redis; the auth interceptor needs the token service.
+        @Bean
+        UserTokenService userTokenService() {
+            return mock(UserTokenService.class);
+        }
+
         // The slice does not start Redis; caching infrastructure still needs a manager.
         @Bean
         CacheManager cacheManager() {
             return new ConcurrentMapCacheManager();
         }
     }
+
+    private static final String TOKEN = "test-token";
+
+    private static final String AUTH_HEADER = "Bearer " + TOKEN;
 
     @Autowired
     private MockMvc mockMvc;
@@ -62,6 +76,15 @@ class SettingsControllerTest {
 
     @Autowired
     private PreprocessConcurrencyService preprocessConcurrencyService;
+
+    @Autowired
+    private UserTokenService userTokenService;
+
+    @BeforeEach
+    void authenticate() {
+        // The universal interceptor requires a valid Bearer token on every request.
+        doReturn(Optional.of("test-user")).when(userTokenService).resolveUserId(TOKEN);
+    }
 
     private static AiSettingsView view() {
         return new AiSettingsView(
@@ -76,7 +99,8 @@ class SettingsControllerTest {
     void getReturnsMaskedView() throws Exception {
         doReturn(view()).when(aiSettingsService).view();
 
-        mockMvc.perform(get("/api/settings/ai"))
+        mockMvc.perform(get("/api/settings/ai")
+                .header(HttpHeaders.AUTHORIZATION, AUTH_HEADER))
             .andExpect(status().isOk())
             .andExpect(jsonPath("$.code").value(0))
             .andExpect(jsonPath("$.data.chatApiKey").value("••••abcd"))
@@ -98,6 +122,7 @@ class SettingsControllerTest {
             6, null, null, null, null));
 
         mockMvc.perform(put("/api/settings/ai")
+                .header(HttpHeaders.AUTHORIZATION, AUTH_HEADER)
                 .contentType(MediaType.APPLICATION_JSON)
                 .content(body))
             .andExpect(status().isOk())
@@ -113,6 +138,7 @@ class SettingsControllerTest {
             .when(aiSettingsService).update(any());
 
         mockMvc.perform(put("/api/settings/ai")
+                .header(HttpHeaders.AUTHORIZATION, AUTH_HEADER)
                 .contentType(MediaType.APPLICATION_JSON)
                 .content("{\"workers\":8,\"maxWorkers\":2}"))
             .andExpect(status().isBadRequest())
@@ -126,10 +152,19 @@ class SettingsControllerTest {
         // ignore the boot-time ApplicationReadyEvent call; count request-driven calls only
         clearInvocations(preprocessConcurrencyService);
 
-        mockMvc.perform(delete("/api/settings/ai"))
+        mockMvc.perform(delete("/api/settings/ai")
+                .header(HttpHeaders.AUTHORIZATION, AUTH_HEADER))
             .andExpect(status().isOk())
             .andExpect(jsonPath("$.message").value("AI settings reset to server defaults"));
 
         verify(preprocessConcurrencyService).apply();
+    }
+
+    @Test
+    void missingBearerTokenIsRejectedByInterceptor() throws Exception {
+        mockMvc.perform(get("/api/settings/ai"))
+            .andExpect(status().isUnauthorized())
+            .andExpect(jsonPath("$.code").value(401))
+            .andExpect(jsonPath("$.message").value("Authentication required"));
     }
 }

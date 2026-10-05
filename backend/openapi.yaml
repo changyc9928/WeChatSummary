@@ -5,6 +5,8 @@ info:
 servers:
 - url: http://localhost:8080
   description: Generated server url
+security:
+- bearerAuth: []
 tags:
 - name: bridge-log-controller
   description: Bridge log streaming (webhook ingest + viewer)
@@ -39,6 +41,7 @@ paths:
       - bridge-log-controller
       summary: Ingest log lines POSTed by the bridge webhook
       operationId: ingest
+      security: []
       requestBody:
         content:
           application/json:
@@ -69,11 +72,6 @@ paths:
       - chat-summary-controller
       operationId: startSummary
       parameters:
-      - name: X-User-Id
-        in: header
-        required: true
-        schema:
-          type: string
       - name: uuid
         in: path
         required: true
@@ -98,11 +96,6 @@ paths:
       - chat-summary-controller
       operationId: restartSummary
       parameters:
-      - name: X-User-Id
-        in: header
-        required: true
-        schema:
-          type: string
       - name: uuid
         in: path
         required: true
@@ -127,11 +120,6 @@ paths:
       - chat-summary-controller
       operationId: pauseSummary
       parameters:
-      - name: X-User-Id
-        in: header
-        required: true
-        schema:
-          type: string
       - name: uuid
         in: path
         required: true
@@ -151,11 +139,6 @@ paths:
       - preprocess-controller
       operationId: preprocess
       parameters:
-      - name: X-User-Id
-        in: header
-        required: true
-        schema:
-          type: string
       - name: uuid
         in: path
         required: true
@@ -174,11 +157,6 @@ paths:
       - preprocess-controller
       operationId: restartPreprocess
       parameters:
-      - name: X-User-Id
-        in: header
-        required: true
-        schema:
-          type: string
       - name: uuid
         in: path
         required: true
@@ -197,11 +175,6 @@ paths:
       - preprocess-controller
       operationId: reprocess
       parameters:
-      - name: X-User-Id
-        in: header
-        required: true
-        schema:
-          type: string
       - name: uuid
         in: path
         required: true
@@ -220,11 +193,6 @@ paths:
       - preprocess-controller
       operationId: abortTask
       parameters:
-      - name: X-User-Id
-        in: header
-        required: true
-        schema:
-          type: string
       - name: uuid
         in: path
         required: true
@@ -242,12 +210,6 @@ paths:
       tags:
       - upload-controller
       operationId: upload
-      parameters:
-      - name: X-User-Id
-        in: header
-        required: true
-        schema:
-          type: string
       requestBody:
         description: ZIP archive to ingest
         content:
@@ -258,6 +220,8 @@ paths:
                 file:
                   type: string
                   format: binary
+              required:
+                - file
         required: true
       responses:
         "200":
@@ -271,6 +235,7 @@ paths:
       tags:
       - auth-controller
       operationId: register
+      security: []
       requestBody:
         content:
           application/json:
@@ -289,6 +254,7 @@ paths:
       tags:
       - auth-controller
       operationId: login
+      security: []
       requestBody:
         content:
           application/json:
@@ -302,6 +268,18 @@ paths:
             '*/*':
               schema:
                 $ref: "#/components/schemas/ApiResponseAuthResponse"
+  /api/auth/logout:
+    post:
+      tags:
+      - auth-controller
+      operationId: logout
+      responses:
+        "200":
+          description: OK
+          content:
+            '*/*':
+              schema:
+                $ref: "#/components/schemas/ApiResponseVoid"
   /api/tools/bridge/meta:
     get:
       tags:
@@ -335,11 +313,6 @@ paths:
       - chat-summary-controller
       operationId: getStatusAndProgress
       parameters:
-      - name: X-User-Id
-        in: header
-        required: true
-        schema:
-          type: string
       - name: uuid
         in: path
         required: true
@@ -359,11 +332,6 @@ paths:
       - chat-summary-controller
       operationId: getChatPreview
       parameters:
-      - name: X-User-Id
-        in: header
-        required: true
-        schema:
-          type: string
       - name: uuid
         in: path
         required: true
@@ -383,11 +351,6 @@ paths:
       - preprocess-controller
       operationId: getProgress
       parameters:
-      - name: X-User-Id
-        in: header
-        required: true
-        schema:
-          type: string
       - name: uuid
         in: path
         required: true
@@ -406,11 +369,6 @@ paths:
       - preprocess-controller
       operationId: getVideoFileById
       parameters:
-      - name: X-User-Id
-        in: header
-        required: true
-        schema:
-          type: string
       - name: id
         in: path
         required: true
@@ -430,11 +388,6 @@ paths:
       - preprocess-controller
       operationId: getVideoSummariesByUuid
       parameters:
-      - name: X-User-Id
-        in: header
-        required: true
-        schema:
-          type: string
       - name: uuid
         in: query
         required: true
@@ -465,12 +418,6 @@ paths:
       tags:
       - preprocess-controller
       operationId: deleteVideoSummariesByIds
-      parameters:
-      - name: X-User-Id
-        in: header
-        required: true
-        schema:
-          type: string
       requestBody:
         content:
           application/json:
@@ -492,11 +439,6 @@ paths:
       - preprocess-controller
       operationId: getImageFileById
       parameters:
-      - name: X-User-Id
-        in: header
-        required: true
-        schema:
-          type: string
       - name: id
         in: path
         required: true
@@ -516,11 +458,6 @@ paths:
       - preprocess-controller
       operationId: getImageSummariesByUuid
       parameters:
-      - name: X-User-Id
-        in: header
-        required: true
-        schema:
-          type: string
       - name: uuid
         in: query
         required: true
@@ -551,12 +488,6 @@ paths:
       tags:
       - preprocess-controller
       operationId: deleteImageSummariesByIds
-      parameters:
-      - name: X-User-Id
-        in: header
-        required: true
-        schema:
-          type: string
       requestBody:
         content:
           application/json:
@@ -578,11 +509,6 @@ paths:
       - preprocess-controller
       operationId: getEmojiFileById
       parameters:
-      - name: X-User-Id
-        in: header
-        required: true
-        schema:
-          type: string
       - name: id
         in: path
         required: true
@@ -602,11 +528,6 @@ paths:
       - preprocess-controller
       operationId: getEmojiSummariesByUuid
       parameters:
-      - name: X-User-Id
-        in: header
-        required: true
-        schema:
-          type: string
       - name: uuid
         in: query
         required: true
@@ -637,12 +558,6 @@ paths:
       tags:
       - preprocess-controller
       operationId: deleteEmojiSummariesByIds
-      parameters:
-      - name: X-User-Id
-        in: header
-        required: true
-        schema:
-          type: string
       requestBody:
         content:
           application/json:
@@ -664,11 +579,6 @@ paths:
       - preprocess-controller
       operationId: getAudioFileById
       parameters:
-      - name: X-User-Id
-        in: header
-        required: true
-        schema:
-          type: string
       - name: id
         in: path
         required: true
@@ -688,11 +598,6 @@ paths:
       - preprocess-controller
       operationId: getAudioSummariesByUuid
       parameters:
-      - name: X-User-Id
-        in: header
-        required: true
-        schema:
-          type: string
       - name: uuid
         in: query
         required: true
@@ -723,12 +628,6 @@ paths:
       tags:
       - preprocess-controller
       operationId: deleteAudioSummariesByIds
-      parameters:
-      - name: X-User-Id
-        in: header
-        required: true
-        schema:
-          type: string
       requestBody:
         content:
           application/json:
@@ -749,12 +648,6 @@ paths:
       tags:
       - upload-controller
       operationId: getAvailableSessions
-      parameters:
-      - name: X-User-Id
-        in: header
-        required: true
-        schema:
-          type: string
       responses:
         "200":
           description: OK
@@ -768,11 +661,6 @@ paths:
       - preprocess-controller
       operationId: deleteVideoSummaryById
       parameters:
-      - name: X-User-Id
-        in: header
-        required: true
-        schema:
-          type: string
       - name: id
         in: path
         required: true
@@ -791,11 +679,6 @@ paths:
       - preprocess-controller
       operationId: clearVideoSummaryTextById
       parameters:
-      - name: X-User-Id
-        in: header
-        required: true
-        schema:
-          type: string
       - name: id
         in: path
         required: true
@@ -813,12 +696,6 @@ paths:
       tags:
       - preprocess-controller
       operationId: clearVideoSummaryTextsByIds
-      parameters:
-      - name: X-User-Id
-        in: header
-        required: true
-        schema:
-          type: string
       requestBody:
         content:
           application/json:
@@ -840,11 +717,6 @@ paths:
       - preprocess-controller
       operationId: deleteAllVideoSummariesByUuid
       parameters:
-      - name: X-User-Id
-        in: header
-        required: true
-        schema:
-          type: string
       - name: uuid
         in: query
         required: true
@@ -863,11 +735,6 @@ paths:
       - preprocess-controller
       operationId: deleteImageSummaryById
       parameters:
-      - name: X-User-Id
-        in: header
-        required: true
-        schema:
-          type: string
       - name: id
         in: path
         required: true
@@ -886,11 +753,6 @@ paths:
       - preprocess-controller
       operationId: deleteAllImageSummariesByUuid
       parameters:
-      - name: X-User-Id
-        in: header
-        required: true
-        schema:
-          type: string
       - name: uuid
         in: query
         required: true
@@ -909,11 +771,6 @@ paths:
       - preprocess-controller
       operationId: deleteEmojiSummaryById
       parameters:
-      - name: X-User-Id
-        in: header
-        required: true
-        schema:
-          type: string
       - name: id
         in: path
         required: true
@@ -932,11 +789,6 @@ paths:
       - preprocess-controller
       operationId: deleteAllEmojiSummariesByUuid
       parameters:
-      - name: X-User-Id
-        in: header
-        required: true
-        schema:
-          type: string
       - name: uuid
         in: query
         required: true
@@ -955,11 +807,6 @@ paths:
       - preprocess-controller
       operationId: deleteAudioSummaryById
       parameters:
-      - name: X-User-Id
-        in: header
-        required: true
-        schema:
-          type: string
       - name: id
         in: path
         required: true
@@ -978,11 +825,6 @@ paths:
       - preprocess-controller
       operationId: clearAudioSummaryTextById
       parameters:
-      - name: X-User-Id
-        in: header
-        required: true
-        schema:
-          type: string
       - name: id
         in: path
         required: true
@@ -1000,12 +842,6 @@ paths:
       tags:
       - preprocess-controller
       operationId: clearAudioSummaryTextsByIds
-      parameters:
-      - name: X-User-Id
-        in: header
-        required: true
-        schema:
-          type: string
       requestBody:
         content:
           application/json:
@@ -1027,11 +863,6 @@ paths:
       - preprocess-controller
       operationId: deleteAllAudioSummariesByUuid
       parameters:
-      - name: X-User-Id
-        in: header
-        required: true
-        schema:
-          type: string
       - name: uuid
         in: query
         required: true
@@ -1050,11 +881,6 @@ paths:
       - upload-controller
       operationId: deleteSession
       parameters:
-      - name: X-User-Id
-        in: header
-        required: true
-        schema:
-          type: string
       - name: uuid
         in: path
         required: true
@@ -1111,6 +937,10 @@ paths:
               schema:
                 $ref: "#/components/schemas/ApiResponseAiSettingsView"
 components:
+  securitySchemes:
+    bearerAuth:
+      type: http
+      scheme: bearer
   schemas:
     AiSettingsView:
       type: object
@@ -1354,7 +1184,7 @@ components:
     AuthResponse:
       type: object
       properties:
-        uuid:
+        token:
           type: string
     ApiResponseBridgeToolMeta:
       type: object

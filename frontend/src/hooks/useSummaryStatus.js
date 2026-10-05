@@ -3,7 +3,7 @@ import { apiClient } from '../api/client';
 
 const INITIAL_STATE = { status: 'INITIAL_STATE', progress: 0.0, result: null, errorMessage: null };
 
-export default function useSummaryStatus({ uuidInput, currentUser }) {
+export default function useSummaryStatus({ uuidInput }) {
   const [summaryState, setSummaryState] = useState(INITIAL_STATE);
   const [loading, setLoading] = useState(false);
   const [pausing, setPausing] = useState(false);
@@ -27,7 +27,6 @@ export default function useSummaryStatus({ uuidInput, currentUser }) {
   const fetchStatus = useCallback(async (uuid) => {
     try {
       const data = await apiClient.chatSummary.getStatusAndProgress({
-        xUserId: currentUser?.uuid,
         uuid
       });
       if (!data) return;
@@ -65,7 +64,7 @@ export default function useSummaryStatus({ uuidInput, currentUser }) {
     } catch (err) {
       console.error("Error fetching summary status:", err);
     }
-  }, [currentUser, stopPolling]);
+  }, [stopPolling]);
 
   const startSummary = useCallback(async (payload = {}) => {
     if (!uuidInput) return;
@@ -75,7 +74,6 @@ export default function useSummaryStatus({ uuidInput, currentUser }) {
     setSummaryState({ status: 'RUNNING', progress: 0, result: null, errorMessage: null });
     try {
       await apiClient.chatSummary.startSummary({
-        xUserId: currentUser?.uuid,
         uuid: uuidInput,
         summaryRequestDTO: payload
       });
@@ -88,7 +86,7 @@ export default function useSummaryStatus({ uuidInput, currentUser }) {
     } finally {
       setLoading(false);
     }
-  }, [uuidInput, currentUser, fetchStatus, stopPolling]);
+  }, [uuidInput, fetchStatus, stopPolling]);
 
   const restartSummary = useCallback(async (payload = {}) => {
     if (!uuidInput) return;
@@ -97,7 +95,6 @@ export default function useSummaryStatus({ uuidInput, currentUser }) {
     setSummaryState({ status: 'RUNNING', progress: 0, result: null, errorMessage: null });
     try {
       await apiClient.chatSummary.restartSummary({
-        xUserId: currentUser?.uuid,
         uuid: uuidInput,
         summaryRequestDTO: payload
       });
@@ -110,14 +107,13 @@ export default function useSummaryStatus({ uuidInput, currentUser }) {
     } finally {
       setRestarting(false);
     }
-  }, [uuidInput, currentUser, fetchStatus, stopPolling]);
+  }, [uuidInput, fetchStatus, stopPolling]);
 
   const pauseSummary = useCallback(async () => {
     if (!uuidInput) return;
     setPausing(true);
     try {
       await apiClient.chatSummary.pauseSummary({
-        xUserId: currentUser?.uuid,
         uuid: uuidInput
       });
       fetchStatus(uuidInput);
@@ -126,7 +122,7 @@ export default function useSummaryStatus({ uuidInput, currentUser }) {
     } finally {
       setPausing(false);
     }
-  }, [uuidInput, currentUser, fetchStatus]);
+  }, [uuidInput, fetchStatus]);
 
   useEffect(() => {
     setSummaryState(INITIAL_STATE);

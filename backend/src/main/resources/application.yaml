@@ -82,6 +82,11 @@ summary:
 task:
   redis-ttl: 1d
 
+auth:
+  # Bearer token lifetime in Redis. Every authenticated request renews it (sliding expiration),
+  # so active users stay logged in while idle tokens expire automatically.
+  token-ttl: 24h
+
 http:
   cache-max-age: 1h
 

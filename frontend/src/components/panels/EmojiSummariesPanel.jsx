@@ -21,7 +21,7 @@ export default function EmojiSummariesPanel({
   const { t } = useLanguage();
   const [emojiObjectUrls, setEmojiObjectUrls] = useState({});
 
-  // Fetch emoji image bytes with X-User-Id header and create local Object URLs
+  // Fetch emoji image bytes (Bearer token attached by the API client) and create local Object URLs
   useEffect(() => {
     const objectUrls = {};
     let isMounted = true;
@@ -32,7 +32,6 @@ export default function EmojiSummariesPanel({
       for (const item of emojiSummaries) {
         try {
           const blob = await apiClient.preprocess.getEmojiFileById({
-            xUserId: currentUser.uuid,
             id: item.id
           });
           if (isMounted) {

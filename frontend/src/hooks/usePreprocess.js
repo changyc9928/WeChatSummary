@@ -26,7 +26,6 @@ export default function usePreprocess({ uuidInput, currentUser, onCompleted }) {
   const checkProgress = useCallback(async (uuid) => {
     try {
       const data = await apiClient.preprocess.getProgress({
-        xUserId: currentUser?.uuid,
         uuid
       });
       if (data?.data) {
@@ -41,7 +40,7 @@ export default function usePreprocess({ uuidInput, currentUser, onCompleted }) {
       console.error(err);
     }
     return null;
-  }, [currentUser]);
+  }, []);
 
   const startPolling = useCallback((uuid) => {
     stopPolling();
@@ -69,7 +68,7 @@ export default function usePreprocess({ uuidInput, currentUser, onCompleted }) {
     setError(null);
     setLoading(true);
     try {
-      await apiClient.preprocess.preprocess({ xUserId: currentUser.uuid, uuid: uuidInput });
+      await apiClient.preprocess.preprocess({ uuid: uuidInput });
       startPolling(uuidInput);
     } catch (err) {
       setError(err.message);
@@ -82,7 +81,7 @@ export default function usePreprocess({ uuidInput, currentUser, onCompleted }) {
     if (!uuidInput) return;
     setAborting(true);
     try {
-      await apiClient.preprocess.abortTask({ xUserId: currentUser?.uuid, uuid: uuidInput });
+      await apiClient.preprocess.abortTask({ uuid: uuidInput });
       stopPolling();
       await checkProgress(uuidInput);
     } catch (err) {
@@ -90,14 +89,14 @@ export default function usePreprocess({ uuidInput, currentUser, onCompleted }) {
     } finally {
       setAborting(false);
     }
-  }, [uuidInput, currentUser, stopPolling, checkProgress]);
+  }, [uuidInput, stopPolling, checkProgress]);
 
   const reprocess = useCallback(async () => {
     if (!uuidInput || !currentUser) return;
     setError(null);
     setReprocessing(true);
     try {
-      await apiClient.preprocess.reprocess({ xUserId: currentUser.uuid, uuid: uuidInput });
+      await apiClient.preprocess.reprocess({ uuid: uuidInput });
       setIsFinished(true);
       await checkProgress(uuidInput);
     } catch (err) {
@@ -113,7 +112,7 @@ export default function usePreprocess({ uuidInput, currentUser, onCompleted }) {
     setRestarting(true);
     setIsFinished(false);
     try {
-      await apiClient.preprocess.restartPreprocess({ xUserId: currentUser.uuid, uuid: uuidInput });
+      await apiClient.preprocess.restartPreprocess({ uuid: uuidInput });
       startPolling(uuidInput);
     } catch (err) {
       setError(err.message);

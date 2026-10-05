@@ -32,28 +32,23 @@ import {
 } from '../models/index';
 
 export interface GetChatPreviewRequest {
-    xUserId: string;
     uuid: string;
 }
 
 export interface GetStatusAndProgressRequest {
-    xUserId: string;
     uuid: string;
 }
 
 export interface PauseSummaryRequest {
-    xUserId: string;
     uuid: string;
 }
 
 export interface RestartSummaryRequest {
-    xUserId: string;
     uuid: string;
     summaryRequestDTO?: SummaryRequestDTO;
 }
 
 export interface StartSummaryRequest {
-    xUserId: string;
     uuid: string;
     summaryRequestDTO?: SummaryRequestDTO;
 }
@@ -66,13 +61,6 @@ export class ChatSummaryControllerApi extends runtime.BaseAPI {
     /**
      */
     async getChatPreviewRaw(requestParameters: GetChatPreviewRequest, initOverrides?: RequestInit | runtime.InitOverrideFunction): Promise<runtime.ApiResponse<ApiResponseChatPreviewResponse>> {
-        if (requestParameters['xUserId'] == null) {
-            throw new runtime.RequiredError(
-                'xUserId',
-                'Required parameter "xUserId" was null or undefined when calling getChatPreview().'
-            );
-        }
-
         if (requestParameters['uuid'] == null) {
             throw new runtime.RequiredError(
                 'uuid',
@@ -84,10 +72,14 @@ export class ChatSummaryControllerApi extends runtime.BaseAPI {
 
         const headerParameters: runtime.HTTPHeaders = {};
 
-        if (requestParameters['xUserId'] != null) {
-            headerParameters['X-User-Id'] = String(requestParameters['xUserId']);
-        }
+        if (this.configuration && this.configuration.accessToken) {
+            const token = this.configuration.accessToken;
+            const tokenString = await token("bearerAuth", []);
 
+            if (tokenString) {
+                headerParameters["Authorization"] = `Bearer ${tokenString}`;
+            }
+        }
 
         let urlPath = `/api/summary/preview/{uuid}`;
         urlPath = urlPath.replace(`{${"uuid"}}`, encodeURIComponent(String(requestParameters['uuid'])));
@@ -112,13 +104,6 @@ export class ChatSummaryControllerApi extends runtime.BaseAPI {
     /**
      */
     async getStatusAndProgressRaw(requestParameters: GetStatusAndProgressRequest, initOverrides?: RequestInit | runtime.InitOverrideFunction): Promise<runtime.ApiResponse<ApiResponseSummaryProgressResponse>> {
-        if (requestParameters['xUserId'] == null) {
-            throw new runtime.RequiredError(
-                'xUserId',
-                'Required parameter "xUserId" was null or undefined when calling getStatusAndProgress().'
-            );
-        }
-
         if (requestParameters['uuid'] == null) {
             throw new runtime.RequiredError(
                 'uuid',
@@ -130,10 +115,14 @@ export class ChatSummaryControllerApi extends runtime.BaseAPI {
 
         const headerParameters: runtime.HTTPHeaders = {};
 
-        if (requestParameters['xUserId'] != null) {
-            headerParameters['X-User-Id'] = String(requestParameters['xUserId']);
-        }
+        if (this.configuration && this.configuration.accessToken) {
+            const token = this.configuration.accessToken;
+            const tokenString = await token("bearerAuth", []);
 
+            if (tokenString) {
+                headerParameters["Authorization"] = `Bearer ${tokenString}`;
+            }
+        }
 
         let urlPath = `/api/summary/status-pool/{uuid}`;
         urlPath = urlPath.replace(`{${"uuid"}}`, encodeURIComponent(String(requestParameters['uuid'])));
@@ -158,13 +147,6 @@ export class ChatSummaryControllerApi extends runtime.BaseAPI {
     /**
      */
     async pauseSummaryRaw(requestParameters: PauseSummaryRequest, initOverrides?: RequestInit | runtime.InitOverrideFunction): Promise<runtime.ApiResponse<ApiResponseTaskAckResponse>> {
-        if (requestParameters['xUserId'] == null) {
-            throw new runtime.RequiredError(
-                'xUserId',
-                'Required parameter "xUserId" was null or undefined when calling pauseSummary().'
-            );
-        }
-
         if (requestParameters['uuid'] == null) {
             throw new runtime.RequiredError(
                 'uuid',
@@ -176,10 +158,14 @@ export class ChatSummaryControllerApi extends runtime.BaseAPI {
 
         const headerParameters: runtime.HTTPHeaders = {};
 
-        if (requestParameters['xUserId'] != null) {
-            headerParameters['X-User-Id'] = String(requestParameters['xUserId']);
-        }
+        if (this.configuration && this.configuration.accessToken) {
+            const token = this.configuration.accessToken;
+            const tokenString = await token("bearerAuth", []);
 
+            if (tokenString) {
+                headerParameters["Authorization"] = `Bearer ${tokenString}`;
+            }
+        }
 
         let urlPath = `/api/summary/pause/{uuid}`;
         urlPath = urlPath.replace(`{${"uuid"}}`, encodeURIComponent(String(requestParameters['uuid'])));
@@ -204,13 +190,6 @@ export class ChatSummaryControllerApi extends runtime.BaseAPI {
     /**
      */
     async restartSummaryRaw(requestParameters: RestartSummaryRequest, initOverrides?: RequestInit | runtime.InitOverrideFunction): Promise<runtime.ApiResponse<ApiResponseTaskAckResponse>> {
-        if (requestParameters['xUserId'] == null) {
-            throw new runtime.RequiredError(
-                'xUserId',
-                'Required parameter "xUserId" was null or undefined when calling restartSummary().'
-            );
-        }
-
         if (requestParameters['uuid'] == null) {
             throw new runtime.RequiredError(
                 'uuid',
@@ -224,10 +203,14 @@ export class ChatSummaryControllerApi extends runtime.BaseAPI {
 
         headerParameters['Content-Type'] = 'application/json';
 
-        if (requestParameters['xUserId'] != null) {
-            headerParameters['X-User-Id'] = String(requestParameters['xUserId']);
-        }
+        if (this.configuration && this.configuration.accessToken) {
+            const token = this.configuration.accessToken;
+            const tokenString = await token("bearerAuth", []);
 
+            if (tokenString) {
+                headerParameters["Authorization"] = `Bearer ${tokenString}`;
+            }
+        }
 
         let urlPath = `/api/summary/restart/{uuid}`;
         urlPath = urlPath.replace(`{${"uuid"}}`, encodeURIComponent(String(requestParameters['uuid'])));
@@ -253,13 +236,6 @@ export class ChatSummaryControllerApi extends runtime.BaseAPI {
     /**
      */
     async startSummaryRaw(requestParameters: StartSummaryRequest, initOverrides?: RequestInit | runtime.InitOverrideFunction): Promise<runtime.ApiResponse<ApiResponseTaskAckResponse>> {
-        if (requestParameters['xUserId'] == null) {
-            throw new runtime.RequiredError(
-                'xUserId',
-                'Required parameter "xUserId" was null or undefined when calling startSummary().'
-            );
-        }
-
         if (requestParameters['uuid'] == null) {
             throw new runtime.RequiredError(
                 'uuid',
@@ -273,10 +249,14 @@ export class ChatSummaryControllerApi extends runtime.BaseAPI {
 
         headerParameters['Content-Type'] = 'application/json';
 
-        if (requestParameters['xUserId'] != null) {
-            headerParameters['X-User-Id'] = String(requestParameters['xUserId']);
-        }
+        if (this.configuration && this.configuration.accessToken) {
+            const token = this.configuration.accessToken;
+            const tokenString = await token("bearerAuth", []);
 
+            if (tokenString) {
+                headerParameters["Authorization"] = `Bearer ${tokenString}`;
+            }
+        }
 
         let urlPath = `/api/summary/{uuid}`;
         urlPath = urlPath.replace(`{${"uuid"}}`, encodeURIComponent(String(requestParameters['uuid'])));
