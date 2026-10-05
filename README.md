@@ -50,4 +50,20 @@ keys, and Export chat + media ZIP. The frontend talks to it at
 See `exporter/README.md` for flags (`--allow-origins`, `--log-level`, ...) and
 security details.
 
+## Rough performance expectations
+
+Highly dependent on hardware, API keys, and chat size — ballpark figures:
+
+| Step | Typical time |
+|------|--------------|
+| Bridge key recovery (Windows, WeChat running) | seconds to ~1 min |
+| Chat + media export ZIP (GB-scale media) | minutes to tens of minutes |
+| Voice transcription (faster-whisper, CPU, `large-v3`) | ~real-time to several× real-time of audio length |
+| AI summary / image / video description (cloud LLM) | seconds to a minute per batch |
+| First docker compose up (image pulls, whisper model download) | 10–30 min |
+
+Tip: reduce `WHISPER_MODEL` (e.g. `small` or `base`) for much faster
+transcription at lower accuracy; CPU transcription of large chats can take a
+long time. Subsequent runs reuse the `whisper_models` and `pgdata` volumes.
+
 See `exporter/README.md` and `frontend/README.md` for more detail.
