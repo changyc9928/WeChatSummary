@@ -36,3 +36,6 @@ uploads/
 # Local secrets (API keys, etc.) — never commit
 .env
 .env.local
+
+# Local TLS certs (self-signed, per-machine)
+frontend/certs/

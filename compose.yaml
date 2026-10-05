@@ -70,13 +70,14 @@ services:
       context: ./frontend
       dockerfile: Dockerfile
       args:
-        # URL the browser uses to reach the backend. Defaults to localhost;
-        # override in .env (VITE_API_BASE_URL=http://<lan-ip>:8080) when
-        # opening the UI from another device on the network.
-        VITE_API_BASE_URL: ${VITE_API_BASE_URL:-http://127.0.0.1:8080}
+        # Leave empty so API calls are same-origin through the frontend nginx HTTPS
+        # proxy. Set to a full URL (https://<host>:3001) only if decoupling.
+        VITE_API_BASE_URL: ${VITE_API_BASE_URL:-}
     container_name: wechat-frontend
     ports:
-      - "3001:80" # Maps port 3001 on your host to Nginx port 80
+      - "443:443"  # HTTPS frontend
+      - "3001:443" # HTTPS frontend (alt)
+      - "3002:80"  # Redirects to HTTPS (3000 is taken by Grafana)
     depends_on:
       - postgres
       - rabbitmq
