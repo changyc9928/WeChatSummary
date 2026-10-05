@@ -34,10 +34,14 @@ databases, so key recovery and chat export run on the Windows machine where
 WeChat is logged in, via the `bridge` sidecar:
 
 ```powershell
-cd exporter
-GOOS=windows GOARCH=amd64 go build -o bridge.exe ./cmd/bridge   # or use the prebuilt tools/bridge.exe
 .\bridge.exe --port 8787 --token <optional-secret>
 ```
+
+You don't need to build it yourself: the web UI (Dashboard → bridge panel)
+lets you download the prebuilt `bridge.exe` served by the backend
+(`GET /api/tools/bridge`). To rebuild from source instead, cross-compile
+with `GOOS=windows GOARCH=amd64 go build -o bridge.exe ./cmd/bridge` in
+`exporter/` (or use the copy in `tools/`).
 
 Then, with WeChat running and logged in, open the web UI and use the
 "bridge" features to: Get DB key (verify against the real chat DB), Get media
