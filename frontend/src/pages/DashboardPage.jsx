@@ -150,6 +150,7 @@ export default function DashboardPage({
       {/* Row 3: Step 3 (Full Width) */}
       <div style={{ width: '100%', display: 'block' }}>
         <StepSummary
+          currentUser={currentUser}
           handlePauseSummary={summary.pauseSummary}
           handleRestartSummary={summary.restartSummary}
           handleStartSummary={summary.startSummary}

@@ -3,6 +3,7 @@ package com.wechat.wechatsummary.service;
 import com.wechat.wechatsummary.config.SummaryConfig;
 import com.wechat.wechatsummary.dto.ChatPreviewResponse;
 import com.wechat.wechatsummary.dto.ChatPreviewRow;
+import com.wechat.wechatsummary.dto.PersonContextDto;
 import com.wechat.wechatsummary.dto.SummaryProgressResponse;
 import com.wechat.wechatsummary.entity.ChatSummaryStatus;
 import com.wechat.wechatsummary.entity.ChatSummaryTask;
@@ -43,6 +44,7 @@ public class ChatSummaryService {
     private final ChatSummaryTaskRepository taskRepository;
     private final SummaryConfig summaryConfig;
     private final IdentityService identityService;
+    private final PersonContextService personContextService;
 
     private static final ObjectMapper SUMMARY_MAPPER = new ObjectMapper();
 
@@ -51,6 +53,20 @@ public class ChatSummaryService {
     @Async
     public void summarizeChatLogAsync(String userId, UUID uuid, LocalDateTime startTime,
         LocalDateTime endTime) {
+        summarizeChatLogAsync(userId, uuid, startTime, endTime, null);
+    }
+
+    /**
+     * Step 3 entry with optional user-confirmed person context.
+     *
+     * <p>The original map-reduce flow is unchanged; when a non-empty context
+     * is available (inline or stored for the same window) it is rendered as an
+     * extra block appended to the roster prompt. Any failure here falls back
+     * to the original roster-only flow.
+     */
+    @Async
+    public void summarizeChatLogAsync(String userId, UUID uuid, LocalDateTime startTime,
+        LocalDateTime endTime, PersonContextDto inlineContext) {
         if (activeThreads.containsKey(uuid)) {
             log.warn(
                 "Execution request rejected for user UUID: [{}] and task {}: Thread is already running.",
@@ -90,6 +106,40 @@ public class ChatSummaryService {
                 uuid.toString(), sampleText, rawContent);
             String roster = identityService.formatRoster(registry);
 
+            // Lightweight Step 3 extension: user-confirmed person context for THIS
+            // window only. Inline wins; otherwise use the stored sidecar when its
+            // window matches. Empty/mismatch/failure -> original roster-only flow.
+            // The block is passed as an EXPLICIT argument into the summary prompts
+            // (see AiService 3-arg overloads), not hidden inside the roster string.
+            String personBlock = "";
+            try {
+                PersonContextDto effectiveContext = null;
+                if (inlineContext != null && !personContextService.isEmpty(
+                    personContextService.normalize(inlineContext))) {
+                    effectiveContext = personContextService.normalize(inlineContext);
+                    effectiveContext.setStartTime(startTime);
+                    effectiveContext.setEndTime(endTime);
+                    personContextService.save(userId, uuid, effectiveContext);
+                } else {
+                    effectiveContext = personContextService.loadForWindow(userId, uuid, startTime,
+                        endTime);
+                }
+                if (effectiveContext != null && !personContextService.isEmpty(effectiveContext)) {
+                    String rendered = personContextService.formatForPrompt(effectiveContext);
+                    if (!rendered.isBlank()) {
+                        personBlock = rendered;
+                        log.info("Person context applied ({} people, {} chars) for task {}",
+                            effectiveContext.getPeople().size(), personBlock.length(), uuid);
+                    }
+                }
+                if (personBlock.isEmpty()) {
+                    log.info("No person context for task {}, using roster-only prompts", uuid);
+                }
+            } catch (Exception e) {
+                log.warn("Person-context injection failed, continuing without it: {}",
+                    e.getMessage());
+            }
+
             // ---- Map phase: summarize each chunk independently (resumable) ----
             List<String> chunkSummaries = loadChunkSummaries(tempProgressPath);
             int startIndex = chunkSummaries.size();
@@ -105,7 +155,8 @@ public class ChatSummaryService {
                 log.info("Summarizing segment ({}/{}) for user UUID: [{}] and task UUID: {}", i + 1,
                     chunks.size(), userId, uuid);
 
-                String chunkSummary = aiService.summarizeSingleChunk(chunks.get(i), roster);
+                String chunkSummary = aiService.summarizeSingleChunk(chunks.get(i), roster,
+                    personBlock);
                 chunkSummaries.add(chunkSummary);
                 saveChunkSummaries(tempProgressPath, chunkSummaries);
             }
@@ -128,7 +179,8 @@ public class ChatSummaryService {
                         // Nothing to merge with; carry the single summary forward unchanged.
                         nextLevel.add(batch.get(0));
                     } else {
-                        nextLevel.add(aiService.combineSummaries(new ArrayList<>(batch), roster));
+                        nextLevel.add(aiService.combineSummaries(new ArrayList<>(batch), roster,
+                            personBlock));
                     }
                 }
                 level = nextLevel;

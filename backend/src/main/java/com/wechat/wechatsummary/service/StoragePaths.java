@@ -54,6 +54,15 @@ public class StoragePaths {
     }
 
     /**
+     * Sidecar file for the lightweight per-summary person context
+     * ({@code {uuid}_person_context.json} in the outputs dir).
+     * Temporary per task; a different time window regenerates it.
+     */
+    public Path personContextFile(String userId, String uuid) {
+        return outputDir(userId).resolve(uuid + "_person_context.json");
+    }
+
+    /**
      * Locates the raw chat export JSON sitting inside the session workspace
      * ({@code uploadDir / {userId} / {uuid} / *.json}). This is the source of truth for the
      * WeChat (talker) IDs that back the wxid-keyed identity registry. Returns {@code null} when no

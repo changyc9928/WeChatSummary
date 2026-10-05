@@ -1,7 +1,9 @@
-import React from 'react';
+import React, { useEffect, useState } from 'react';
 import { styles } from '../../styles/dashboardStyles';
 import { fromLocalInputValue } from '../../utils/time';
 import useLanguage from '../../hooks/useLanguage';
+import usePersonContext from '../../hooks/usePersonContext';
+import PersonContextPanel from './PersonContextPanel';
 
 export default function StepSummary({
   uuidInput,
@@ -12,7 +14,8 @@ export default function StepSummary({
   handleRestartSummary,
   loading = {},
   selectedStartTime,
-  selectedEndTime
+  selectedEndTime,
+  currentUser
 }) {
   const { t } = useLanguage();
   const currentStatus = (summaryState?.status || 'INITIAL_STATE').toUpperCase();
@@ -21,6 +24,21 @@ export default function StepSummary({
   const isPaused = currentStatus === 'PAUSED';
   const isIdling = currentStatus === 'IDLING';
   const isFinished = currentStatus === 'SUCCESS' || currentStatus === 'COMPLETED';
+
+  const person = usePersonContext({ uuidInput, currentUser, selectedStartTime, selectedEndTime });
+  const [contextOpen, setContextOpen] = useState(false);
+  const [confirming, setConfirming] = useState(false);
+
+  // Load already-saved context (e.g. page refresh after a run) so the panel
+  // is visible even when the summary already finished.
+  useEffect(() => {
+    if (uuidInput && currentUser?.uuid && isPreprocessFinished) {
+      person.fetchContext();
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [uuidInput, currentUser?.uuid, isPreprocessFinished]);
+
+  const hasContext = (person.context?.people || []).length > 0;
 
   const statusLabel = (() => {
     const map = {
@@ -55,10 +73,29 @@ export default function StepSummary({
     }
   };
 
+  const handleExtract = async () => {
+    setContextOpen(true);
+    await person.extractContext();
+  };
+
+  const handleConfirmAndStart = async (isRestart = false) => {
+    setConfirming(true);
+    try {
+      // Persist user-confirmed context first; the summary pipeline loads it
+      // automatically for the same window, so no inline payload is needed.
+      await person.saveContext(person.context);
+    } finally {
+      setConfirming(false);
+    }
+    handleStartWithParams(isRestart);
+  };
+
   const rawResult = summaryState?.result;
   const displayResultText = typeof rawResult === 'string'
     ? rawResult
     : (rawResult ? JSON.stringify(rawResult, null, 2) : '');
+
+  const canEditContext = !isRunning && !!uuidInput && isPreprocessFinished;
 
   return (
     <div style={styles.card}>
@@ -74,10 +111,87 @@ export default function StepSummary({
       ) : (
         <div style={styles.actionButtonGroup}>
 
-          {(currentStatus === 'INITIAL_STATE' || isIdling) && (
-            <button type="button" onClick={() => handleStartWithParams(false)} disabled={loading.start} style={styles.button}>
-              {loading.start ? t('summary.starting') : t('summary.run')}
-            </button>
+          {/* Person context section: visible before AND after the run, so the
+              relationship view never disappears once the summary finishes.
+              Editing is disabled while the engine is running. */}
+          {canEditContext && !isRunning && (
+            <div style={{ display: 'flex', flexDirection: 'column', gap: '12px', marginBottom: isFinished ? '16px' : 0 }}>
+              <div style={{ fontSize: '0.85rem', color: 'var(--text-muted)' }}>
+                {t('personContext.intro')}
+              </div>
+              <div style={styles.actionButtonRow}>
+                <button
+                  type="button"
+                  onClick={handleExtract}
+                  disabled={person.extracting || loading.start || confirming}
+                  style={styles.buttonSecondary}
+                >
+                  {person.extracting ? t('personContext.extracting') : t('personContext.extract')}
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setContextOpen(v => !v)}
+                  style={styles.buttonSecondary}
+                >
+                  {contextOpen ? t('personContext.hide') : t('personContext.review')}
+                  {hasContext ? ` (${person.context.people.length})` : ''}
+                </button>
+              </div>
+
+              {person.error && (
+                <div style={styles.dbErrorBox}>
+                  {t('personContext.extractFailed')} {person.error}
+                </div>
+              )}
+
+              {(contextOpen || hasContext) && (
+                <PersonContextPanel
+                  context={person.context}
+                  onChange={person.setContext}
+                  disabled={person.extracting || person.saving || confirming}
+                />
+              )}
+
+              {(contextOpen || hasContext) && !isFinished && !isPaused && (
+                <div style={styles.actionButtonRow}>
+                  <button
+                    type="button"
+                    onClick={() => handleConfirmAndStart(false)}
+                    disabled={loading.start || person.saving || confirming || person.extracting}
+                    style={styles.button}
+                  >
+                    {(person.saving || confirming) ? t('personContext.saving') : t('personContext.confirmAndRun')}
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => handleStartWithParams(false)}
+                    disabled={loading.start || confirming}
+                    style={styles.buttonSecondary}
+                  >
+                    {loading.start ? t('summary.starting') : t('personContext.skipAndRun')}
+                  </button>
+                </div>
+              )}
+
+              {(contextOpen || hasContext) && (isFinished || isPaused) && (
+                <div style={styles.actionButtonRow}>
+                  <button
+                    type="button"
+                    onClick={() => handleConfirmAndStart(true)}
+                    disabled={loading.restartSummary || person.saving || confirming || person.extracting}
+                    style={styles.button}
+                  >
+                    {(person.saving || confirming) ? t('personContext.saving') : t('personContext.confirmAndRerun')}
+                  </button>
+                </div>
+              )}
+
+              {!contextOpen && !hasContext && !isFinished && !isPaused && (
+                <button type="button" onClick={() => handleStartWithParams(false)} disabled={loading.start} style={styles.button}>
+                  {loading.start ? t('summary.starting') : t('summary.run')}
+                </button>
+              )}
+            </div>
           )}
 
           {isRunning && (

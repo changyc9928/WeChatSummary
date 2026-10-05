@@ -802,5 +802,11 @@ public class WeChatSummaryCacheService {
         } catch (Exception e) {
             log.warn("Failed to delete summary temp for session {}: {}", uuid, e.getMessage());
         }
+        try {
+            java.nio.file.Files.deleteIfExists(storagePaths.personContextFile(userId, uuid));
+        } catch (Exception e) {
+            log.warn("Failed to delete person-context sidecar for session {}: {}", uuid,
+                e.getMessage());
+        }
     }
 }

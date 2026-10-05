@@ -296,10 +296,38 @@ public class AiService {
         backoff = @Backoff(delay = 30000, maxDelay = 3600000, multiplier = 2.0, random = true)
     )
     public String summarizeSingleChunk(String chunk, String roster) {
+        return summarizeSingleChunk(chunk, roster, null);
+    }
+
+    /**
+     * Summarizes a single chat chunk with an explicit user-confirmed person
+     * context block (Step 3 lightweight extension).
+     *
+     * @param chunk              the chat segment to summarize
+     * @param roster             the wxid-keyed identity roster (may be empty)
+     * @param personContextBlock the rendered {@code ## 当前聊天人物 Context}
+     *                           block; blank means "no confirmed context",
+     *                           in which case the prompt is identical to the
+     *                           original roster-only version
+     * @return the independent summary of this chunk
+     */
+    @Retryable(
+        retryFor = {RateLimitException.class, InternalServerException.class,
+            OpenAIIoException.class},
+        maxAttempts = 10,
+        backoff = @Backoff(delay = 30000, maxDelay = 3600000, multiplier = 2.0, random = true)
+    )
+    public String summarizeSingleChunk(String chunk, String roster, String personContextBlock) {
         log.info("Requesting independent chunk summary from ChatClient...");
         if (log.isDebugEnabled()) {
             log.debug("Chunk size: {} chars", chunk != null ? chunk.length() : 0);
         }
+        String personSection = personContextBlock != null && !personContextBlock.isBlank()
+            ? personContextBlock + "\n\n"
+            : "";
+        log.info("Chunk prompt: roster={} chars, personContext={} chars ({})",
+            roster != null ? roster.length() : 0, personSection.length(),
+            personSection.isEmpty() ? "absent, roster-only prompt" : "USER-CONFIRMED, injected");
 
         String userPrompt = """
             请总结以下这段微信聊天记录片段。你是一个冷静、客观、专门处理大马华人网络社群群聊记录的审计员，使用接地气、直接的“吃瓜/纪实语调”。
@@ -315,16 +343,17 @@ public class AiService {
 
             %s
 
-            身份与命名要求（非常重要）：
+            %s身份与命名要求（非常重要）：
             - 严格参照上面的【群成员身份表】使用【规范名】来指代每个人，不要自创或混用不同称呼。
             - 同一个人的不同外号 / 代称必须合并到同一个人，绝不可当成多个人。
             - 写清每个事件的“主体”（谁做的）与“客体”（谁被描述 / 被谈论），不要张冠李戴。
+            - 上面的【当前聊天人物 Context】（如有）已经用户确认，优先级高于模型自行推测：别名合并与人物关系以它为准。
 
             严禁对内容进行学术化或哲学升华，直接输出最终总结文本，无须包含思考、注解或标签。
 
             聊天片段：
             %s
-            """.formatted(roster != null ? roster : "", chunk);
+            """.formatted(roster != null ? roster : "", personSection, chunk);
 
         try {
             return callThrottled(() -> aiModels.chatClient().prompt()
@@ -358,6 +387,21 @@ public class AiService {
         backoff = @Backoff(delay = 30000, maxDelay = 3600000, multiplier = 2.0, random = true)
     )
     public String combineSummaries(List<String> summaries, String roster) {
+        return combineSummaries(summaries, roster, null);
+    }
+
+    /**
+     * Merges chunk summaries with an explicit user-confirmed person context
+     * block (Step 3 lightweight extension). Blank block = original behavior.
+     */
+    @Retryable(
+        retryFor = {RateLimitException.class, InternalServerException.class,
+            OpenAIIoException.class},
+        maxAttempts = 10,
+        backoff = @Backoff(delay = 30000, maxDelay = 3600000, multiplier = 2.0, random = true)
+    )
+    public String combineSummaries(List<String> summaries, String roster,
+        String personContextBlock) {
         log.info("Requesting merge of {} chunk summaries from ChatClient...", summaries.size());
         StringBuilder sb = new StringBuilder();
         for (int i = 0; i < summaries.size(); i++) {
@@ -365,6 +409,12 @@ public class AiService {
                 .append(summaries.get(i))
                 .append("\n\n");
         }
+        String personSection = personContextBlock != null && !personContextBlock.isBlank()
+            ? personContextBlock + "\n\n"
+            : "";
+        log.info("Merge prompt: roster={} chars, personContext={} chars ({})",
+            roster != null ? roster.length() : 0, personSection.length(),
+            personSection.isEmpty() ? "absent, roster-only prompt" : "USER-CONFIRMED, injected");
 
         String userPrompt = """
             以下是同一段微信群聊记录按时间顺序分段的若干份总结。请将它们合并为一份连贯、完整、结构清晰的总总结。
@@ -375,14 +425,15 @@ public class AiService {
 
             %s
 
-            身份与命名要求（非常重要）：
+            %s身份与命名要求（非常重要）：
             - 严格参照上面的【群成员身份表】使用【规范名】来指代每个人，不要自创或混用不同称呼。
             - 同一个人的不同外号 / 代称必须合并到同一个人，绝不可当成多个人。
             - 写清每个事件的“主体”（谁做的）与“客体”（谁被描述 / 被谈论），不要张冠李戴。
+            - 上面的【当前聊天人物 Context】（如有）已经用户确认，优先级高于模型自行推测：别名合并与人物关系以它为准。
 
             各段总结如下：
             %s
-            """.formatted(roster != null ? roster : "", sb.toString());
+            """.formatted(roster != null ? roster : "", personSection, sb.toString());
 
         try {
             return callThrottled(() -> aiModels.chatClient().prompt()
@@ -447,6 +498,158 @@ public class AiService {
         } catch (Exception e) {
             log.error("Failed to execute alias discovery via ChatClient", e);
             return new java.util.LinkedHashMap<>();
+        }
+    }
+
+    /**
+     * Step 3 lightweight pass: extracts only the people actually appearing /
+     * mentioned / discussed in the CURRENT chat window, plus their obvious
+     * aliases and conservatively-confirmed relationships.
+     *
+     * <p>This is NOT a knowledge graph: no profiling (age/gender/occupation),
+     * no lurkers, no speculation. On any failure the caller falls back to an
+     * empty context so the original summary flow keeps working.
+     *
+     * @param chatSample time-filtered chat text (already truncated by caller)
+     * @return parsed person context, or an empty one when nothing reliable found
+     */
+    @Retryable(
+        retryFor = {RateLimitException.class, InternalServerException.class,
+            OpenAIIoException.class},
+        maxAttempts = 3,
+        backoff = @Backoff(delay = 10000, maxDelay = 120000, multiplier = 2.0, random = true)
+    )
+    public com.wechat.wechatsummary.dto.PersonContextDto extractPersonContext(
+        String chatSample) {
+        log.info("Requesting person-context extraction from ChatClient...");
+        String sample = chatSample == null ? "" : chatSample;
+        // Keep the prompt bounded: head slice is enough for identity cues.
+        if (sample.length() > 18000) {
+            sample = sample.substring(0, 18000);
+        }
+        final String promptSample = sample;
+        String userPrompt = """
+            你的任务不是总结聊天，只负责提取当前这次聊天中的人物 Context。
+
+            1. 只找出当前聊天范围内实际出现的人物，来源包括：
+               - 在聊天记录中实际发言的人；
+               - 在聊天内容中被明确提及的人；
+               - 虽然没有发言，但聊天内容明确正在讨论/涉及的人。
+               不要加入只是群成员但完全没出现的人、潜水人员，不要推测可能相关的人。
+            2. 合并明显的别名（同一人的不同称呼必须合并到同一个人，id 唯一）。
+               每人只需要 id、name、aliases，不要推测年龄、性别、职业、性格、住址等聊天没有明确提供的信息。
+            3. 提取聊天中能够合理确认的人物关系，关系保持简单自由文本即可，如：朋友、熟人、同事、家人、情侣、认识、关系较好、经常一起活动、经常开玩笑等。
+               如果无法确定，可以写“关系不确定”或直接不建立该关系。不要为了填充而编造关系。
+               特别注意：不要因为两个人在聊天中发生一次争论/互怼，就判断为“敌对”或“关系不好”，一次冲突不等于长期关系。
+
+            要求只输出严格 JSON，不要输出任何解释、前后缀或代码围栏，格式如下：
+            {"people": [{"id": "p1", "name": "Aiden", "aliases": ["A哥", "艾登"]}], "relationships": [{"from": "p1", "to": "p2", "relationship": "朋友"}]}
+            如果没有可靠关系，relationships 为空数组 []。如果没有发现任何人物，people 为空数组 []。
+
+            当前聊天内容：
+            %s
+            """.formatted(promptSample);
+
+        try {
+            String raw = callThrottled(() -> aiModels.chatClient().prompt()
+                .user(userPrompt)
+                .call()
+                .content());
+            return parsePersonContextJson(raw);
+        } catch (RateLimitException | org.springframework.web.client.HttpServerErrorException e) {
+            log.warn("Transient error during person-context extraction: {}. Retrying...",
+                e.getMessage());
+            throw e;
+        } catch (Exception e) {
+            log.warn("Person-context extraction failed, falling back to empty context: {}",
+                e.getMessage());
+            return new com.wechat.wechatsummary.dto.PersonContextDto();
+        }
+    }
+
+    private com.wechat.wechatsummary.dto.PersonContextDto parsePersonContextJson(String raw) {
+        com.wechat.wechatsummary.dto.PersonContextDto empty =
+            new com.wechat.wechatsummary.dto.PersonContextDto();
+        if (raw == null || raw.isBlank()) {
+            return empty;
+        }
+        String cleaned = raw.trim();
+        if (cleaned.startsWith("```")) {
+            int firstNewline = cleaned.indexOf('\n');
+            cleaned = firstNewline >= 0 ? cleaned.substring(firstNewline + 1) : cleaned;
+            int lastFence = cleaned.lastIndexOf("```");
+            if (lastFence >= 0) {
+                cleaned = cleaned.substring(0, lastFence);
+            }
+            cleaned = cleaned.trim();
+        }
+        // Tolerate leading/trailing prose: extract the outermost JSON object.
+        int objStart = cleaned.indexOf('{');
+        int objEnd = cleaned.lastIndexOf('}');
+        if (objStart >= 0 && objEnd > objStart) {
+            cleaned = cleaned.substring(objStart, objEnd + 1);
+        }
+        try {
+            com.fasterxml.jackson.databind.JsonNode root = ALIAS_MAPPER.readTree(cleaned);
+            java.util.List<com.wechat.wechatsummary.dto.PersonDto> people =
+                new java.util.ArrayList<>();
+            java.util.List<com.wechat.wechatsummary.dto.PersonRelationshipDto> rels =
+                new java.util.ArrayList<>();
+            com.fasterxml.jackson.databind.JsonNode peopleNode = root.get("people");
+            if (peopleNode != null && peopleNode.isArray()) {
+                int idx = 0;
+                for (com.fasterxml.jackson.databind.JsonNode p : peopleNode) {
+                    idx++;
+                    String id = p.hasNonNull("id") ? p.get("id").asText().trim() : "p" + idx;
+                    String name = p.hasNonNull("name") ? p.get("name").asText().trim() : "";
+                    if (name.isEmpty()) {
+                        continue;
+                    }
+                    if (id.isEmpty()) {
+                        id = "p" + idx;
+                    }
+                    java.util.List<String> aliases = new java.util.ArrayList<>();
+                    com.fasterxml.jackson.databind.JsonNode a = p.get("aliases");
+                    if (a != null && a.isArray()) {
+                        for (com.fasterxml.jackson.databind.JsonNode alias : a) {
+                            String av = alias.asText("").trim();
+                            if (!av.isEmpty() && !av.equals(name) && !aliases.contains(av)) {
+                                aliases.add(av);
+                            }
+                        }
+                    }
+                    people.add(new com.wechat.wechatsummary.dto.PersonDto(id, name, aliases));
+                }
+            }
+            com.fasterxml.jackson.databind.JsonNode relNode = root.get("relationships");
+            if (relNode != null && relNode.isArray()) {
+                java.util.Set<String> ids = new java.util.HashSet<>();
+                for (com.wechat.wechatsummary.dto.PersonDto p : people) {
+                    ids.add(p.getId());
+                }
+                for (com.fasterxml.jackson.databind.JsonNode r : relNode) {
+                    String from = r.hasNonNull("from") ? r.get("from").asText().trim() : "";
+                    String to = r.hasNonNull("to") ? r.get("to").asText().trim() : "";
+                    String rel = r.hasNonNull("relationship") ? r.get("relationship").asText().trim()
+                        : "";
+                    if (from.isEmpty() || to.isEmpty() || rel.isEmpty()) {
+                        continue;
+                    }
+                    if (!ids.contains(from) || !ids.contains(to) || from.equals(to)) {
+                        continue;
+                    }
+                    rels.add(
+                        new com.wechat.wechatsummary.dto.PersonRelationshipDto(from, to, rel));
+                }
+            }
+            com.wechat.wechatsummary.dto.PersonContextDto dto =
+                new com.wechat.wechatsummary.dto.PersonContextDto();
+            dto.setPeople(people);
+            dto.setRelationships(rels);
+            return dto;
+        } catch (Exception e) {
+            log.warn("Could not parse person-context JSON from model output: {}", e.getMessage());
+            return empty;
         }
     }
 
