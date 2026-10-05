@@ -19,12 +19,31 @@ faster-whisper transcription service.
 
 ## Quick start
 
+You can put API keys in the root `.env` (loaded automatically by compose), or leave them blank and configure provider/model API keys later in the web UI's Settings page (stored in the database, takes precedence). `.env` also holds `VITE_API_BASE_URL`.
+
 ```bash
-export GEMINI_API_KEY=...   # and/or NVIDIA_API_KEY
 docker compose up --build
 ```
 
 Frontend: https://localhost (or :3001). Backend: http://localhost:8080.
 
-See `exporter/README.md` for running the `bridge.exe` key-recovery sidecar on
-Windows, and `frontend/README.md` for frontend dev details.
+### Chat export sidecar (bridge)
+
+The browser cannot read WeChat's process memory or decrypt its SQLCipher
+databases, so key recovery and chat export run on the Windows machine where
+WeChat is logged in, via the `bridge` sidecar:
+
+```powershell
+cd exporter
+GOOS=windows GOARCH=amd64 go build -o bridge.exe ./cmd/bridge   # or use the prebuilt tools/bridge.exe
+.\bridge.exe --port 8787 --token <optional-secret>
+```
+
+Then, with WeChat running and logged in, open the web UI and use the
+"bridge" features to: Get DB key (verify against the real chat DB), Get media
+keys, and Export chat + media ZIP. The frontend talks to it at
+`http://127.0.0.1:8787`; pass the same `--token` in the UI if you set one.
+See `exporter/README.md` for flags (`--allow-origins`, `--log-level`, ...) and
+security details.
+
+See `exporter/README.md` and `frontend/README.md` for more detail.
